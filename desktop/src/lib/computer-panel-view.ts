@@ -24,7 +24,7 @@ export function readComputerPanelView(
 ): ComputerPanelView {
   try {
     const value = storage.getItem(storageKey(botId));
-    if (value === "android" || value === "browser" || value === "routines" || value === "files" || value === "data") return value;
+    if (value === "android" || value === "routines" || value === "files" || value === "data") return value;
   } catch {
   }
   return "computer";

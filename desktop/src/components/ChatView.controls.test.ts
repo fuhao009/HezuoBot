@@ -70,6 +70,17 @@ const bot: Bot = {
 };
 
 describe("the header's right side", () => {
+  it("always exposes the explicit browser takeover in chat, independent of bot activity", () => {
+    for (const advanced of [true, false]) {
+      fixture.advanced = advanced;
+      for (const busy of [true, false]) {
+        const markup = renderToStaticMarkup(createElement(ChatView, { bot: { ...bot, busy } }));
+        expect(markup).toMatch(/data-browser-takeover[^>]*>Take over browser<\/button>/);
+        expect(markup).not.toContain("data-browser-transport");
+      }
+    }
+  });
+
   const header = (of: Bot = bot) => {
     fixture.menus = [];
     fixture.model = null;

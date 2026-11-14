@@ -3,7 +3,6 @@
   "product.billing.insufficient": "포인트가 부족하여 보낼 수 없습니다. 현재 {n}포인트를 사용할 수 있습니다. 관리자에게 충전을 요청하세요.",
   "product.billing.expired": "로그인이 만료되었습니다. 다시 로그인해 주세요.",
   "product.billing.requestId": "요청 ID",
-  "product.billing.model": "실제 모델: {model}",
   "server.helper.ask.overview": "내 봇들은 뭐 하고 있어?",
   "server.helper.ask.inbox": "받은편지함을 맡을 봇을 만들어 줘",
   "server.helper.ask.routine": "아침 루틴을 만들어 줘",

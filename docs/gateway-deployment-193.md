@@ -52,7 +52,7 @@
 
 当前实际部署 `8e54c107d`，分支 `backend/gateway-beta`。18项迁移已应用、0待应用，HTTPS健康与后台200。渠道revision3、任务计费策略revision3，新增 Luna Chat 和 auto-chat。每次部署均停服并完整备份数据/源码；备份 `pre-beta-<SHA>-{data,code}.tgz` 位于root私有backups目录。
 
-35,012输入tokens预占20.6074积分；客户端断开后可信usage结算、reserved归零。最终真实模型矩阵22条全部settled且成本非unknown。供应商后台独立对照及遗留复核账号清理尚未完成，详细提交、请求ID、失败历史和验收边界见 [内测交付](gateway-beta-delivery.md)。下方任务计费部署信息为此前历史记录。
+35,012输入tokens预占20.6074积分；客户端断开后可信usage结算、reserved归零。最终真实模型矩阵22条全部settled且成本非unknown。供应商后台独立对照及遗留复核账号清理尚未完成，详细提交、请求ID、失败历史和验收边界见 [内测交付](archive/gateway-beta-delivery.md)。下方任务计费部署信息为此前历史记录。
 
 
 - 地址：`https://192.168.66.193:18487`，仅绑定该内网地址。

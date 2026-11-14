@@ -199,6 +199,22 @@ describe("taking browser control implicitly", () => {
 });
 
 describe("handing browser control back", () => {
+  it("releases synchronously on explicit view close even when kept or taking", async () => {
+    const h = harness();
+    const take = deferred();
+    h.transport.take.mockImplementationOnce(() => take.promise);
+    h.control.keep(true);
+    h.control.takeControl();
+    await settle();
+    h.control.close(true);
+    expect(h.transport.release).toHaveBeenCalledOnce();
+    take.resolve();
+    await settle();
+    expect(h.transport.send).not.toHaveBeenCalled();
+    h.control.close(true);
+    expect(h.transport.release).toHaveBeenCalledOnce();
+  });
+
   it("hands back after 8 idle seconds, once releases are confirmed, and any input restarts the wait", async () => {
     vi.useFakeTimers();
     const h = harness();

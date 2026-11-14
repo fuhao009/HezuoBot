@@ -37,7 +37,7 @@ function tabsOf(value: unknown): BrowserTab[] {
  * it, else over the v1 live view. Security: a new connection never replays old input. Only the server gives this view a
  * hold: one of the same person's, when none of their views uses it or when they take it over here.
  */
-export function LiveBrowser({ bot, signIn, page }: { bot: Bot; signIn?: BrowserSignIn; page?: BrowserPage }) {
+export function LiveBrowser({ bot, signIn, page, takeover }: { bot: Bot; signIn?: BrowserSignIn; page?: BrowserPage; takeover?: number }) {
   const { state } = useStore();
   const [fallback, setFallback] = useState(false);
   const stream = state.config?.browserEngine?.engine === "chrome" && !fallback;
@@ -76,6 +76,7 @@ export function LiveBrowser({ bot, signIn, page }: { bot: Bot; signIn?: BrowserS
   const keepNow = useRef(false);
   const signInHandled = useRef(0);
   const pageHandled = useRef(0);
+  const takeoverHandled = useRef<number | undefined>(undefined);
   const signInPage = useRef<string | null>(null);
   const pageNow = useRef<string | null>(null);
   const scopedThread = browserScope(state.config?.team, bot.threadId).threadId;
@@ -166,7 +167,7 @@ export function LiveBrowser({ bot, signIn, page }: { bot: Bot; signIn?: BrowserS
 
   const onClient = useCallback((client: PreviewStreamClient | null) => {
     clientRef.current = client;
-    browserControl.current?.close();
+    browserControl.current?.close(!client);
     browserControl.current = null;
     if (!client) return;
     const transport = "transport" in client
@@ -244,6 +245,12 @@ export function LiveBrowser({ bot, signIn, page }: { bot: Bot; signIn?: BrowserS
     latest.current.takeControl();
     latest.current.openSignInPage();
   }, [signIn, connected]);
+
+  useEffect(() => {
+    if (takeover === undefined || !connected || takeoverHandled.current === takeover) return;
+    takeoverHandled.current = takeover;
+    latest.current.takeControl();
+  }, [takeover, connected]);
 
   // A new tab, so whatever the bot has open stays as it was; a sleeping browser is woken first.
   useEffect(() => {
@@ -331,7 +338,7 @@ export function LiveBrowser({ bot, signIn, page }: { bot: Bot; signIn?: BrowserS
       connected={connected}
       control={control}
       takeStatus={takeStatus}
-      hint={t(kept || signInOpen ? "browser.control.keptHint" : "browser.control.yoursHint", { name: bot.name })}
+      hint={t(kept || signInOpen ? "browser.control.closeHandBackHint" : "browser.control.yoursHint", { name: bot.name })}
       commandsReady={commandsReady}
       profileName={profileName}
       fullscreen={fullscreen}
@@ -412,7 +419,7 @@ export function LiveBrowser({ bot, signIn, page }: { bot: Bot; signIn?: BrowserS
   </div>;
 }
 
-export function BrowserPanel({ bot, signIn, page }: { bot: Bot; signIn?: BrowserSignIn; page?: BrowserPage }) {
+export function BrowserPanel({ bot, signIn, page, takeover }: { bot: Bot; signIn?: BrowserSignIn; page?: BrowserPage; takeover?: number }) {
   const { state } = useStore();
   const engine = state.config?.browserEngine;
   const [requested, setRequested] = useState(false);
@@ -427,7 +434,7 @@ export function BrowserPanel({ bot, signIn, page }: { bot: Bot; signIn?: Browser
     finally { setRequested(false); }
   };
   if (bot.browser === false) return <div className="p-5 text-[13px] text-ink-secondary">{t("browser.panel.enableBot")}</div>;
-  if (engine?.kind === "engine" && !installing && !engine.installError) return <LiveBrowser key={bot.id} bot={bot} signIn={signIn} page={page} />;
+  if (engine?.kind === "engine" && !installing && !engine.installError) return <LiveBrowser key={`${bot.id}:${bot.threadId}:${bot.browserProfile ?? ""}`} bot={bot} signIn={signIn} page={page} takeover={takeover} />;
   return <div className="flex min-h-0 flex-1 flex-col items-start justify-center gap-3 rounded-xl bg-card p-5">
     <div className="text-[15px] font-medium text-ink">{engine?.kind === "engine" ? t("browser.panel.installIncomplete") : t("browser.panel.engineNotInstalled")}</div>
     <p className="text-[13px] leading-relaxed text-ink-secondary">{engine?.kind === "engine" ? t("browser.panel.installIncompleteHelp") : engine?.installable && admin !== false ? t("browser.panel.engineNotInstalledHelp", { name: bot.name }) : browserUnavailableReason(state.config)}</p>

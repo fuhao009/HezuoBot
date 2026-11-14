@@ -3,7 +3,7 @@
 ## 版本与部署
 
 - T1–T4 分支：`backend/gateway-v1-lan`；任务计费增量分支：`backend/task-aware-billing`。
-- T1–T4 基线功能提交：`c911aefce`；当前部署以 [193 部署记录](gateway-deployment-193.md) 为准。
+- T1–T4 基线功能提交：`c911aefce`；当前部署以 [193 部署记录](../gateway-deployment-193.md) 为准。
 - 管理后台：`https://192.168.66.193:18487/admin`。
 - T1–T4 基线仅改网关和交接文档，无桌面/手机/共享类型改动。下方任务计费增量新增迁移 `0015_task_billing.sql` 与 `0016_billing_policy.sql`。
 
@@ -56,11 +56,11 @@ T1/T2 回归名称（参数化覆盖多个场景）：
 
 ## 客户端对接
 
-拉取本分支后读 [客户端错误契约](gateway-client-api.md#错误与重试)。普通账号仍需管理员开通并补充积分；模型协议为 Responses，不能把该 ID 发送到 Chat 端点。生产未验证项：桌面真实请求、SSE、工具授权/拒绝、主动停止、账户并发与限流提示。不得将隔离通过写成三端生产联调完成。
+拉取本分支后读 [客户端错误契约](../gateway-client-api.md#错误与重试)。普通账号仍需管理员开通并补充积分；模型协议为 Responses，不能把该 ID 发送到 Chat 端点。生产未验证项：桌面真实请求、SSE、工具授权/拒绝、主动停止、账户并发与限流提示。不得将隔离通过写成三端生产联调完成。
 
 ## 任务感知计费增量（2026-11-13）
 
-功能提交 `89e3991c6` 已推送 `personal/backend/task-aware-billing` 并部署 193。生产渠道 revision 2、策略 revision 2 已启用：Luna/Sol/Astra 三档 Responses 与 `auto-responses`，1000 积分/USD 估值、50% 目标毛利、10% 风险附加、初始 2.2 倍。默认仍为 Luna，不替客户端暗中开启自动选模。生产激活时无新计费样本，真实推理和盈利没有验证；完整备份、迁移与版本记录见 [部署记录](gateway-deployment-193.md#2026-11-13-任务计费上线)。
+功能提交 `89e3991c6` 已推送 `personal/backend/task-aware-billing` 并部署 193。生产渠道 revision 2、策略 revision 2 已启用：Luna/Sol/Astra 三档 Responses 与 `auto-responses`，1000 积分/USD 估值、50% 目标毛利、10% 风险附加、初始 2.2 倍。默认仍为 Luna，不替客户端暗中开启自动选模。生产激活时无新计费样本，真实推理和盈利没有验证；完整备份、迁移与版本记录见 [部署记录](../gateway-deployment-193.md#2026-11-13-任务计费上线)。
 
 ### 能力与兼容边界
 
@@ -88,7 +88,7 @@ node scripts/verify-gateway-admin.mjs --task-billing --smoke
 - 浏览器通过一次性运营者账号读取两条真实隔离结算记录，修改目标毛利后保存成功，服务端返回策略版本 2。1440px 与 390px 实际页面已观察；390px 整页宽度仍为 390px，无页面错误，localStorage/sessionStorage 为空。完成后停止 fixture 并关闭浏览器。
 - 这些证据不代表真实供应商费用、三端联调或生产动态定价已启用；没有使用真实账号测试扣费。生产启用状态单独记录于部署文档。
 
-客户端按 [报价与预算契约](gateway-client-api.md#任务计费报价与预算) 接入；运营者按 [策略与指标契约](gateway-admin-api.md#智能计费) 配置。
+客户端按 [报价与预算契约](../gateway-client-api.md#任务计费报价与预算) 接入；运营者按 [策略与指标契约](../gateway-admin-api.md#智能计费) 配置。
 
 ### 193 隔离 HTTP API 扣费实测（2026-11-13）
 

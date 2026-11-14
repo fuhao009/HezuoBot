@@ -6,7 +6,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import type { AppState, Bot, InstanceInfo } from "@/state/store";
 import { setLocale, t } from "@/lib/i18n";
 
-const fixture = vi.hoisted(() => ({ advanced: true, android: false, browser: false, page: undefined as unknown }));
+const fixture = vi.hoisted(() => ({ advanced: true, android: false, browser: false, page: undefined as unknown, takeover: undefined as number | undefined }));
 
 vi.mock("./DesktopCapabilities", async (importOriginal) => ({
   ...await importOriginal<typeof import("./DesktopCapabilities")>(),
@@ -26,7 +26,7 @@ vi.mock("@/lib/interface-mode", () => ({ useAdvancedMode: () => fixture.advanced
 vi.mock("@/lib/use-owner-or-admin", () => ({ useOwnerOrAdmin: () => true }));
 vi.mock("./CloudScreenPreview", () => ({ CloudScreenPreview: () => null }));
 vi.mock("./AndroidDevicePanel", () => ({ AndroidDevicePanel: () => null, useAndroidUsbDevices: () => ({ devices: fixture.android ? [{ serial: "p1" }] : [] }) }));
-vi.mock("./BrowserPanel", () => ({ BrowserPanel: ({ page }: { page?: unknown }) => { fixture.page = page; return null; } }));
+vi.mock("./BrowserPanel", () => ({ BrowserPanel: ({ page, takeover }: { page?: unknown; takeover?: number }) => { fixture.page = page; fixture.takeover = takeover; return createElement("div", { "data-testid": "browser-panel" }); } }));
 vi.mock("./CloudBackendPicker", () => ({ CloudBackendPicker: () => null }));
 vi.mock("./bot-settings/RoutinesSection", () => ({ RoutinesSection: () => null }));
 vi.mock("./data/DataPanel", () => ({ DataPanel: () => createElement("div", { "data-testid": "data-panel" }) }));
@@ -42,6 +42,7 @@ vi.mock("@/state/store", async (importOriginal) => ({
 const { ComputerPanel } = await import("./ComputerPanel");
 const { requestPanelPage } = await import("@/lib/page-open");
 const { BotEditorStore, initialState } = await import("@/state/store");
+import { requestBrowserTakeover } from "@/lib/browser-takeover";
 
 const engine = (instanceId: string) => ({
   instanceId, driverKind: "claudeAgent", displayName: instanceId, access: "subscription",
@@ -105,6 +106,7 @@ beforeEach(() => {
   fixture.android = false;
   fixture.browser = false;
   fixture.page = undefined;
+  fixture.takeover = undefined;
 });
 afterEach(() => {
   root?.unmount();
@@ -114,6 +116,35 @@ afterEach(() => {
 });
 
 describe("Computer panel tab", () => {
+  it("keeps a browser-only bot hidden through bot activity and restored panel state", async () => {
+    fixture.browser = true;
+    localStorage.setItem("omb-computer-panel-view:scout", "browser");
+    await open(makeBot({ computer: "browser" }));
+    expect(selected()).toBe("Screen");
+    expect(document.querySelector('[data-testid="browser-panel"]')).toBeNull();
+    await open(makeBot({ computer: "browser", busy: true }));
+    expect(selected()).toBe("Screen");
+    expect(document.querySelector('[data-testid="browser-panel"]')).toBeNull();
+  });
+
+  it("shows and takes only the explicitly requested conversation, without replaying on thread changes", async () => {
+    fixture.browser = true;
+    requestBrowserTakeover("scout", "thread");
+    await open(makeBot());
+    expect(selected()).toBe("Browser");
+    expect(fixture.takeover).toEqual(expect.any(Number));
+    await open(makeBot({ threadId: "other-thread" }));
+    expect(selected()).toBe("Screen");
+    expect(document.querySelector('[data-testid="browser-panel"]')).toBeNull();
+    await open(makeBot());
+    expect(selected()).toBe("Screen");
+    flushSync(() => requestBrowserTakeover("other-bot", "thread"));
+    expect(selected()).toBe("Screen");
+    flushSync(() => requestBrowserTakeover("scout", "thread"));
+    await settle();
+    expect(selected()).toBe("Browser");
+  });
+
   it("names the tablist from the active catalog", async () => {
     setLocale("de");
     await open(makeBot());

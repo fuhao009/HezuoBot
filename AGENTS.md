@@ -60,6 +60,14 @@ separate integration worktree. The 193 product build needs
 `--lan-origin --gateway-ca <pem>`, and `electron-builder` is only on `PATH` when run
 through `pnpm` (or with `node_modules/.bin` added).
 
+## Requirement documents
+
+Each batch of requested changes lives in one document, `docs/current-batch.md`,
+covering desktop, gateway and mobile together; do not split a batch across several
+files. When a batch is accepted, move it to `docs/archive/` with its completion
+date prefixed (for example `archive/2026-11-20-batch-1.md`) and start the next batch
+in a new `docs/current-batch.md`, carrying over anything unfinished.
+
 ## Working with the owner
 
 When anything blocks or stalls (a conflict needing a decision, a failing build or

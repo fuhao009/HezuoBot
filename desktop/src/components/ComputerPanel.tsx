@@ -26,6 +26,7 @@ import { routineRunLabel, routineRunTone } from "@/lib/routine-display";
 import { AndroidDevicePanel, useAndroidUsbDevices } from "./AndroidDevicePanel";
 import { BrowserPanel } from "./BrowserPanel";
 import { usePanelPage, type PanelPage } from "@/lib/page-open";
+import { useBrowserTakeover } from "@/lib/browser-takeover";
 const DataPanel = lazy(() => import("./data/DataPanel").then((module) => ({ default: module.DataPanel })));
 const loadLiveDesktop = () => import("./LiveDesktop").then((module) => ({ default: module.LiveDesktop }));
 const LiveDesktop = lazy(loadLiveDesktop);
@@ -258,12 +259,23 @@ export function ComputerPanel({
   const errorText = panelErrorText(error);
   const advanced = useAdvancedMode();
   const [storedPanelView, setPanelView] = useState<ComputerPanelView>(() => readComputerPanelView(bot.id));
+  const [browserTakeover, setBrowserTakeover] = useState<{ target: string; nonce: number } | null>(null);
+  const browserTarget = `${profileBot.id}:${profileBot.threadId}`;
+  useBrowserTakeover(profileBot.id, profileBot.threadId, (nonce) => {
+    explicitPanelView.current = true;
+    setBrowserTakeover({ target: browserTarget, nonce });
+    setPanelView("browser");
+  });
   const requestedDataResult = state.dataResultFocus?.botId === bot.id ? state.dataResultFocus : undefined;
   const [dataRequest, setDataRequest] = useState<{ id: string; requestId: number }>();
   const androidStatus = useAndroidUsbDevices();
   const androidConnected = androidStatus.devices.length > 0;
   const panelTabs = computerPanelTabs({ advanced, androidConnected });
-  const panelView = resolveComputerPanelView(storedPanelView, { advanced, androidConnected });
+  const previousPanelTarget = useRef<string | null>(null);
+  // Model and Auto's resolved surface never move the tab.
+  const panelTargetKey = `${profileBot.id}:${profileBot.threadId}:${livePlace}:${profileBot.cloudBackend ?? "box"}`;
+  const panelView = previousPanelTarget.current !== null && previousPanelTarget.current !== panelTargetKey
+    ? "computer" : resolveComputerPanelView(storedPanelView, { advanced, androidConnected });
   const panelRef = useComputerPanelEntry(profileBot.id, panelView);
   const browserAvailableHere = browserAvailable(state.config);
   const browserEnabled = builtInBrowserEnabled(state.config) && bot.browser !== false
@@ -308,16 +320,17 @@ export function ComputerPanel({
     writeComputerPanelView(bot.id, view);
   };
 
-  const previousPanelTarget = useRef<string | null>(null);
-  // Excludes the model and Auto's resolved surface: neither may move the tab.
-  const panelTargetKey = `${profileBot.id}:${profileBot.threadId}:${livePlace}:${profileBot.cloudBackend ?? "box"}`;
   useEffect(() => {
     const previous = previousPanelTarget.current;
-    if (previous === panelTargetKey && (explicitPanelView.current || !(bot.computer === "browser" && browserEnabled))) return;
-    if (previous !== panelTargetKey) explicitPanelView.current = false;
+    if (previous === panelTargetKey) return;
+    if (previous !== null) {
+      explicitPanelView.current = false;
+      setBrowserTakeover(null);
+      setSignInRequest(undefined);
+      setPageRequest(undefined);
+    }
     previousPanelTarget.current = panelTargetKey;
-    setPanelView(bot.computer === "browser" && browserEnabled ? "browser"
-      : previous === null ? readComputerPanelView(bot.id) : "computer");
+    if (previous !== null) setPanelView("computer");
   }, [panelTargetKey, bot.id, bot.computer, browserEnabled]);
 
   useEffect(() => {
@@ -1272,7 +1285,7 @@ export function ComputerPanel({
         <div {...tabPanelProps("browser")} className={cn("flex min-h-0 flex-1 flex-col px-4 pb-4", TAB_PANEL_FOCUS)}>
           {browserSwitchRow}
           {signInHelp?.place === "browser" && <div className="-mt-1 mb-3">{signInBanner()}</div>}
-          <BrowserPanel bot={bot} signIn={signInRequest} page={pageRequest} />
+          <BrowserPanel key={browserTarget} bot={bot} signIn={signInRequest} page={pageRequest} takeover={browserTakeover?.target === browserTarget ? browserTakeover.nonce : undefined} />
           {errorText && (
             <div role="alert" className="mt-2 rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-[12px] text-danger">
               {errorText}

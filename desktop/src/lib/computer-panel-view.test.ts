@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { readComputerPanelView, resolveComputerPanelView, writeComputerPanelView } from "./computer-panel-view";
 
 describe("computer panel view persistence", () => {
-  it("restores the browser for the same bot after the expanded workspace closes", () => {
+  it("never restores browser visibility from a previous panel session", () => {
     const values = new Map<string, string>();
     const storage = {
       getItem: (key: string) => values.get(key) ?? null,
@@ -12,7 +12,7 @@ describe("computer panel view persistence", () => {
 
     writeComputerPanelView("sprout", "browser", storage);
 
-    expect(readComputerPanelView("sprout", storage)).toBe("browser");
+    expect(readComputerPanelView("sprout", storage)).toBe("computer");
     expect(readComputerPanelView("another-bot", storage)).toBe("computer");
   });
 

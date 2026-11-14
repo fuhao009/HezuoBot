@@ -202,7 +202,7 @@ It prints per-request receipts and the opening/closing wallet totals.
 Omit `--smoke` to inspect the actual `/admin` billing surface using the printed
 disposable credentials; interrupt the launcher after browser verification. This
 does not contact a personal upstream or prove production billing. See the
-[billing delivery evidence](../gateway-v1-delivery.md#任务感知计费增量2026-11-13).
+[billing delivery evidence](../archive/gateway-v1-delivery.md#任务感知计费增量2026-11-13).
 
 
 The [desktop server connection smoke](desktop-server-connection.md) mounts the

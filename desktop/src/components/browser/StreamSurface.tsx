@@ -432,9 +432,9 @@ export function StreamSurface(props: {
     propsRef.current.onClient?.(client);
     return () => {
       painter.stop();
+      propsRef.current.onClient?.(null);
       client.stop();
       if (clientRef.current === client) clientRef.current = null;
-      propsRef.current.onClient?.(null);
       setControlState(null);
       setConnected(false);
       setAgentCursor(null);

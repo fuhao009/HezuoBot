@@ -8,7 +8,7 @@
 
 相关资料：
 
-- [原后台设计](gateway-admin-design.md)：历史设计与接口线索。
+- [原后台设计](../gateway-admin-design.md)：历史设计与接口线索。
 - [网关第一版服务端任务](gateway-v1-server-tasks.md)：上游协议、请求错误与结算约束。
 - [内测服务端待办](gateway-beta-server-todo.md)：任务计费、待复核、用户停用、重置密码要求。
 

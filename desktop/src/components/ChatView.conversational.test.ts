@@ -70,9 +70,23 @@ describe("conversational replies", () => {
     expect(document.querySelector("[data-quick-model]")?.textContent).toBe("Quick reply with Claude Haiku 4.5");
   });
 
-  it("shows actual gateway model and usage below the assistant reply", async () => {
-    await draw(profile({ messages: messages.map(message => message.role === "bot" ? { ...message, aiModel: "selected-model", aiUsage: { input: 123, output: 45 } } : message) }));
-    expect(document.querySelector("[data-ai-model]")?.textContent).toBe("Model: selected-model · 123 / 45");
+  it.each([false, true])("keeps model attribution and usage out of replies (conversational: %s)", async (conversational) => {
+    await draw(profile({
+      ...(conversational ? { replyStyle: "conversational" as const } : {}),
+      messages: messages.map(message => message.role === "bot" ? {
+        ...message, aiModel: "gpt-6-astra", aiUsage: { input: 34003, output: 48 },
+      } : message),
+    }));
+    expect(document.querySelector("[data-ai-model]")).toBeNull();
+    expect(document.body.textContent).not.toContain("gpt-6-astra");
+    expect(document.body.textContent).not.toContain("34003");
+    expect(document.body.textContent).not.toContain("实际模型");
+    expect(document.body.textContent).toContain("where is it");
+    if (conversational) {
+      expect(segments()).toEqual(["Found it.", "```ts\nconst a = 1;\n\nconst b = 2;\n```", "Want me to run it?"]);
+    } else {
+      expect([...document.querySelectorAll("[data-md]")].map((el) => el.textContent)).toContain(reply);
+    }
   });
   it("shows history bubbles at once, each part its own Simple bubble stacked close under the last", async () => {
     await draw(profile({ replyStyle: "conversational" }));

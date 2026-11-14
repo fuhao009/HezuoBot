@@ -105,6 +105,36 @@ const pill = () => host.querySelector<HTMLButtonElement>("[data-pill]")!;
 const button = (label: string) => [...host.querySelectorAll("button")].find((candidate) => (candidate.getAttribute("aria-label") ?? candidate.textContent) === label)!;
 
 describe("the browser panel's connection", () => {
+  it("detaches the native view on close without closing the browser session", async () => {
+    const surface = { surfaceId: "native-fixture", revision: 1, interactive: false, visible: true };
+    const detach = vi.fn(async () => {});
+    vi.stubGlobal("ogb", { browserSurface: {
+      attach: vi.fn(async () => surface), detach, layout: vi.fn(async () => {}),
+      onState: () => () => {}, focus: vi.fn(async () => {}),
+    } });
+    const socket = await streaming("you");
+    await act(async () => socket.message({ type: "surface", viewerId: "viewer-fixture" }));
+    await flush();
+    await act(async () => root.render(null));
+    expect(detach).toHaveBeenCalledWith(surface);
+    expect(socket.sent.at(-1)).toEqual({ type: "releaseControl" });
+  });
+
+  it("takes once after the explicit chat request connects, and immediately hands back before closing the view", async () => {
+    await render({ takeover: 1 });
+    const socket = FakeSocket.instances.at(-1)!;
+    await act(async () => { socket.open(); socket.control("agent"); });
+    await flush();
+    expect(socket.sent.filter((message) => message.type === "takeControl")).toHaveLength(1);
+    await act(async () => socket.control("you"));
+    await render({ takeover: 1 });
+    expect(socket.sent.filter((message) => message.type === "takeControl")).toHaveLength(1);
+    await act(async () => root.render(null));
+    expect(socket.sent.at(-1)).toEqual({ type: "releaseControl" });
+    expect(socket.readyState).toBe(3);
+    expect(socket.sent.some((message) => ["restart", "tabClose", "sleep"].includes(String(message.type)))).toBe(false);
+  });
+
   it("streams the new engine's browser over the v2 socket, sized to the panel", async () => {
     await render();
     expect(FakeSocket.instances).toHaveLength(1);
@@ -271,15 +301,6 @@ describe("who holds the browser", () => {
     await act(async () => pill().click());
     await flush();
     expect(socket.sent.at(-1)).toEqual({ type: "releaseControl" });
-  });
-
-  it("says what keeping the browser means while the person has it", async () => {
-    const socket = await streaming("agent");
-    await act(async () => pill().click());
-    await act(async () => socket.control("you"));
-    await flush();
-    expect(pill().title).toBe(t("browser.control.keptHint", { name: "Pepper" }));
-    expect(pill().title).toContain("5 minutes");
   });
 
   it("shows the person their hold from another of their views, and hands it back from here", async () => {

@@ -105,7 +105,9 @@ screens retain the existing overlay drawers rather than draggable columns.
 
 Managed workspaces present bots and tasks rather than a model picker. Chat
 headers, bot badges and bot creation/settings keep model controls hidden;
-completed reply usage shows the actual public model from `x-ai-model`.
+completed replies do not display model attribution or token usage, including
+metadata retained on existing messages. The gateway's public model metadata
+remains available to API clients; this is a chat presentation change.
 Account balances and settled charges remain authoritative in Account history.
 The default model follows the live catalog: `auto-responses`, then `auto-chat`,
 otherwise the catalog default. Only protocols with a published automatic model

@@ -14,6 +14,7 @@ import { useSpeech } from "@/lib/tts/useSpeech";
 import { localSystemVoiceActive } from "@/lib/local-voice";
 import { computerStartLine, useScreensWhile } from "@/lib/computer-start";
 import { rememberComputerPanelOpen } from "@/lib/computer-panel-focus";
+import { requestBrowserTakeover } from "@/lib/browser-takeover";
 import { useCaptionChrome, useDesktopCapabilities } from "@/components/DesktopCapabilities";
 import {
   api,
@@ -34,7 +35,6 @@ import {
 } from "@/state/store";
 import { claudeUpdateTarget, failedTurnCause, signedOutEngine } from "@/lib/failed-turn";
 import { plainErrorLine, productGatewayLine } from "@/lib/plain-error";
-import { productAiMessageMetadata } from "@/lib/product-ai-message";
 import { openPlaceAction, placeRowViewFor, usePlaceSeat, worksOnSimpleLabel } from "@/lib/place-view";
 import type { PlaceRow } from "../../../packages/shared/place-view";
 import { trialCreditKind, type TrialCreditRefusal } from "../../../packages/shared/trial-credit";
@@ -278,7 +278,6 @@ const Bubble = memo(function Bubble({
   const remoteClient = window.ogb?.remoteClient?.active === true;
   const peer = peerLine(message) ?? peerRequest(message, botId);
   const user = message.role === "user" && !peer;
-  const ai = productAiMessageMetadata(message);
   const speaker = user ? otherSpeaker(message, speakerViewer ?? null) : null;
   const ownBubbleStyle = speaker ? undefined : bubbleStyle;
   const [expanded, setExpanded] = useState(false);
@@ -507,7 +506,6 @@ const Bubble = memo(function Bubble({
         </span>
       </div>
       <ReactionChips threadId={threadId} message={message} bots={bots} align={user ? "end" : "start"} canReact={canReact} />
-      {!user && ai.aiModel && <div data-ai-model className="mt-1 text-[11px] text-ink-tertiary">{t("product.billing.model", { model: ai.aiModel })}{ai.aiUsage && ` · ${ai.aiUsage.input} / ${ai.aiUsage.output}`}</div>}
       {forks.length > 1 && (
         <div className="mt-1 flex items-center gap-0.5 pr-1 text-[12px] text-ink-secondary">
           <button
@@ -1077,6 +1075,12 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
             <ListChecks size={18} aria-hidden="true" />
           </button>}
           <LiveCallChip currentBotId={bot.id} onOpen={(botId, threadId) => openThread(dispatch, { botId, threadId }, state, showThreads)} />
+          {!remoteClient && bot.browser !== false && <button
+            type="button"
+            data-browser-takeover
+            onClick={() => { requestBrowserTakeover(bot.id, bot.threadId); dispatch({ type: "toggleComputer", open: true }); }}
+            className="shrink-0 rounded-full border border-hairline/40 px-3 py-1.5 text-[12px] text-ink-secondary hover:bg-raised hover:text-ink"
+          >{t("chat.takeBrowser")}</button>}
           {!phoneMenu && !unifiedPanel && <button
             data-tour="computer"
             data-product-work-entry="computer"

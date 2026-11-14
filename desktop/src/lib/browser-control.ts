@@ -203,7 +203,11 @@ export function createBrowserControl(options: {
       state = "releasing";
       void transport.release().catch(() => {});
     },
-    close() { closed = true; clearTimeout(idle); clearTimeout(notice); buffer = []; held.clear(); dropped.clear(); },
+    close(handBack = false) {
+      if (closed) return;
+      if (handBack) void transport.release().catch(() => {});
+      closed = true; clearTimeout(idle); clearTimeout(notice); buffer = []; held.clear(); dropped.clear();
+    },
   };
 }
 
