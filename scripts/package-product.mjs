@@ -48,6 +48,7 @@ options:
   --arch arm64|x64           target CPU (default: the platform's configured targets)
   --dir                      build an unpacked app directory for an isolated smoke test
   --unsigned                 skip macOS signing when no certificate is available
+  --debug                    enable bundled request/response debug logging (sensitive content)
   --dry-run                  validate the origin and write the generated config, build nothing
   --local-origin             allow a loopback origin (the local gateway deployment)
   --lan-origin               allow a private-network IPv4 origin (10/8, 172.16/12, 192.168/16), any port
@@ -82,12 +83,13 @@ export class UsageError extends Error {}
 
 export function parseArgs(argv) {
   // `pnpm run <script> -- args` forwards the separator itself in pnpm 10.
-  const options = { platform: null, arch: null, dir: false, unsigned: false, dryRun: false, localOrigin: false, lanOrigin: false, gatewayCa: null, help: false };
+  const options = { platform: null, arch: null, dir: false, unsigned: false, debug: false, dryRun: false, localOrigin: false, lanOrigin: false, gatewayCa: null, help: false };
   for (let index = argv[0] === "--" ? 1 : 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--help" || arg === "-h") options.help = true;
     else if (arg === "--dir") options.dir = true;
     else if (arg === "--unsigned") options.unsigned = true;
+    else if (arg === "--debug") options.debug = true;
     else if (arg === "--dry-run") options.dryRun = true;
     else if (arg === "--local-origin") options.localOrigin = true;
     else if (arg === "--lan-origin") options.lanOrigin = true;
@@ -212,7 +214,7 @@ async function linuxProductResources(scratch) {
 }
 
 /** Build the complete product configuration from the checked-in base. */
-export async function productBuildConfig({ scratch, platform, unsigned }) {
+export async function productBuildConfig({ scratch, platform, unsigned, debug = false }) {
   const base = parseYaml(await readFile(BASE_CONFIG, "utf8"));
   if (!base || typeof base !== "object" || Array.isArray(base)) throw new Error("electron-builder.yml did not parse as a mapping");
   const config = structuredClone(base);
@@ -239,6 +241,14 @@ export async function productBuildConfig({ scratch, platform, unsigned }) {
   const productServicePath = path.join(scratch, "product-service.json");
   const extraResources = Array.isArray(base.extraResources) ? structuredClone(base.extraResources) : [];
   extraResources.push({ from: productServicePath, to: "product-service.json" });
+  const productDebugPath = path.join(scratch, "product-debug.json");
+  if (debug) {
+    await writeFile(productDebugPath, `${JSON.stringify({ enabled: true })}\n`, { mode: 0o644 });
+    extraResources.push({ from: productDebugPath, to: "product-debug.json" });
+  } else {
+    // Reusing a staging directory must never carry a debug marker forward.
+    await rm(productDebugPath, { force: true });
+  }
   config.extraResources = extraResources;
 
   const mac = { ...base.mac, publish: null };
@@ -364,7 +374,7 @@ export async function packageProduct(options, environment = process.env) {
   await rm(scratch, { recursive: true, force: true });
   await mkdir(scratch, { recursive: true, mode: 0o700 });
   const { config, productServicePath } = await productBuildConfig({
-    scratch, platform: options.platform, unsigned: options.unsigned,
+    scratch, platform: options.platform, unsigned: options.unsigned, debug: options.debug,
   });
   if (options.arch && Array.isArray(config[options.platform]?.target)) {
     config[options.platform].target = config[options.platform].target.map((target) => ({
@@ -387,6 +397,7 @@ export async function packageProduct(options, environment = process.env) {
       origin,
       configPath,
       productServicePath,
+      debug: options.debug === true,
       outputDir: path.relative(root, RELEASE_DIR),
       steps: steps.map((script) => `pnpm ${script}`),
       builder: ["electron-builder", ...args, "--config", configPath],
@@ -423,7 +434,7 @@ export async function packageProduct(options, environment = process.env) {
     // A finished build keeps no update feed: afterPack removed it before
     // signing, and this second pass proves the shipped bundle has none and
     // pins exactly the origin this build was asked for.
-    verified.push(await verifyProductApp({ ...app, expectOrigin: origin }));
+    verified.push(await verifyProductApp({ ...app, expectOrigin: origin, expectDebug: options.debug === true }));
   }
   return {
     dryRun: false,
@@ -432,6 +443,7 @@ export async function packageProduct(options, environment = process.env) {
     arch: options.arch ?? "configured targets",
     dir: options.dir,
     unsigned: options.unsigned,
+    debug: options.debug === true,
     localOrigin: options.localOrigin,
     lanOrigin: options.lanOrigin,
     /** True when the bundle carries the origin's public certificate (resource v2). */

@@ -1,4 +1,5 @@
 import { createPinnedHttpsFetch } from "./product-ca.mjs";
+import { instrumentDebugFetch } from "./debug-log.mjs";
 
 const INSTALLATION_CREDENTIAL =
   /^omb_install_[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}$/;
@@ -369,6 +370,7 @@ export function createControlPlaneClient({
       throw new ControlPlaneError("control_plane_unavailable");
     }
   }
+  transport = instrumentDebugFetch(transport, "main->gateway");
 
   const request = async (
     path,

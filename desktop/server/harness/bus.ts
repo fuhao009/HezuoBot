@@ -3,6 +3,7 @@ import { appendFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { EVENTS_DIR } from "../config.ts";
+import { copyDebugToolDetails, DebugToolEvents } from "../debug-events.ts";
 import { flushNativeLog } from "../drivers/native.ts";
 import { redactSecrets } from "../redact.ts";
 import { batchSaves } from "../save-batch.ts";
@@ -54,6 +55,7 @@ export class EventBus {
   private pendingLogWarnings = new Map<string, RuntimeEvent>();
   private pendingText = new Map<string, { event: TextDelta; timer: ReturnType<typeof setTimeout> }>();
   private readonly appendLog: EventLogAppend;
+  private readonly debugTools = new DebugToolEvents();
   private queued: QueuedLog[] = [];
   private queuedBytes = 0;
   private pumping = false;
@@ -90,6 +92,7 @@ export class EventBus {
           return;
         }
         const stamped = { ...event, providerInstanceId: instance.instanceId };
+        copyDebugToolDetails(event, stamped);
         if (!this.gate?.(stamped)) this.publish(stamped);
       });
       this.unsubscribes.set(instance.instanceId, unsub);
@@ -97,6 +100,7 @@ export class EventBus {
   }
 
   publish(raw: RuntimeEvent) {
+    this.debugTools.observe(raw);
     if (raw.type === "turn.progress") {
       this.progress.offer(this.steps.progress(raw));
       return;

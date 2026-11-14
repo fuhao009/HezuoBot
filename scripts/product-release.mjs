@@ -197,7 +197,7 @@ async function bundleIdentifier(appDir) {
  * the upstream build over this one — so the hook deletes it before signing and
  * this check refuses any bundle that still has one.
  */
-export async function verifyProductApp({ appDir, resourcesDir, removeFeed = false, expectOrigin = null }) {
+export async function verifyProductApp({ appDir, resourcesDir, removeFeed = false, expectOrigin = null, expectDebug = null }) {
   const asarFile = path.join(resourcesDir, "app.asar");
   if (!(await exists(asarFile))) throw new Error(`product_app_missing_asar: ${asarFile}`);
   const metadata = await readAsarPackageJson(asarFile);
@@ -209,6 +209,15 @@ export async function verifyProductApp({ appDir, resourcesDir, removeFeed = fals
   const resource = await readProductServiceResource(resourcesDir);
   if (expectOrigin !== null && resource.origin !== expectOrigin) {
     throw new Error(`product_app_origin_mismatch: ${resource.origin}`);
+  }
+  if (expectDebug !== null) {
+    const debugPath = path.join(resourcesDir, "product-debug.json");
+    if (expectDebug) {
+      const marker = JSON.parse(await readFile(debugPath, "utf8"));
+      if (marker?.enabled !== true) throw new Error(`product_app_debug_marker_invalid: ${debugPath}`);
+    } else if (await exists(debugPath)) {
+      throw new Error(`product_app_debug_marker_present: ${debugPath}`);
+    }
   }
   const feed = path.join(resourcesDir, "app-update.yml");
   if (removeFeed) await rm(feed, { force: true });

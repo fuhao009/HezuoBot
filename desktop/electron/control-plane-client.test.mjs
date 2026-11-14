@@ -13,6 +13,7 @@ import {
   normalizeAccountEmail,
   normalizeControlPlaneURL,
 } from "./control-plane-client.mjs";
+import { setDebugLogSink } from "./debug-log.mjs";
 
 /** A throwaway certificate for 127.0.0.1, or null where openssl is absent. */
 function certificate(altName = "IP:127.0.0.1", commonName = "127.0.0.1") {
@@ -46,6 +47,23 @@ const jsonResponse = (body, init = {}) =>
   });
 
 describe("control-plane desktop client", () => {
+  it("retains the underlying network cause in debug logs without changing the account error", async () => {
+    const records = [];
+    setDebugLogSink(record => records.push(record));
+    try {
+      const cause = Object.assign(new Error("connect EHOSTUNREACH"), { code: "EHOSTUNREACH" });
+      const client = createControlPlaneClient({ baseURL: "https://accounts.openmausbot.com",
+        fetchImpl: async () => { throw new TypeError("fetch failed", { cause }); } });
+      await expect(client.signInWithPassword("ada@example.com", "private-password-123")).rejects.toMatchObject({ code: "network_unavailable" });
+      const output = JSON.stringify(records);
+      expect(output).toContain("EHOSTUNREACH");
+      expect(output).toContain("ada@example.com");
+      expect(output).not.toContain("private-password-123");
+    } finally {
+      setDebugLogSink(null);
+    }
+  });
+
   it.each([9, 129])("rejects a %i-character password before transport", async length => {
     const fetchImpl = vi.fn();
     const client = createControlPlaneClient({ baseURL: "https://accounts.openmausbot.com", fetchImpl });

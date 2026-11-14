@@ -4,6 +4,7 @@
 // the prompt is sent and `_meta.isReplay` updates are dropped. Permissions fail closed: only an
 // `allow`-kind option approves, and option order is never a security contract.
 import { mkdtempSync, rmSync } from "node:fs";
+import { debugToolEvent } from "../../debug-events.ts";
 import { homedir, tmpdir } from "node:os";
 import { lstat, mkdir, readFile, realpath, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
@@ -881,7 +882,7 @@ export function createAcpDriver(support: AcpSupport): ProviderDriver<AcpConfig> 
           const finished = u.status === "completed" || u.status === "failed";
           const toolEnded = (itemId: string | undefined) => {
             current.state.producedItem = true;
-            for (const event of acpToolEndEvents(u, itemId, current.endedToolIds)) emit({ ...base(threadId, current.turnId), ...event });
+            for (const event of acpToolEndEvents(u, itemId, current.endedToolIds)) emit(debugToolEvent({ ...base(threadId, current.turnId), ...event }, u));
           };
           switch (u.sessionUpdate) {
             case "agent_message_chunk": {
@@ -924,7 +925,7 @@ export function createAcpDriver(support: AcpSupport): ProviderDriver<AcpConfig> 
               // tool_call_update after it.
               const itemId = (typeof u.toolCallId === "string" && u.toolCallId) ? u.toolCallId
                 : finished ? `acp-tool-unkeyed-${++unkeyedToolSeq}` : nextUnkeyedToolId(current);
-              emit({
+              emit(debugToolEvent({
                 ...base(threadId, current.turnId),
                 type: "item.started",
                 itemType: "tool",
@@ -932,7 +933,7 @@ export function createAcpDriver(support: AcpSupport): ProviderDriver<AcpConfig> 
                 title: String(u.rawInput?.command ?? u.title ?? "tool").slice(0, 80),
                 summary: commandSummary(u.rawInput),
                 input: toolDetailPreview(u.rawInput),
-              });
+              }, u));
               if (finished) toolEnded(itemId);
               break;
             }

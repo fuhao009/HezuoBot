@@ -1,4 +1,5 @@
 import { codexToolSurfaceArgs } from "./codex-tool-surface.ts";
+import { debugToolEvent } from "../debug-events.ts";
 import { codexShellDisabled, GUEST_CONFINED_CODEX_ARGS } from "./codex-guest.ts";
 import { TEAM_TOOLS_FAILED, teamToolsFailed } from "./team-tools.ts";
 import { reportUnsupportedCalls, rolloutMark, type RolloutMark } from "./codex-unsupported-calls.ts";
@@ -1212,7 +1213,7 @@ export const CodexDriver: ProviderDriver<CodexConfig> = {
                       ? "web_search"
                       : null;
             if (title) {
-              emit({
+              emit(debugToolEvent({
                 ...base(threadId, turnId),
                 type: "item.started",
                 itemType: "tool",
@@ -1220,7 +1221,7 @@ export const CodexDriver: ProviderDriver<CodexConfig> = {
                 title,
                 summary: item.type === "commandExecution" ? commandSummary({ command: item.command }) : undefined,
                 input: toolDetailPreview(item.type === "commandExecution" ? { command: item.command, cwd: item.cwd } : item.type === "mcpToolCall" ? (runs ? item.arguments?.arguments ?? {} : item.arguments) : item.type === "fileChange" ? item.changes : item.query),
-              });
+              }, item));
             }
             break;
           }
@@ -1250,14 +1251,14 @@ export const CodexDriver: ProviderDriver<CodexConfig> = {
                 });
               }
             } else if (["commandExecution", "fileChange", "mcpToolCall", "webSearch"].includes(item.type)) {
-              emit({
+              emit(debugToolEvent({
                 ...base(threadId, turnId),
                 type: "item.completed",
                 itemType: "tool",
                 itemId: item.id,
                 ok: item.status !== "failed" && item.status !== "declined",
                 output: toolDetailPreview(item.type === "commandExecution" ? { output: item.aggregatedOutput, exitCode: item.exitCode } : item.type === "mcpToolCall" ? item.error ?? item.result : item.type === "fileChange" ? item.changes : item.action),
-              });
+              }, item));
               if (item.type === "mcpToolCall") {
                 for (const img of extractMcpImages(item.result)) {
                   emit({ ...base(threadId, turnId), type: "item.completed", itemType: "assistant_image", data: img.data });

@@ -1,5 +1,7 @@
 import { fingerprint, MAX_DELIVERED_THREADS, replayDelivered, type DeliveredUserMessage } from "./chat-delivered-replay.ts";
 import { FETCH_LIMIT_MS, fetchPastLimit } from "./chat-fetch.ts";
+import { debugOutboundFetch } from "../debug-outbound.ts";
+import { debugToolEvent } from "../debug-events.ts";
 import type {
   DriverCreateInput,
   ModelCatalog,
@@ -294,7 +296,8 @@ export function createOpenAIChatRuntime<Config>(options: RuntimeOptions<Config>)
           ...(tools.length ? { tools } : {}),
         });
       // A pinned transport has no undici headers/body limit of its own, so it needs no long-reply fallback.
-      const transport = options.fetchImpl ?? (options.timeoutMs > FETCH_LIMIT_MS ? fetchPastLimit : fetch);
+      const defaultTransport = options.timeoutMs > FETCH_LIMIT_MS ? debugOutboundFetch(fetchPastLimit as typeof fetch) : fetch;
+      const transport = options.fetchImpl ?? defaultTransport;
       const send = (url: string, init: RequestInit) => {
         reportRequestTokens(url, init);
         return transport(url, init);
@@ -848,9 +851,9 @@ export function createOpenAIChatRuntime<Config>(options: RuntimeOptions<Config>)
                 // A question goes before the gate: Full would auto-run an unanswered ask, Ask would show Allow/Deny.
                 const questions = parseAskQuestions(args);
                 abort.signal.throwIfAborted();
-                emit({ ...base(turn.threadId, turnId), type: "item.started", itemType: "tool", itemId: call.id,
+                emit(debugToolEvent({ ...base(turn.threadId, turnId), type: "item.started", itemType: "tool", itemId: call.id,
                   title: call.function.name, ...(inputPreview ? { input: inputPreview } : {}),
-                });
+                }, call));
                 started = true;
                 if (!questions) {
                   denials.push(ASK_USER_TOOL);
@@ -876,9 +879,9 @@ export function createOpenAIChatRuntime<Config>(options: RuntimeOptions<Config>)
                 const allowed = !floored && (full || !shown.ask
                   || await approval.ask(shown.title, shownPreview ?? "This tool has no arguments.", shown.grant));
                 abort.signal.throwIfAborted();
-                emit({ ...base(turn.threadId, turnId), type: "item.started", itemType: "tool", itemId: call.id,
+                emit(debugToolEvent({ ...base(turn.threadId, turnId), type: "item.started", itemType: "tool", itemId: call.id,
                   title: shown.title, ...(shownPreview ? { input: shownPreview } : {}),
-                });
+                }, call));
                 started = true;
                 if (allowed) {
                   result = await tools.execute(call.function.name, args as Record<string, unknown>, abort.signal);
@@ -905,11 +908,11 @@ export function createOpenAIChatRuntime<Config>(options: RuntimeOptions<Config>)
                 ? "Tool interrupted; an operation already dispatched may have taken effect. Verify its state before retrying."
                 : safeText(asError(error).message).slice(0, 2_000) };
             }
-            if (!started) emit({ ...base(turn.threadId, turnId), type: "item.started", itemType: "tool", itemId: call.id, title: call.function.name });
+            if (!started) emit(debugToolEvent({ ...base(turn.threadId, turnId), type: "item.started", itemType: "tool", itemId: call.id, title: call.function.name }, call));
             const repeatNote = skipRepeatCount ? undefined : repeats?.noteAfter(call.function.name, call.function.arguments, result);
             const text = safeText(result.text);
             const output = preview({ ok: result.ok, result: text });
-            emit({ ...base(turn.threadId, turnId), type: "item.completed", itemType: "tool", itemId: call.id, ok: result.ok, output });
+            emit(debugToolEvent({ ...base(turn.threadId, turnId), type: "item.completed", itemType: "tool", itemId: call.id, ok: result.ok, output }, result));
             if (!result.ok) { toolFailed = true; failedCalls.push(title); }
             messages.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify({ ok: result.ok, result: repeatNote ? `${text}\n\n${repeatNote}` : text }) });
             abort.signal.throwIfAborted();

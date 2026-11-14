@@ -5,6 +5,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { installProductAccountIpc } from "./product-account-ipc.mjs";
 import { createProductAccountWindow, normalizeAccountDocumentUrl, normalizeLocalDocumentUrl } from "./product-account-window.mjs";
+import { setDebugLogSink } from "./debug-log.mjs";
+import { installMainIpcDebug } from "./debug-main.mjs";
 
 const ACCOUNT_URL = "file:///Applications/Hezuo.app/Contents/Resources/ui/product-account.html";
 const OTHER_ACCOUNT_URL = "file:///Users/person/Downloads/product-account.html";
@@ -71,6 +73,7 @@ function harness({ account = fakeWindow(ACCOUNT_URL), accountUrl = ACCOUNT_URL, 
     handle: (channel, handler) => handlers.set(channel, handler),
     removeHandler: channel => handlers.delete(channel),
   };
+  installMainIpcDebug(ipcMain);
   const installed = installProductAccountIpc({
     ipcMain,
     service: fake,
@@ -155,6 +158,34 @@ test("password calls reach the service only from the account page, and never com
   }
   await assert.rejects(async () => scoped.handlers.get("product-account:sign-in-password")(childEvent(account), "person@example.test", password),
     /only available/);
+});
+
+test("debug account logging masks positional credentials and preserves results and failures", async () => {
+  const records = [];
+  setDebugLogSink(record => records.push(record));
+  try {
+    const { handlers, account, calls } = harness();
+    const password = "correct horse battery staple";
+    for (const channel of ["sign-in-password", "sign-up", "confirm-email", "reset-password", "verify-code"]) {
+      const args = ["person@example.test"];
+      if (["confirm-email", "reset-password", "verify-code"].includes(channel)) args.push("12345678");
+      if (channel !== "verify-code") args.push(password);
+      await handlers.get(`product-account:${channel}`)(eventFor(account), ...args);
+    }
+    assert.equal(calls[0][2], password);
+    assert.ok(records.some(record => record.responseBody?.auth === "signed_in"));
+    await assert.rejects(handlers.get("product-account:sign-in-password")(childEvent(account), "person@example.test", password), /only available/);
+    assert.ok(records.some(record => record.event === "error"));
+    assert.throws(() => handlers.get("product-account:close")(childEvent(account)), /only available/);
+    assert.equal(handlers.get("product-account:close")(eventFor(account)), undefined);
+    assert.equal(records.filter(record => record.url === "product-account:sign-in-password" && record.event === "request").length, 2);
+    const serialized = JSON.stringify(records);
+    assert.ok(serialized.includes("person@example.test"));
+    assert.equal(serialized.includes(password), false);
+    assert.equal(serialized.includes("12345678"), false);
+  } finally {
+    setDebugLogSink(null);
+  }
 });
 
 test("a password outside the published range and a malformed code never reach the service", async () => {

@@ -1,5 +1,9 @@
 // Import first: it reads a Cloud home's secrets off the launcher's pipe before any module can start a process.
 import { BOOT_CLOUD_SECRETS } from "./cloud-secrets-boot.ts";
+import { captureApiDebugLog } from "./debug-http.ts";
+import { setDebugLogSink } from "../electron/debug-log.mjs";
+import { logDebugBroadcast } from "./debug-events.ts";
+import { installDebugOutboundLogging } from "./debug-outbound.ts";
 import { createAdminAudit } from "./host/admin-audit.ts";
 import type { ProductAiMessageMetadata } from "../src/lib/product-ai-message.ts";
 import { decisionActorFor } from "./request-decision-actor.ts";
@@ -638,6 +642,17 @@ import { withScopeHint } from "./connector-scope-hint.ts";
 import { connectorRequestItems } from "./connector-request-items.ts";
 import { onThreadSeen, personAsks as personAskAt, sawThread } from "./thread-presence.ts"; import { createWarmSummaryHost, HARNESS_IDLE_FRACTION } from "./host/warm-summary-host.ts";
 
+type UtilityParentPort = {
+  on(event: "message", listener: (event: { data?: object }) => void): void;
+  postMessage(message: object): void;
+};
+// Only Electron's utility process supplies parentPort, private to the desktop main process; plain Node leaves it absent.
+const utilityParentPort = (process as NodeJS.Process & { parentPort?: UtilityParentPort }).parentPort;
+utilityParentPort?.on("message", event => {
+  if ((event.data as { type?: unknown } | undefined)?.type !== "hezuo:debug-log-enable") return;
+  setDebugLogSink(record => utilityParentPort.postMessage({ type: "hezuo:debug-log", record }));
+  installDebugOutboundLogging();
+});
 const PORT = Number(process.env.OMB_PORT || process.env.OGB_PORT || 8799);
 const WEBHOOK_PORT = Number(process.env.OMB_WEBHOOK_PORT || PORT + 1);
 const WEBHOOK_PUBLIC_URL = process.env.OMB_WEBHOOK_PUBLIC_URL || undefined;
@@ -1331,12 +1346,6 @@ const availableSkills = () => mergeSkills(bundledSkills, loadUserSkills(join(DAT
 const usbPhoneOffered = (instance: { adapter: { capabilities: { phoneMcp?: boolean } } }, skills: readonly BundledSkill[]) => instance.adapter.capabilities.phoneMcp === true &&
   !CLOUD_HOME && !HOSTED_WORKSPACE && skills.some(({ manifest }) => manifest.defaultEnabled && manifest.requiredCapabilities.includes("phoneMcp"));
 
-type UtilityParentPort = {
-  on(event: "message", listener: (event: { data?: object }) => void): void;
-  postMessage(message: object): void;
-};
-// Only Electron's utility process supplies parentPort, private to the desktop main process; plain Node leaves it absent.
-const utilityParentPort = (process as NodeJS.Process & { parentPort?: UtilityParentPort }).parentPort;
 const embeddedBrowserBackend = utilityParentPort && process.versions.electron && process.env.OMB_EMBEDDED_BROWSER === "1"
   ? createEmbeddedBrowserBackend({ send: message => utilityParentPort.postMessage(message), egressPort: key => browserEgress.open(key) }) : undefined;
 type DesktopPrivateMessage = BrowserCleanupWireRequest | import("./login-handoff.ts").LoginHandoffResult | {
@@ -4827,6 +4836,7 @@ function cursorSeq(raw: string | string[] | undefined): number | null {
 
 /** `adminOnly` frames are withheld from client sessions, live and on replay; a `person`'s frames reach only their streams. */
 function broadcast(payload: Record<string, unknown>, options: { adminOnly?: boolean; person?: string } = {}) {
+  logDebugBroadcast(payload, options);
   // Close stale email streams before any further workspace data is delivered.
   sessions.recheckMembership();
   const seq = ++lastSeq;
@@ -12747,6 +12757,7 @@ ROUTES.push(createLiveRoutes({
 
 const toolResults = new ToolResults();
 const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
+  const debugRequest = captureApiDebugLog(req, res);
   if (CLOUD_TEAM) holdBodyDeadline(req, res);
   let url: URL;
   try {
@@ -15632,6 +15643,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
 
     return json(res, 404, { error: `no route: ${method} ${path}` });
   } catch (e) {
+    debugRequest?.error(e);
     const status = (e as any)?.status ?? 500;
     const candidateCode = (e as { code?: unknown })?.code;
     const code = typeof candidateCode === "string" && ["guarded_busy", "guarded_branch", "guarded_permissions", "guarded_request_changed", "guarded_request_untracked", "outside_workspace"].includes(candidateCode)

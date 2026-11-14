@@ -4,6 +4,7 @@ import path from "node:path";
 import { createEmbeddedBrowserBroker } from "./embedded-browser-cdp.mjs";
 import { createEmbeddedBrowserSurfaceManager } from "./embedded-browser-surface.mjs";
 import { targetsServer } from "./server-session.mjs";
+import { installEmbeddedBrowserNetworkLogger } from "./embedded-browser-network-log.mjs";
 
 /** One private browser runtime per utility child; renderer messages carry no profile authority. */
 export function createEmbeddedBrowserRuntime({ proc, dataDir, accountKey, session, createNativeView, createFallbackWindow, owner, current, serverPort }) {
@@ -38,19 +39,24 @@ export function createEmbeddedBrowserRuntime({ proc, dataDir, accountKey, sessio
       const dir = path.join(root, key.startsWith("temp:") ? "temp" : "profiles", hash);
       await fs.mkdir(dir, { recursive: true, mode: 0o700 });
       const isolated = session.fromPath(path.join(dir, "electron"));
-      isolated.webRequest.onBeforeRequest((details, callback) => callback({ cancel: targetsServer(details.url, serverPort()) }));
-      await isolated.setProxy({ mode: "fixed_servers", proxyRules: `socks5://127.0.0.1:${egressPort}`, proxyBypassRules: "<-loopback>" });
-      await isolated.closeAllConnections();
-      if (closed || !current()) throw new Error("Browser runtime changed");
-      const manifest = path.join(dir, "electron-tabs.json");
-      let restoreTabs = null;
-      try { restoreTabs = JSON.parse(await fs.readFile(manifest, "utf8")); } catch (error) { if (error.code !== "ENOENT" && !(error instanceof SyntaxError)) throw error; }
-      return { session: isolated, downloadDir: path.join(root, "downloads", hash), restoreTabs,
-        async saveTabs(snapshot) {
-          const temp = `${manifest}.${randomUUID()}.tmp`;
-          await fs.writeFile(temp, JSON.stringify(snapshot), { mode: 0o600 });
-          await fs.rename(temp, manifest);
-        } };
+      const networkLog = installEmbeddedBrowserNetworkLogger(isolated, { shouldCancel: url => targetsServer(url, serverPort()) });
+      try {
+        await isolated.setProxy({ mode: "fixed_servers", proxyRules: `socks5://127.0.0.1:${egressPort}`, proxyBypassRules: "<-loopback>" });
+        await isolated.closeAllConnections();
+        if (closed || !current()) throw new Error("Browser runtime changed");
+        const manifest = path.join(dir, "electron-tabs.json");
+        let restoreTabs = null;
+        try { restoreTabs = JSON.parse(await fs.readFile(manifest, "utf8")); } catch (error) { if (error.code !== "ENOENT" && !(error instanceof SyntaxError)) throw error; }
+        return { session: isolated, downloadDir: path.join(root, "downloads", hash), restoreTabs, release: () => networkLog.dispose(),
+          async saveTabs(snapshot) {
+            const temp = `${manifest}.${randomUUID()}.tmp`;
+            await fs.writeFile(temp, JSON.stringify(snapshot), { mode: 0o600 });
+            await fs.rename(temp, manifest);
+          } };
+      } catch (error) {
+        networkLog.dispose();
+        throw error;
+      }
     },
   });
   function detach(input) {

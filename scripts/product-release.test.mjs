@@ -13,6 +13,7 @@ import {
   operatorOrigin,
   productServiceDocument,
   readProductServiceResource,
+  verifyProductApp,
 } from "./product-release.mjs";
 
 const cleanups = [];
@@ -32,6 +33,29 @@ async function certificate(address = "127.0.0.1") {
 }
 
 describe("the bundled product resource", () => {
+  it("verifies debug markers and refuses stale markers in normal artifacts", async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), "hezuo-debug-artifact-"));
+    cleanups.push(() => rm(directory, { recursive: true, force: true }));
+    const metadata = Buffer.from(JSON.stringify({ ombProductManaged: true, main: "desktop/electron/main.mjs", productName: "Hezuo" }));
+    const headerJson = Buffer.from(JSON.stringify({ files: { "package.json": { size: metadata.length, offset: "0" } } }));
+    const header = Buffer.alloc(8 + headerJson.length);
+    header.writeUInt32LE(headerJson.length, 4);
+    headerJson.copy(header, 8);
+    const prefix = Buffer.alloc(8);
+    prefix.writeUInt32LE(header.length, 4);
+    await writeFile(path.join(directory, "app.asar"), Buffer.concat([prefix, header, metadata]));
+    await writeFile(path.join(directory, "product-service.json"), JSON.stringify(productServiceDocument("https://ai.acme-ai.net")));
+    const verify = (expectDebug) => verifyProductApp({ appDir: directory, resourcesDir: directory, expectDebug });
+    await expect(verify(false)).resolves.toMatchObject({ productName: "Hezuo" });
+    await expect(verify(true)).rejects.toMatchObject({ code: "ENOENT" });
+    const markerPath = path.join(directory, "product-debug.json");
+    await writeFile(markerPath, JSON.stringify({ enabled: false }));
+    await expect(verify(true)).rejects.toThrow(/product_app_debug_marker_invalid/);
+    await writeFile(markerPath, JSON.stringify({ enabled: true }));
+    await expect(verify(true)).resolves.toMatchObject({ productName: "Hezuo" });
+    await expect(verify(false)).rejects.toThrow(/product_app_debug_marker_present/);
+  });
+
   it("pins only the origin unless a certificate is supplied", async () => {
     expect(productServiceDocument("https://ai.acme-ai.net")).toEqual({ version: 1, origin: "https://ai.acme-ai.net" });
     // A certificate that does not cover the origin is refused, never written.

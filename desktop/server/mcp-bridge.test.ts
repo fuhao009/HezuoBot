@@ -294,7 +294,8 @@ describe("createGateInterceptor", () => {
   it("forwards a first approved observation exactly once after a long authorization wait", async () => {
     vi.useFakeTimers();
     try {
-      const { promise, resolve: approve } = Promise.withResolvers<ControlState>();
+      let approve!: (state: ControlState) => void;
+      const promise = new Promise<ControlState>(resolve => { approve = resolve; });
       const check = vi.fn(() => promise);
       const { forwarded, refused, intercept } = harness(check);
       const call = JSON.stringify({ id: 1, method: "tools/call", params: { name: "list_apps", arguments: {} } });

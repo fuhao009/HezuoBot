@@ -2,6 +2,7 @@
 // (`pi --mode rpc --no-session`), not ACP. pi is BYOK and reads ~/.pi/agent/auth.json itself, so
 // this driver holds no key; resumeCursor is pi's `sessionFile` (switch_session).
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { debugToolEvent } from "../debug-events.ts";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -646,7 +647,7 @@ export const PiDriver: ProviderDriver<PiConfig> = {
           }
           case "tool_execution_start": {
             flushAssistantText();
-            emit({
+            emit(debugToolEvent({
               ...base(threadId, turnId),
               type: "item.started",
               itemType: "tool",
@@ -654,18 +655,18 @@ export const PiDriver: ProviderDriver<PiConfig> = {
               title: String(evt.toolName ?? "tool").slice(0, 80),
               summary: commandSummary(evt.args),
               input: toolDetailPreview(evt.args),
-            });
+            }, evt));
             return;
           }
           case "tool_execution_end": {
-            emit({
+            emit(debugToolEvent({
               ...base(threadId, turnId),
               type: "item.completed",
               itemType: "tool",
               itemId: evt.toolCallId,
               ok: !evt.isError,
               output: toolDetailPreview(evt.result),
-            });
+            }, evt));
             return;
           }
           case "extension_ui_request": {

@@ -1,6 +1,7 @@
 // Claude Code over stream-json both ways: prompt on stdin, one retained CLI process per thread,
 // each turn settled by the CLI's own `result` frame.
 import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { debugToolEvent } from "../debug-events.ts";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { createServer as createNetServer } from "node:net";
 import { homedir, tmpdir } from "node:os";
@@ -1565,7 +1566,7 @@ export const ClaudeDriver: ProviderDriver<ClaudeConfig> = {
             }
             for (const b of Array.isArray(msg.content) ? msg.content : []) {
               if (b.type === "tool_use") {
-                emit({
+                emit(debugToolEvent({
                   ...base(threadId, currentTurnId()),
                   type: "item.started",
                   itemType: "tool",
@@ -1573,7 +1574,7 @@ export const ClaudeDriver: ProviderDriver<ClaudeConfig> = {
                   title: b.name,
                   summary: commandSummary(b.input),
                   input: toolDetailPreview(b.input),
-                });
+                }, b));
               }
             }
             if (msg.usage) {
@@ -1599,7 +1600,7 @@ export const ClaudeDriver: ProviderDriver<ClaudeConfig> = {
             }
             for (const b of Array.isArray(o.message?.content) ? o.message.content : []) {
               if (b.type === "tool_result") {
-                emit({ ...base(threadId, currentTurnId()), type: "item.completed", itemType: "tool", itemId: b.tool_use_id, ok: !b.is_error, output: toolDetailPreview(b.content) });
+                emit(debugToolEvent({ ...base(threadId, currentTurnId()), type: "item.completed", itemType: "tool", itemId: b.tool_use_id, ok: !b.is_error, output: toolDetailPreview(b.content) }, b));
                 for (const img of extractMcpImages(b.content)) {
                   emit({ ...base(threadId, currentTurnId()), type: "item.completed", itemType: "assistant_image", data: img.data });
                 }

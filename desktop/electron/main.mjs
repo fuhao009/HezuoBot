@@ -1,3 +1,5 @@
+import "./debug-main-bootstrap.mjs";
+import { utilityDebugLifecycle } from "./debug-main.mjs";
 import { installRendererSmokeProbe } from "./renderer-smoke-probe.mjs";
 import { createEmbeddedBrowserRuntime } from "./embedded-browser-runtime.mjs";
 import { createDesktopViewerWindow } from "./desktop-viewer-window.mjs";
@@ -16,6 +18,8 @@ import { createProductAccountService } from "./product-account.mjs";
 import { createEncryptedRecordStore } from "./encrypted-record-store.mjs";
 import { createProductAccountWindow } from "./product-account-window.mjs";
 import { installProductAccountIpc } from "./product-account-ipc.mjs";
+import { setDebugLogSink, debugLogEnabled, emitDebugLog } from "./debug-log.mjs";
+import { createDebugLogWorker } from "./debug-log-worker.mjs";
 import { productVerificationEntry } from "./product-verification-entry.mjs";
 import { migrateProductProfile } from "./product-profile-migration.mjs";
 import { migrateDefaultDataRoot } from "./default-data-root-migration.mjs";
@@ -347,9 +351,13 @@ const desktopMutationToken = randomBytes(32).toString("base64url");
 const desktopLaunchId = randomUUID();
 const companionMutationToken = randomBytes(32).toString("base64url");
 const serverSupervisor = createServerSupervisor({
-  restart: () => startServerOn(SERVER_PORT),
+  restart: () => {
+    utilityDebugLifecycle("restart", serverProc, { port: SERVER_PORT });
+    return startServerOn(SERVER_PORT);
+  },
   stop: stopUtilityServer,
   onReady(proc) {
+    utilityDebugLifecycle("ready", proc, { port: SERVER_PORT });
     serverProc = proc;
     serverReady = true;
     serverStartConflictOnly = false;
@@ -515,6 +523,27 @@ function composioBrokerUrl() {
 
 // Finder/Explorer launches have no usable stdio, so the server child's output goes to server.log here.
 const LOG_DIR = app.getPath("logs");
+let debugLogWorker = null;
+function reportDebugLogFailure(error) {
+  setDebugLogSink(null);
+  // Fixed worker error messages contain no record bodies or credentials. Never log through the failed sink.
+  console.error(error.message);
+  void app.whenReady().then(() => dialog.showMessageBox({
+    type: "error", title: "Diagnostic logging stopped", message: error.message,
+    detail: "Previously accepted records are drained where possible. Restart Hezuo to resume diagnostic logging.",
+  })).catch(() => {});
+}
+if (app.isPackaged) {
+  const debugMarker = path.join(process.resourcesPath, "product-debug.json");
+  if (fs.existsSync(debugMarker) && JSON.parse(fs.readFileSync(debugMarker, "utf8")).enabled === true) {
+    try {
+      debugLogWorker = createDebugLogWorker({ directory: LOG_DIR, onError: reportDebugLogFailure });
+      setDebugLogSink(debugLogWorker.sink, { redact: false });
+    } catch {
+      reportDebugLogFailure(new Error("Debug logging stopped (worker_start_failed); diagnostic records were not saved."));
+    }
+  }
+}
 const DESKTOP_CRASH_LOG = path.join(LOG_DIR, "desktop-crashes.log");
 const DESKTOP_CRASH_LOG_MAX_BYTES = 512 * 1024;
 let logStream = null;
@@ -1308,8 +1337,12 @@ async function startServerOn(port, dataDir = runningDataDir ?? startupEnvironmen
   });
   proc.stderr?.on("data", (d) => slog(`[err] ${String(d).trimEnd()}`));
   proc.on("message", (message) => {
-    if (!serverSupervisor.isCurrent(proc)) return;
     try {
+      if (message?.type === "hezuo:debug-log") {
+        if (debugLogEnabled()) emitDebugLog(message.record);
+        return;
+      }
+      if (!serverSupervisor.isCurrent(proc)) return;
       if (embeddedRuntimes.get(proc)?.receive(message)) return;
       if (productService && message?.type === "hezuo:renew-ai-token" && typeof message.requestId === "string") {
         void productAccount?.renewAiToken().then(ok => {
@@ -1329,6 +1362,7 @@ async function startServerOn(port, dataDir = runningDataDir ?? startupEnvironmen
   proc.once("spawn", () => {
     slog(`spawned pid=${proc.pid}`);
     if (!serverSupervisor.isCurrent(proc)) return;
+    if (debugLogEnabled()) proc.postMessage({ type: "hezuo:debug-log-enable" });
     syncDesktopMutationToken(proc);
     syncPhoneSecretKey(proc); grantLocalComputer(proc, (child) => serverSupervisor.isCurrent(child));
   });
@@ -3331,6 +3365,14 @@ app.on("before-quit", async (e) => {
     }),
   ]);
   await cleanup;
+  // Stop producers only after the server's final lifecycle records, then drain the sole writer.
+  setDebugLogSink(null);
+  if (debugLogWorker) {
+    const drainTimeout = setTimeout(() => debugLogWorker.abort(), 5000);
+    try { await debugLogWorker.close(); }
+    catch { /* The worker reports failures outside diagnostic logging. */ }
+    finally { clearTimeout(drainTimeout); }
+  }
   cuaCleanedUp = true;
   app.quit();
 });

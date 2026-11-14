@@ -5,6 +5,7 @@
 // the instance a META_API_KEY), and the models come from Muse itself, so a
 // new Muse model reaches the picker without an app release.
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { copyDebugToolDetails, debugToolEvent } from "../debug-events.ts";
 import { readFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
@@ -272,6 +273,7 @@ export const MuseCodeDriver: ProviderDriver<MuseConfig> = {
 
     const emit = (event: Record<string, unknown> & { type: RuntimeEvent["type"]; threadId: string }) => {
       const full = { eventId: newEventId(), provider: DRIVER_KIND, providerInstanceId: instanceId, createdAt: new Date().toISOString(), ...event } as RuntimeEvent;
+      copyDebugToolDetails(event, full);
       for (const listener of listeners) listener(full);
     };
 
@@ -417,9 +419,9 @@ export const MuseCodeDriver: ProviderDriver<MuseConfig> = {
           } else if (item.kind === "reasoning") {
             if (!seen) emit({ type: "item.started", threadId, turnId: active.turnId, itemId: item.itemId, itemType: "reasoning" });
           } else if (TOOL_KINDS.has(item.kind)) {
-            if (!seen) emit({ type: "item.started", threadId, turnId: active.turnId, itemId: item.itemId, itemType: "tool", ...museToolStart(item) });
+            if (!seen) emit(debugToolEvent({ type: "item.started", threadId, turnId: active.turnId, itemId: item.itemId, itemType: "tool", ...museToolStart(item) }, item));
             if (!isRunning(item.status) && (!seen || isRunning(seen.status))) {
-              emit({ type: "item.completed", threadId, turnId: active.turnId, itemId: item.itemId, itemType: "tool", ...museToolOutput(item) });
+              emit(debugToolEvent({ type: "item.completed", threadId, turnId: active.turnId, itemId: item.itemId, itemType: "tool", ...museToolOutput(item) }, item));
             }
           }
           return;
