@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HezuoBot 电脑端新布局</title>
+<style>
+:root{
+  color-scheme:light dark;
+  --page:#fff; --ink:#1d1d1f; --muted:#6e6e73; --line:rgba(0,0,0,.08); --seg:#e3e3e8; --seg-on:#fff; --accent:#0071e3;
+  --win:#fff; --side:#f5f5f7; --field:#f5f5f7; --bubble:#f0f0f2; --hover:rgba(0,0,0,.05); --on:rgba(0,0,0,.08);
+  --shadow:0 30px 80px -20px rgba(0,0,0,.28),0 0 0 .5px rgba(0,0,0,.12);
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Helvetica Neue",sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --page:#000; --ink:#f5f5f7; --muted:#a1a1a6; --line:rgba(255,255,255,.1); --seg:#2c2c2e; --seg-on:#636366; --accent:#2997ff;
+    --win:#1c1c1e; --side:#161617; --field:#2c2c2e; --bubble:#2c2c2e; --hover:rgba(255,255,255,.06); --on:rgba(255,255,255,.1);
+    --shadow:0 30px 80px -20px rgba(0,0,0,.8),0 0 0 .5px rgba(255,255,255,.14);
+  }
+}
+*{box-sizing:border-box;margin:0}
+body{font:15px/1.45 var(--font);background:var(--page);color:var(--ink);padding:36px 24px 72px;-webkit-font-smoothing:antialiased}
+button,input,textarea{font:inherit;color:inherit;border:0;background:none;padding:0}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:8px}
+[hidden]{display:none!important}
+main{max-width:1160px;margin:0 auto;display:grid;gap:22px}
+.head{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.head img{width:44px;height:44px}
+h1{font-size:30px;letter-spacing:-.02em;margin-right:auto}
+.seg{display:flex;background:var(--seg);border-radius:11px;padding:3px}
+.seg button{padding:7px 16px;border-radius:8px;font-size:14px;font-weight:500;white-space:nowrap}
+.seg button[aria-pressed="true"]{background:var(--seg-on);box-shadow:0 1px 4px rgba(0,0,0,.16)}
+
+.win{position:relative;display:grid;grid-template-columns:244px minmax(0,1fr) 316px;height:680px;background:var(--win);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
+.win[data-mode="b"]{grid-template-columns:244px minmax(0,1fr)}
+svg.bot{display:block;overflow:visible;flex:none}
+
+.bots{background:var(--side);border-right:1px solid var(--line);padding:12px 10px;display:flex;flex-direction:column;min-width:0}
+.bar{display:flex;align-items:center;height:28px;margin-bottom:10px;padding:0 4px;flex:none}
+.lights{display:flex;gap:8px;margin-right:auto}
+.lights i{width:12px;height:12px;border-radius:50%;background:#ff5f57}
+.lights i:nth-child(2){background:#febc2e}
+.lights i:nth-child(3){background:#28c840}
+.add{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;color:var(--muted)}
+.add:hover{background:var(--hover);color:var(--ink)}
+.add svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+.lists{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:8px}
+.group{border-radius:14px;background:var(--hover);padding:4px;display:flex;flex-direction:column;gap:2px;flex:none}
+.ghead{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:10px;text-align:left;min-width:0}
+.ghead:hover{background:var(--hover)}
+.ghead[aria-pressed="true"]{background:var(--on)}
+.ghead b{flex:1;min-width:0;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ghead i{font-style:normal;font-size:12px;color:var(--muted)}
+.stack{display:flex;padding-left:6px;flex:none}
+.stack .bot{width:22px;height:22px;margin-left:-6px}
+.loose{flex:1;min-height:56px;display:flex;flex-direction:column;gap:2px;border-radius:14px}
+.row{position:relative;display:flex;align-items:center;gap:10px;padding:8px;border-radius:12px;min-width:0;cursor:grab;user-select:none;-webkit-user-select:none}
+.row:hover{background:var(--hover)}
+.row[aria-pressed="true"]{background:var(--on)}
+.row.dragging{opacity:.4}
+.row .bot{width:40px;height:40px;pointer-events:none}
+.row div{min-width:0;pointer-events:none}
+.row b{display:block;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row span{display:block;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row.drop-group,.drop-into{outline:2px solid var(--accent);outline-offset:-2px;background:color-mix(in srgb,var(--accent) 12%,transparent)}
+.row.drop-before::before,.row.drop-after::after{content:"";position:absolute;left:8px;right:8px;height:2px;border-radius:2px;background:var(--accent)}
+.row.drop-before::before{top:-2px}
+.row.drop-after::after{bottom:-2px}
+
+.chat{display:flex;flex-direction:column;min-width:0}
+.top{height:52px;display:flex;align-items:center;justify-content:center;border-bottom:1px solid var(--line);flex:none}
+.who{display:flex;align-items:center;gap:8px;padding:5px 14px 5px 6px;border-radius:980px;font-weight:600;font-size:14px}
+.who>.bot{width:28px;height:28px}
+.who .stack .bot{width:26px;height:26px}
+.win[data-mode="b"] .who:hover,.win[data-mode="b"].open .who{background:var(--on)}
+.win[data-mode="a"] .who{cursor:default}
+.thread{flex:1;overflow:auto;padding:22px 26px;display:flex;flex-direction:column;gap:10px}
+.msg{max-width:72%;align-self:flex-start;display:flex;gap:8px;align-items:flex-end;animation:pop .28s cubic-bezier(.2,.9,.3,1.2) both}
+.msg .bot{width:30px;height:30px}
+.msg p{padding:9px 14px;border-radius:18px;background:var(--bubble)}
+.msg small{display:block;font-size:11px;color:var(--muted);margin:0 0 3px 12px}
+.msg.me{align-self:flex-end}
+.msg.me p{background:var(--c);color:#fff}
+@keyframes pop{from{opacity:0;transform:translateY(6px) scale(.97)}}
+.composer{display:flex;align-items:center;gap:8px;margin:0 22px 20px;padding:6px 6px 6px 18px;border-radius:980px;background:var(--field);flex:none}
+.composer input{flex:1;min-width:0;height:34px;outline:0}
+.composer input::placeholder,.card textarea::placeholder{color:var(--muted)}
+.send{width:34px;height:34px;border-radius:50%;background:var(--c);display:grid;place-items:center;flex:none}
+.send svg{width:16px;height:16px;fill:none;stroke:#fff;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+
+.card{border-left:1px solid var(--line);padding:20px 18px 18px;display:flex;flex-direction:column;gap:14px;min-width:0;overflow:auto;background:var(--win)}
+.win[data-mode="b"] .card{position:absolute;top:60px;left:calc(244px + (100% - 244px)/2 - 170px);width:340px;max-height:calc(100% - 76px);border:0;border-radius:20px;box-shadow:var(--shadow);display:none;z-index:2}
+.win[data-mode="b"].open .card{display:flex;animation:pop .22s ease-out both}
+.face{align-self:center;width:112px;height:112px}
+.face .bot{width:112px;height:112px}
+.members{display:flex;justify-content:center;flex-wrap:wrap;min-height:112px;align-items:center;padding-left:14px}
+.members .bot{width:68px;height:68px;margin-left:-14px}
+.name{align-self:center;text-align:center;font-size:19px;font-weight:600;width:100%;padding:4px 8px;border-radius:10px;outline:0}
+.name:hover,.name:focus{background:var(--field)}
+.shapes{display:grid;grid-template-columns:repeat(6,1fr);gap:2px}
+.shapes button{aspect-ratio:1;border-radius:11px;display:grid;place-items:center}
+.shapes button:hover{background:var(--hover)}
+.shapes button[aria-pressed="true"]{background:var(--on)}
+.shapes .bot{width:78%;height:78%}
+.colors{display:flex;justify-content:center;gap:10px}
+.colors button{width:24px;height:24px;border-radius:50%;box-shadow:0 0 0 2px var(--win),0 0 0 4px transparent}
+.colors button[aria-pressed="true"]{box-shadow:0 0 0 2px var(--win),0 0 0 4px var(--ink)}
+.card label{display:flex;flex-direction:column;gap:8px;font-size:13px;font-weight:600;flex:1;min-height:150px}
+.card textarea{flex:1;resize:none;border-radius:14px;background:var(--field);padding:12px 14px;font-weight:400;font-size:14px;line-height:1.55;outline:0}
+
+.chips{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.chips b{font-size:14px;margin-right:6px;min-width:2em}
+.chips span{font-size:13px;padding:5px 12px;border-radius:980px;background:var(--side)}
+.chips.gone span{color:var(--muted);text-decoration:line-through}
+@media(max-width:900px){.win,.win[data-mode="b"]{grid-template-columns:72px minmax(0,1fr)}.win[data-mode="a"] .card{display:none}.row div,.ghead b,.ghead i,.lights{display:none}}
+</style>
+</head>
+<body>
+<main>
+  <div class="head">
+    <img src="assets/logo-128.png" alt="">
+    <h1>电脑端新布局</h1>
+    <div class="seg" id="mode" role="group" aria-label="布局方案">
+      <button data-mode="a" aria-pressed="true">A 三栏常驻</button>
+      <button data-mode="b" aria-pressed="false">B 点头像再展开</button>
+    </div>
+  </div>
+
+  <div class="win" data-mode="a">
+    <aside class="bots">
+      <div class="bar"><div class="lights"><i></i><i></i><i></i></div><button class="add" aria-label="新建 Bot"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button></div>
+      <div class="lists"></div>
+    </aside>
+    <section class="chat">
+      <div class="top"><button class="who" aria-label="打开卡片"><span class="slot"></span><span class="stack"></span><b></b></button></div>
+      <div class="thread" aria-live="polite"></div>
+      <form class="composer"><input aria-label="消息" autocomplete="off"><button class="send" aria-label="发送"><svg viewBox="0 0 24 24"><path d="M12 19V5M5.5 11.5 12 5l6.5 6.5"/></svg></button></form>
+    </section>
+    <aside class="card">
+      <div class="face"></div>
+      <div class="members"></div>
+      <input class="name" aria-label="名字" maxlength="12">
+      <div class="shapes" role="group" aria-label="头像形状"></div>
+      <div class="colors" role="group" aria-label="头像颜色"></div>
+      <label><span class="prompt-title"></span><textarea></textarea></label>
+    </aside>
+  </div>
+
+  <div class="chips"><b>群组</b><span>把 Bot 拖到另一个 Bot 上 自动建群组</span><span>拖进群组 加入</span><span>拖到群组外 退出</span><span>群组里没有 Bot 自动删除</span><span>点群组名 和整组对话</span></div>
+  <div class="chips gone"><b>去掉</b><span>搜索</span><span>分享</span><span>连接应用</span><span>模型切换</span><span>电脑</span><span>资料库</span><span>例行任务</span><span>用量</span><span>活动</span><span>语音通话</span><span>附件</span><span>插件</span><span>皮肤</span><span>设置</span></div>
+</main>
+<script src="bots.js"></script>
+<script>
+const ink = { cyan: '#1aa9d6', blue: '#3b7bf0', green: '#12a05c', orange: '#f08c2e', purple: '#8b5cf6', pink: '#e55ba4' }
+const $ = (selector) => document.querySelector(selector)
+const make = (tag, className) => Object.assign(document.createElement(tag), { className: className ?? '' })
+const fresh = (kind, color) => {
+  const holder = make('div')
+  holder.innerHTML = HezuoBots.markup({ kind, color })
+  return holder.firstChild
+}
+
+const groups = [{ id: 1, name: '周报小队', prompt: '小研查资料 日报君汇总 每周五交一份周报', log: [] }]
+let nextGroup = 2
+const bots = [
+  { name: '小研', kind: 'drop', color: 'cyan', group: 1, prompt: '你是研究助理 负责查资料 核对信息 写周报', said: '好的 我先读 CRM 再核对公司信息', asked: '把本周的新线索整理成周报' },
+  { name: '日报君', kind: 'cloud', color: 'blue', group: 1, prompt: '每天早上九点汇总昨天的进展 发一份日报', said: '今天的日报已经发出' },
+  { name: '阿码', kind: 'square', color: 'purple', prompt: '你是工程师 改代码前先跑测试 改完说明改了什么', said: '测试全部通过 可以合并了' },
+  { name: '小客', kind: 'flower', color: 'orange', prompt: '你是客服 语气亲切 不确定的事先问我', said: '有 3 位客户在等回复' },
+  ...[['star5', 'pink'], ['pebble', 'green'], ['dome', 'cyan'], ['clover', 'purple']].map(([kind, color]) => ({ name: '新 Bot', kind, color, prompt: '', spare: true })),
+]
+for (const bot of bots) {
+  bot.group ??= null
+  bot.log = [bot.asked && { from: 'me', text: bot.asked }, bot.said && { from: bot, text: bot.said }].filter(Boolean)
+}
+groups[0].log.push({ from: 'me', text: '这周的周报谁来写' }, { from: bots[0], text: '我来查资料' }, { from: bots[1], text: '我来汇总成稿' })
+
+const win = $('.win'), lists = $('.lists'), thread = $('.thread'), input = $('.composer input'), nameField = $('.name'), promptField = $('.card textarea')
+const headAvatar = fresh('drop', 'cyan'), faceAvatar = fresh('drop', 'cyan')
+$('.who .slot').replaceWith(headAvatar)
+$('.face').append(faceAvatar)
+$('.shapes').innerHTML = HezuoBots.kinds.map(([kind, label]) => `<button data-kind="${kind}" aria-label="${label}" aria-pressed="false">${HezuoBots.markup({ kind, color: 'cyan' })}</button>`).join('')
+$('.colors').innerHTML = HezuoBots.colors.map((color, i) => `<button data-color="${color}" aria-label="颜色 ${i + 1}" aria-pressed="false" style="background:${HezuoBots.swatch(color)}"></button>`).join('')
+
+let current = { group: groups[0] }
+let dragged = null
+const shown = () => bots.filter((bot) => !bot.spare)
+const membersOf = (group) => shown().filter((bot) => bot.group === group.id)
+const stackOf = (members) => members.slice(0, 4).map((bot) => HezuoBots.markup(bot)).join('')
+const clearMarks = () => document.querySelectorAll('.drop-group,.drop-before,.drop-after,.drop-into').forEach((node) => node.classList.remove('drop-group', 'drop-before', 'drop-after', 'drop-into'))
+const mark = (node, name) => {
+  if (node.classList.contains(name)) return
+  clearMarks()
+  node.classList.add(name)
+}
+const placeOn = (event, bot) => {
+  const box = bot.row.getBoundingClientRect()
+  const share = (event.clientY - box.top) / box.height
+  if (!bot.group && share > 0.25 && share < 0.75) return 'group'
+  return share < 0.5 ? 'before' : 'after'
+}
+const moveTo = (bot, group, beside, after) => {
+  bot.group = group
+  bots.splice(bots.indexOf(bot), 1)
+  bots.splice(beside ? bots.indexOf(beside) + (after ? 1 : 0) : bots.length, 0, bot)
+}
+
+for (const bot of bots) {
+  bot.row = make('div', 'row')
+  bot.row.tabIndex = 0
+  bot.row.draggable = true
+  bot.row.setAttribute('role', 'button')
+  bot.avatar = fresh(bot.kind, bot.color)
+  bot.title = make('b')
+  bot.last = make('span')
+  const text = make('div')
+  text.append(bot.title, bot.last)
+  bot.row.append(bot.avatar, text)
+  bot.row.addEventListener('click', () => select({ bot }))
+  bot.row.addEventListener('keydown', (event) => event.key === 'Enter' && select({ bot }))
+  bot.row.addEventListener('dragstart', (event) => {
+    dragged = bot
+    bot.row.classList.add('dragging')
+    event.dataTransfer?.setData('text/plain', bot.name)
+  })
+  bot.row.addEventListener('dragend', () => {
+    dragged = null
+    bot.row.classList.remove('dragging')
+    clearMarks()
+  })
+  bot.row.addEventListener('dragover', (event) => {
+    if (!dragged) return
+    event.preventDefault()
+    event.stopPropagation()
+    if (dragged !== bot) mark(bot.row, `drop-${placeOn(event, bot)}`)
+  })
+  bot.row.addEventListener('drop', (event) => {
+    event.preventDefault()
+    event.stopPropagation()
+    if (!dragged || dragged === bot) return
+    const place = placeOn(event, bot)
+    if (place !== 'group') return settle(() => moveTo(dragged, bot.group, bot, place === 'after'))
+    const group = { id: nextGroup++, name: '新群组', prompt: '', log: [] }
+    groups.push(group)
+    settle(() => {
+      bot.group = group.id
+      moveTo(dragged, group.id, bot, true)
+    }, { group })
+    nameField.select()
+  })
+}
+lists.append(...bots.map((bot) => bot.row))
+HezuoBots.mount()
+
+const dropZone = (node, group) => {
+  node.addEventListener('dragover', (event) => {
+    if (!dragged) return
+    event.preventDefault()
+    mark(node, 'drop-into')
+  })
+  node.addEventListener('drop', (event) => {
+    event.preventDefault()
+    if (dragged && dragged.group !== group) settle(() => moveTo(dragged, group))
+  })
+}
+function settle(change, next) {
+  change()
+  clearMarks()
+  for (const group of [...groups]) if (!membersOf(group).length) groups.splice(groups.indexOf(group), 1)
+  const gone = current.group && !groups.includes(current.group)
+  select(next ?? (gone ? { bot: shown()[0] } : current))
+}
+const layout = () => {
+  const loose = make('div', 'loose')
+  dropZone(loose, null)
+  loose.append(...shown().filter((bot) => !bot.group).map((bot) => bot.row))
+  lists.replaceChildren(...groups.map((group) => {
+    const members = membersOf(group)
+    const box = make('div', 'group')
+    const headRow = make('button', 'ghead')
+    headRow.setAttribute('aria-pressed', String(current.group === group))
+    headRow.innerHTML = `<span class="stack">${stackOf(members)}</span><b></b><i>${members.length}</i>`
+    headRow.querySelector('b').textContent = group.name
+    headRow.addEventListener('click', () => select({ group }))
+    dropZone(box, group.id)
+    box.append(headRow, ...members.map((bot) => bot.row))
+    return box
+  }), loose)
+}
+const bubble = ({ from, text }) => {
+  const node = make('div', from === 'me' ? 'msg me' : 'msg')
+  const body = make('div')
+  if (current.group && from !== 'me') {
+    node.innerHTML = HezuoBots.markup(from)
+    body.append(Object.assign(make('small'), { textContent: from.name }))
+  }
+  body.append(Object.assign(make('p'), { textContent: text }))
+  node.append(body)
+  thread.append(node)
+  thread.scrollTop = thread.scrollHeight
+}
+const paint = () => {
+  const { bot, group } = current
+  layout()
+  for (const each of shown()) {
+    each.row.setAttribute('aria-pressed', String(each === bot))
+    each.title.textContent = each.name
+    each.last.textContent = each.log.at(-1)?.text ?? '还没聊过'
+  }
+  win.style.setProperty('--c', bot ? ink[bot.color] : 'var(--accent)')
+  headAvatar.style.display = bot ? '' : 'none'
+  $('.who .stack').innerHTML = group ? stackOf(membersOf(group)) : ''
+  $('.who b').textContent = (bot ?? group).name
+  input.placeholder = `给${(bot ?? group).name}发消息`
+  $('.face').hidden = $('.shapes').hidden = $('.colors').hidden = !bot
+  $('.members').hidden = !group
+  $('.members').innerHTML = group ? membersOf(group).map((member) => HezuoBots.markup(member)).join('') : ''
+  $('.prompt-title').textContent = bot ? '提示词' : '群组提示词'
+  promptField.placeholder = bot ? '告诉它是谁 该做什么' : '告诉这组 Bot 怎么分工'
+  if (!bot) return
+  const { kind, color } = bot
+  for (const svg of [bot.avatar, headAvatar, faceAvatar]) HezuoBots.swap(svg, { kind, color })
+  for (const button of document.querySelectorAll('.shapes button')) {
+    button.setAttribute('aria-pressed', String(button.dataset.kind === kind))
+    const sample = button.querySelector('.bot')
+    if (sample.dataset.color !== color) HezuoBots.swap(sample, { color })
+  }
+  for (const button of document.querySelectorAll('.colors button')) button.setAttribute('aria-pressed', String(button.dataset.color === color))
+}
+const pose = (bot, state) => {
+  HezuoBots.set(bot.avatar, state)
+  if (current.bot === bot) for (const svg of [headAvatar, faceAvatar]) HezuoBots.set(svg, state)
+}
+function select(next) {
+  for (const svg of [headAvatar, faceAvatar]) HezuoBots.set(svg, 'idle')
+  current = next
+  const subject = next.bot ?? next.group
+  nameField.value = subject.name
+  promptField.value = subject.prompt
+  thread.replaceChildren()
+  paint()
+  subject.log.forEach(bubble)
+}
+
+$('.shapes').addEventListener('click', (event) => {
+  const button = event.target.closest('button')
+  if (!button || !current.bot) return
+  current.bot.kind = button.dataset.kind
+  paint()
+})
+$('.colors').addEventListener('click', (event) => {
+  const button = event.target.closest('button')
+  if (!button || !current.bot) return
+  current.bot.color = button.dataset.color
+  paint()
+})
+nameField.addEventListener('input', () => {
+  const subject = current.bot ?? current.group
+  subject.name = nameField.value || (current.bot ? '新 Bot' : '新群组')
+  paint()
+})
+promptField.addEventListener('input', () => {
+  (current.bot ?? current.group).prompt = promptField.value
+})
+$('.add').addEventListener('click', () => {
+  const bot = bots.find((each) => each.spare)
+  if (!bot) return
+  bot.spare = false
+  select({ bot })
+  win.classList.add('open')
+  nameField.select()
+})
+const replies = ['好的 这就去办', '我接着做下一步', '我来收尾检查']
+$('.composer').addEventListener('submit', (event) => {
+  event.preventDefault()
+  const text = input.value.trim()
+  if (!text) return
+  const subject = current.bot ?? current.group
+  const say = (line) => {
+    subject.log.push(line)
+    if ((current.bot ?? current.group) === subject) bubble(line)
+    for (const each of shown()) each.last.textContent = each.log.at(-1)?.text ?? '还没聊过'
+  }
+  input.value = ''
+  say({ from: 'me', text })
+  const team = current.bot ? [current.bot] : membersOf(current.group)
+  team.forEach((bot, index) => {
+    pose(bot, 'working')
+    setTimeout(() => {
+      say({ from: bot, text: replies[index % replies.length] })
+      pose(bot, 'done')
+      setTimeout(() => pose(bot, 'idle'), 2600)
+    }, 1600 + index * 1000)
+  })
+})
+$('#mode').addEventListener('click', (event) => {
+  const button = event.target.closest('button')
+  if (!button) return
+  win.dataset.mode = button.dataset.mode
+  win.classList.remove('open')
+  for (const each of event.currentTarget.children) each.setAttribute('aria-pressed', String(each === button))
+})
+$('.who').addEventListener('click', () => win.dataset.mode === 'b' && win.classList.toggle('open'))
+document.addEventListener('keydown', (event) => event.key === 'Escape' && win.classList.remove('open'))
+select(current)
+</script>
+</body>
+</html>
