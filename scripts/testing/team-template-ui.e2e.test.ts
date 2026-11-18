@@ -66,7 +66,7 @@ describe("additive template imports in the real renderer", () => {
       return true;
     })()`);
     for (const source of ["library", "file"]) {
-      await click("New or share");
+      await click("New");
       await click("Templates");
       if (source === "library") {
         await expect.poll(snapshot, { timeout: 10_000 }).toContain('button "Load"');

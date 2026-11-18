@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HezuoBot 头像方案</title>
+<style>
+*{box-sizing:border-box;margin:0}
+body{font:15px/1.5 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;background:#fff;color:#1d1d1f;padding:40px 24px 80px}
+main{max-width:1080px;margin:0 auto;display:grid;gap:56px}
+header{display:flex;align-items:center;gap:16px}
+header img{width:56px;height:56px}
+h1{font-size:32px;letter-spacing:-.02em}
+h2{font-size:22px;letter-spacing:-.01em;display:flex;align-items:baseline;gap:12px}
+h2 small{font-size:14px;font-weight:400;color:#6e6e73}
+.panels{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px}
+.panel{--bg:#f5f5f7;background:var(--bg);border-radius:24px;padding:26px 22px;display:grid;gap:22px}
+.panel.dark{--bg:#0c0c0d;color:#f5f5f7}
+.big{display:grid;grid-template-columns:repeat(6,1fr);gap:12px}
+.big figure{display:grid;justify-items:center;gap:8px}
+.big svg{width:100%;max-width:76px;height:auto;display:block}
+figcaption{font-size:12px;opacity:.55;font-variant-numeric:tabular-nums}
+.small{display:flex;gap:10px;align-items:center}
+.small svg{width:36px;height:36px}
+.small svg:nth-child(n+7){width:22px;height:22px}
+.small i{width:1px;height:22px;background:currentColor;opacity:.15;margin:0 4px}
+@media(max-width:820px){.panels{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main>
+  <header><img src="assets/logo-128.png" alt=""><h1>头像方案</h1></header>
+  <div id="sets"></div>
+</main>
+<script>
+const palette = {
+  cyan: ['#a5fff0', '#3fdcf2', '#0e9fc0'],
+  blue: ['#a9c9ff', '#4d8dff', '#1f55d6'],
+  green: ['#a6f2c6', '#34c97a', '#0b8a53'],
+  orange: ['#ffd9a3', '#ff9d3c', '#d96a12'],
+  red: ['#ffbcbc', '#f76a6a', '#c93645'],
+  purple: ['#d9cbff', '#9a78f5', '#6a3fd0'],
+}
+const order = ['cyan', 'blue', 'green', 'orange', 'red', 'purple']
+const deep = '#0b141b'
+let serial = 0
+const mix = (a, b) => '#' + [1, 3, 5].map((i) => Math.round((parseInt(a.slice(i, i + 2), 16) + parseInt(b.slice(i, i + 2), 16)) / 2).toString(16).padStart(2, '0')).join('')
+const frame = (color, draw) => {
+  const [light, base, dark] = palette[color]
+  const id = `g${serial++}`
+  const defs = `<defs><linearGradient id="${id}" x1=".15" y1="0" x2=".75" y2="1"><stop offset="0" stop-color="${base}"/><stop offset="1" stop-color="${dark}"/></linearGradient></defs>`
+  return `<svg viewBox="0 0 100 100">${defs}${draw({ light, base, dark, facet: mix(light, base), fill: `url(#${id})` })}</svg>`
+}
+
+const headA = [
+  `<rect x="24" y="36" width="52" height="40" rx="14" fill="#fff"/>`,
+  `<circle cx="50" cy="58" r="24" fill="#fff"/>`,
+  `<rect x="22" y="40" width="56" height="34" rx="17" fill="#fff"/>`,
+  `<path d="M35 37h30l11 11v18L65 77H35L24 66V48z" fill="#fff" stroke="#fff" stroke-width="5" stroke-linejoin="round"/>`,
+  `<rect x="27" y="36" width="46" height="42" rx="9" fill="#fff"/>`,
+  `<path d="M26 54a24 24 0 0 1 48 0v13a10 10 0 0 1-10 10H36a10 10 0 0 1-10-10z" fill="#fff"/>`,
+]
+const topA = [
+  `<path d="M50 36V25" stroke="#fff" stroke-width="5" stroke-linecap="round"/><circle cx="50" cy="20" r="5.5" fill="#fff"/>`,
+  `<ellipse cx="50" cy="25" rx="14" ry="4.5" fill="none" stroke="#fff" stroke-width="3.8"/>`,
+  `<path d="M50 40V27" stroke="#fff" stroke-width="5" stroke-linecap="round"/><path d="M41 24h18" stroke="#fff" stroke-width="5" stroke-linecap="round"/>`,
+  `<path d="M38 36l-6-12M62 36l6-12" stroke="#fff" stroke-width="4.5" stroke-linecap="round"/><circle cx="31" cy="22" r="4.2" fill="#fff"/><circle cx="69" cy="22" r="4.2" fill="#fff"/>`,
+  `<rect x="42" y="25" width="16" height="10" rx="3.5" fill="#fff"/>`,
+  `<rect x="15" y="50" width="7" height="16" rx="3.5" fill="#fff"/><rect x="78" y="50" width="7" height="16" rx="3.5" fill="#fff"/>`,
+]
+const faceA = [
+  (c) => `<rect x="31" y="47" width="38" height="18" rx="9" fill="${c.dark}"/><circle cx="42" cy="56" r="3.6" fill="${c.light}"/><circle cx="58" cy="56" r="3.6" fill="${c.light}"/>`,
+  (c) => `<circle cx="41" cy="57" r="5" fill="${c.dark}"/><circle cx="59" cy="57" r="5" fill="${c.dark}"/>`,
+  (c) => `<rect x="37" y="49" width="7.5" height="15" rx="3.75" fill="${c.dark}"/><rect x="55.5" y="49" width="7.5" height="15" rx="3.75" fill="${c.dark}"/>`,
+  (c) => `<circle cx="50" cy="57" r="11.5" fill="${c.dark}"/><circle cx="50" cy="57" r="4.6" fill="${c.light}"/>`,
+  (c) => `<rect x="32" y="50" width="36" height="11" rx="5.5" fill="${c.dark}"/><rect x="37" y="53.5" width="11" height="4" rx="2" fill="${c.light}"/>`,
+  (c) => `<path d="M35 61q5.5-9 11 0M54 61q5.5-9 11 0" fill="none" stroke="${c.dark}" stroke-width="4.6" stroke-linecap="round"/>`,
+]
+const setA = order.map((color, i) =>
+  frame(color, (c) => `<rect width="100" height="100" rx="28" fill="${c.fill}"/>${topA[i]}${headA[i]}${faceA[i](c)}`),
+)
+
+const round = (d, paint) => `<path d="${d}" fill="${paint}" stroke="${paint}" stroke-width="7" stroke-linejoin="round"/>`
+const gap = (d) => `<path d="${d}" fill="none" stroke="var(--bg)" stroke-width="3.2" stroke-linecap="round"/>`
+const visor = (x, y, w, h, c) =>
+  `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${h / 2}" fill="${deep}"/><circle cx="${x + w * 0.3}" cy="${y + h / 2}" r="${h * 0.24}" fill="${c.light}"/><circle cx="${x + w * 0.7}" cy="${y + h / 2}" r="${h * 0.24}" fill="${c.light}"/>`
+const shapeB = [
+  (c) => round('M50 17 85 78H15z', c.fill) + round('M50 17 85 78H50z', c.facet) + gap('M50 13V82') + visor(31, 54, 38, 15, c),
+  (c) =>
+    round('M17 31 50 50V88L17 69z', c.fill) + round('M50 50 83 31V69L50 88z', c.dark) + round('M50 12 83 31 50 50 17 31z', c.facet) +
+    gap('M50 50 15 30M50 50 85 30M50 50V91') +
+    `<path d="M23 47 50 62 77 47V60L50 75 23 60z" fill="${deep}" stroke="${deep}" stroke-width="3" stroke-linejoin="round"/><circle cx="37" cy="61.5" r="3.4" fill="${c.light}"/><circle cx="63" cy="61.5" r="3.4" fill="${c.light}"/>`,
+  (c) => round('M50 13 87 50 50 87 13 50z', c.fill) + round('M50 13 87 50 50 87z', c.facet) + gap('M50 9V91') + visor(29, 42.5, 42, 15, c),
+  (c) => round('M16 24H84L50 86z', c.fill) + round('M50 24H84L50 86z', c.facet) + gap('M50 20V90') + visor(30, 33, 40, 15, c),
+  (c) => round('M14 41 86 41 73 84H27z', c.fill) + round('M50 13 86 41H14z', c.facet) + gap('M9 41H91') + visor(32, 54, 36, 15, c),
+  (c) =>
+    `<path d="M50 16 88 80H12z" fill="none" stroke="${c.fill}" stroke-width="13" stroke-linejoin="round"/><path d="M50 16 88 80" fill="none" stroke="${c.facet}" stroke-width="13" stroke-linecap="round"/>` +
+    gap('M43.5 16 81.5 80') +
+    `<circle cx="42" cy="63" r="5" fill="${c.base}"/><circle cx="58" cy="63" r="5" fill="${c.base}"/>`,
+]
+const setB = order.map((color, i) => frame(color, shapeB[i]))
+
+const eyesC = [
+  (c) => `<circle cx="38" cy="50" r="6.5" fill="${c.light}"/><circle cx="62" cy="50" r="6.5" fill="${c.light}"/>`,
+  (c) => `<rect x="33" y="39" width="9.5" height="22" rx="4.75" fill="${c.light}"/><rect x="57.5" y="39" width="9.5" height="22" rx="4.75" fill="${c.light}"/>`,
+  (c) => `<path d="M29 55q8.5-13 17 0M54 55q8.5-13 17 0" fill="none" stroke="${c.light}" stroke-width="5.2" stroke-linecap="round"/>`,
+  (c) => `<rect x="29" y="47" width="17" height="6.5" rx="3.25" fill="${c.light}"/><rect x="54" y="47" width="17" height="6.5" rx="3.25" fill="${c.light}"/>`,
+  (c) => `<circle cx="38" cy="50" r="6.5" fill="${c.light}"/><path d="M54 51q8.5-9 17 0" fill="none" stroke="${c.light}" stroke-width="5.2" stroke-linecap="round"/>`,
+  (c) => `<rect x="31" y="42" width="13" height="13" rx="3.5" fill="${c.light}"/><rect x="56" y="42" width="13" height="13" rx="3.5" fill="${c.light}"/><rect x="44" y="61" width="12" height="4" rx="2" fill="${c.light}" opacity=".7"/>`,
+]
+const setC = order.map((color, i) =>
+  frame(color, (c) => `<rect width="100" height="100" rx="28" fill="${c.fill}"/><rect x="16" y="27" width="68" height="46" rx="17" fill="${deep}"/>${eyesC[i](c)}`),
+)
+
+const bodyD = [
+  { head: `<rect x="30" y="22" width="40" height="30" rx="11"/>`, arms: `<rect x="19" y="58" width="9" height="21" rx="4.5"/><rect x="72" y="58" width="9" height="21" rx="4.5"/>`, top: `<path d="M50 22v-8" stroke-width="4.5" stroke-linecap="round"/><circle cx="50" cy="11" r="4.5"/>`, chest: (c) => `<circle cx="50" cy="69" r="4.5" fill="${c.light}"/>` },
+  { head: `<circle cx="50" cy="37" r="18"/>`, arms: `<rect x="19" y="58" width="9" height="21" rx="4.5" transform="rotate(28 23.5 60)"/><rect x="72" y="58" width="9" height="21" rx="4.5" transform="rotate(-150 76.5 62)"/>`, top: `<path d="M38 22l-5-9M62 22l5-9" stroke-width="4" stroke-linecap="round"/>`, chest: (c) => `<rect x="42" y="65" width="16" height="4" rx="2" fill="${c.light}"/><rect x="42" y="72" width="10" height="4" rx="2" fill="${c.light}"/>` },
+  { head: `<rect x="26" y="24" width="48" height="27" rx="13.5"/>`, arms: `<rect x="19" y="58" width="9" height="21" rx="4.5"/><rect x="72" y="58" width="9" height="21" rx="4.5"/>`, top: `<rect x="44" y="15" width="12" height="8" rx="3"/>`, chest: (c) => `<rect x="41" y="64" width="18" height="11" rx="4" fill="${c.light}"/>` },
+  { head: `<path d="M33 22h34l7 8v14l-7 8H33l-7-8V30z" stroke-width="4" stroke-linejoin="round"/>`, arms: `<rect x="19" y="58" width="9" height="21" rx="4.5" transform="rotate(-150 23.5 62)"/><rect x="72" y="58" width="9" height="21" rx="4.5" transform="rotate(150 76.5 62)"/>`, top: ``, chest: (c) => `<circle cx="44" cy="69" r="3.2" fill="${c.light}"/><circle cx="56" cy="69" r="3.2" fill="${c.light}"/>` },
+  { head: `<rect x="31" y="20" width="38" height="32" rx="8"/>`, arms: `<rect x="19" y="58" width="9" height="21" rx="4.5"/><rect x="72" y="58" width="9" height="21" rx="4.5" transform="rotate(-150 76.5 62)"/>`, top: `<path d="M50 20v-7" stroke-width="4.5" stroke-linecap="round"/><path d="M43 12h14" stroke-width="4.5" stroke-linecap="round"/>`, chest: (c) => `<path d="M43 69h14" stroke="${c.light}" stroke-width="4" stroke-linecap="round"/>` },
+  { head: `<path d="M28 44a22 22 0 0 1 44 0v2a6 6 0 0 1-6 6H34a6 6 0 0 1-6-6z"/>`, arms: `<rect x="19" y="58" width="9" height="21" rx="4.5" transform="rotate(28 23.5 60)"/><rect x="72" y="58" width="9" height="21" rx="4.5" transform="rotate(-28 76.5 60)"/>`, top: ``, chest: (c) => `<circle cx="50" cy="69" r="5.5" fill="none" stroke="${c.light}" stroke-width="3"/>` },
+]
+const eyesD = [
+  `<circle cx="42" cy="37" r="4.4"/><circle cx="58" cy="37" r="4.4"/>`,
+  `<rect x="38" y="31" width="6" height="12" rx="3"/><rect x="56" y="31" width="6" height="12" rx="3"/>`,
+  `<rect x="33" y="31" width="34" height="12" rx="6"/>`,
+  `<circle cx="50" cy="37" r="8"/>`,
+  `<circle cx="42" cy="36" r="4.4"/><circle cx="58" cy="36" r="4.4"/>`,
+  `<path d="M37 40q5-8 10 0M53 40q5-8 10 0" fill="none" stroke="${deep}" stroke-width="4" stroke-linecap="round"/>`,
+]
+const pupilD = [
+  ``, ``,
+  (c) => `<circle cx="42" cy="37" r="2.6" fill="${c.light}"/><circle cx="58" cy="37" r="2.6" fill="${c.light}"/>`,
+  (c) => `<circle cx="50" cy="37" r="3.2" fill="${c.light}"/>`,
+  ``, ``,
+]
+const setD = order.map((color, i) =>
+  frame(color, (c) => {
+    const b = bodyD[i]
+    return `<rect width="100" height="100" rx="28" fill="${c.light}"/><g fill="${c.fill}" stroke="${c.fill}" stroke-width="0">${b.top}${b.head}<rect x="45" y="51" width="10" height="6"/><rect x="32" y="56" width="36" height="27" rx="9"/>${b.arms}</g>${b.chest(c)}<g fill="${deep}">${eyesD[i]}</g>${pupilD[i] ? pupilD[i](c) : ''}`
+  }),
+)
+
+const sets = [
+  ['A', '机器人头像', '白色机器人头加天线 面罩 眼睛', setA],
+  ['B', '棱面 Bot', '延续你标志的折面和留缝 不带底板', setB],
+  ['C', '屏幕脸', '深色屏幕上的发光眼睛', setC],
+  ['D', '全身小机器人', '头 身体 手臂的完整小人', setD],
+]
+const panel = (code, svgs, dark) =>
+  `<div class="panel${dark ? ' dark' : ''}"><div class="big">${svgs.map((s, i) => `<figure>${s}<figcaption>${code}${i + 1}</figcaption></figure>`).join('')}</div><div class="small">${svgs.join('')}<i></i>${svgs.join('')}</div></div>`
+document.getElementById('sets').outerHTML = sets
+  .map(([code, name, note, svgs]) => `<section><h2>${code} ${name}<small>${note}</small></h2><div class="panels">${panel(code, svgs, false)}${panel(code, svgs, true)}</div></section>`)
+  .join('')
+</script>
+</body>
+</html>

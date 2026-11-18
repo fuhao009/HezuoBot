@@ -53,7 +53,6 @@ import { SidebarResizeHandle } from "./SidebarResizeHandle";
 import { SidebarTileGrid } from "./SidebarTiles";
 import { GlassBar, GlassScrollFrame, GlassScroller } from "./GlassScrollFrame";
 import { SidebarSectionHeader } from "./SidebarSectionHeader";
-import { SidebarSearchPill, SidebarSearchToggle } from "./SidebarSimpleTop";
 import { SidebarRailSeparator, SimpleRailFooter } from "./SidebarSimpleRail";
 
 const bot = (id: string, extra: Partial<Bot> = {}): Bot => ({
@@ -82,6 +81,8 @@ const sectionOrder = (tree: ReactElement<Props>[]) => tree.map((node) => node.pr
 const headers = (tree: ReactElement<Props>[]) => tree.filter((node) => node.type === SidebarSectionHeader) as ReactElement<Parameters<typeof SidebarSectionHeader>[0]>[];
 const listedBots = (tree: ReactElement<Props>[]) => tree.map((node) => (node.props.bot as Bot | undefined)?.id).filter(Boolean);
 const labelled = (tree: ReactElement<Props>[], label: string) => tree.some((node) => node.props["aria-label"] === label);
+const searchButton = (tree: ReactElement<Props>[]) => tree.find((node) => node.type === "button" && node.props["aria-label"] === "Search bots and messages");
+const searchField = (tree: ReactElement<Props>[]) => tree.find((node) => node.type === "input" && node.props["aria-label"] === "Search bots and messages");
 
 beforeEach(() => {
   fixture.values = [];
@@ -158,8 +159,7 @@ describe("Simple-mode sidebar layout", () => {
     expect(headers(tree).map((header) => [header.props.name, header.props.line, header.props.count])).toEqual([["Work", true, 2], ["Ungrouped", true, 1]]);
     expect(listedBots(tree)).toEqual(["dodo", "echo", "cleo"]);
     expect(tree.some((node) => node.props["data-sidebar-product-default"] !== undefined)).toBe(false);
-    expect(tree.some((node) => node.type === SidebarSearchToggle)).toBe(true);
-  });
+      });
 
   it("fades the list's edges in both modes, with the top buttons and the tiles fixed above it", () => {
     fixture.state = { ...fixture.state, bots: [bot("chief", { chiefOfStaff: true, pinned: true }), bot("atlas", { pinned: true }), bot("bea")] };
@@ -264,25 +264,15 @@ describe("Simple-mode sidebar layout", () => {
     expect(lines.find((header) => header.props.name === "Ungrouped")!.props.collapsed).toBe(true);
   });
 
-  it("toggles a search pill from the round search button, and closing it clears the filter", () => {
-    const toggle = () => render().tree.find((node) => node.type === SidebarSearchToggle)!.props as Parameters<typeof SidebarSearchToggle>[0];
-    const pill = () => render().tree.find((node) => node.type === SidebarSearchPill)?.props as Parameters<typeof SidebarSearchPill>[0] | undefined;
-    expect(render().tree.some((node) => node.props["aria-label"] === "Search bots and messages" && node.type === "input")).toBe(false);
-    expect(pill()).toBeUndefined();
-    expect(toggle().open).toBe(false);
-    toggle().onToggle();
-    expect(toggle().open).toBe(true);
-    pill()!.onQuery("bea");
-    expect(pill()!.query).toBe("bea");
+  it("leaves search to Advanced: no button or field in Simple mode, and Advanced's field filters the list", () => {
+    expect(labelled(render().tree, "Search bots and messages")).toBe(false);
+    fixture.values = [];
+    fixture.advanced = true;
+    const field = () => searchField(render().tree)!.props as { value: string; onChange: (event: { target: { value: string } }) => void };
+    expect(field().value).toBe("");
+    field().onChange({ target: { value: "bea" } });
+    expect(field().value).toBe("bea");
     expect(listedBots(render().tree)).toEqual(["bea"]);
-    pill()!.onClose();
-    expect(pill()).toBeUndefined();
-    expect(listedBots(render().tree)).toEqual(["dodo", "atlas", "bea"]);
-    toggle().onToggle();
-    pill()!.onQuery("atlas");
-    toggle().onToggle();
-    expect(pill()).toBeUndefined();
-    expect(listedBots(render().tree)).toHaveLength(3);
   });
 
   it("opens at 280px in Simple and 320px in Advanced, each remembering its own resized width", () => {
@@ -327,17 +317,18 @@ describe("Simple-mode sidebar layout", () => {
     expect(listedBots(tree)).toEqual(["dodo", "atlas", "bea"]);
     expect(headers(tree)).toEqual([]);
     expect(tree.filter((node) => node.type === SidebarRailSeparator)).toHaveLength(2);
-    expect(tree.some((node) => node.type === SidebarSearchToggle)).toBe(false);
+    expect(searchButton(tree)).toBeUndefined();
     expect(edge(tree)?.avatars, "the rail keeps its edge, to drag it open again").toBe(true);
     expect(edge(tree)?.avatarsWidth).toBe(92);
     expect(tree.some((node) => node.props["data-sidebar-top-buttons"] !== undefined)).toBe(false);
   });
 
-  it("puts round search and the same + menu at the top of the rail, and dragging its edge out opens it again", () => {
+  it("puts the same + menu alone at the top of the rail, and dragging its edge out opens it again", () => {
     setSidebarDensity("icons");
     const top = () => render().tree.find((node) => node.props["data-sidebar-rail-top"] !== undefined)!;
-    const plus = () => nodes(top().props.children).find((node) => node.type === "button" && node.props["aria-label"] === "New or share")!;
+    const plus = () => nodes(top().props.children).find((node) => node.type === "button" && node.props["aria-label"] === "New")!;
     expect(plus().props.className).toEqual(expect.stringContaining("size-9"));
+    expect(searchButton(nodes(top().props.children))).toBeUndefined();
     (plus().props.onClick as () => void)();
     const menu = nodes(top().props.children).find((node) => /\bmin-w-\[200px\]/.test(node.props.className ?? ""))!;
     expect(menu.props.className).toEqual(expect.stringContaining("left-full top-0"));
@@ -347,7 +338,7 @@ describe("Simple-mode sidebar layout", () => {
     expect(item("New chat"), "a new conversation starts from the bot panel").toBeUndefined();
     expect(item("New bot")).toBeDefined();
     expect(item("New group chat")).toBeDefined();
-    expect(item("Templates")).toBeDefined();
+    expect(item("Templates"), "the team library is Advanced's").toBeUndefined();
     edge(render().tree)!.onAvatars(false);
     expect(fixture.storage.get(SIDEBAR_DENSITY_KEY)).toBe("comfortable");
     expect(render().tree.some((node) => node.type === SimpleRailFooter)).toBe(false);
@@ -356,7 +347,7 @@ describe("Simple-mode sidebar layout", () => {
   it("New Bot makes a bot at once in both modes, Chief of Staff or not; Advanced keeps Create department and Templates", () => {
     fixture.state = { ...fixture.state, bots: [bot("atlas", { chiefOfStaff: true }), bot("bea")] };
     const openMenu = () => {
-      const plus = () => render().tree.find((node) => node.type === "button" && node.props["aria-label"] === "New or share")!;
+      const plus = () => render().tree.find((node) => node.type === "button" && node.props["aria-label"] === "New")!;
       (plus().props.onClick as () => void)();
       const tree = render().tree;
       return (label: string) => tree.find((node) => node.type === "button" && nodes(node.props.children).concat(node).some((part) => Children.toArray(part.props.children).includes(label)));
@@ -373,24 +364,18 @@ describe("Simple-mode sidebar layout", () => {
     expect(fixture.dispatch.mock.calls.map(([action]) => action)).toEqual([{ type: "newBot" }]);
   });
 
-  const railSearch = (tree: ReactElement<Props>[]) => tree.find((node) => node.type === "button" && node.props["aria-label"] === "Search bots and messages")!.props.onClick as () => void;
-
-  it("opens the search pill from the rail's search button by expanding the sidebar", () => {
-    setSidebarDensity("icons");
-    expect(render().tree.some((node) => node.type === SidebarSearchPill)).toBe(false);
-    railSearch(render().tree)();
-    const { tree } = render();
-    expect(tree.some((node) => node.type === SimpleRailFooter)).toBe(false);
-    expect(tree.some((node) => node.type === SidebarSearchPill)).toBe(true);
+  it("stays a rail with no edge to drag and no search button while a side panel holds it collapsed", () => {
+    const { tree } = render(true);
+    expect(edge(tree), "no edge to drag while a side panel holds it collapsed").toBeUndefined();
+    expect(searchButton(tree)).toBeUndefined();
+    expect(tree.some((node) => node.type === SimpleRailFooter)).toBe(true);
   });
 
-  it("opens the command palette instead when a side panel holds the sidebar collapsed", () => {
+  it("opens the command palette from the search button of Advanced's column of icons", () => {
+    fixture.advanced = true;
     const opened = vi.fn();
     window.addEventListener("omb:open-command-palette", opened);
-    const search = railSearch(render(true).tree);
-    expect(edge(render(true).tree), "no edge to drag while a side panel holds it collapsed").toBeUndefined();
-    search();
+    (searchButton(render(true).tree)!.props.onClick as () => void)();
     expect(opened).toHaveBeenCalledOnce();
-    expect(render(true).tree.some((node) => node.type === SimpleRailFooter)).toBe(true);
   });
 });

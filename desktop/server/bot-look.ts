@@ -1,4 +1,4 @@
-import { DEFAULT_MASCOT_BODY, type MascotBodyId } from "../../packages/shared/mascot-bodies.ts";
+import { MASCOT_BODY_IDS, type MascotBodyId } from "../../packages/shared/mascot-bodies.ts";
 import { HEZUO_COLOR_NAMES, type HezuoColor } from "../../packages/shared/wire.ts";
 
 export const STARTER_COLORS: readonly HezuoColor[] = HEZUO_COLOR_NAMES.filter((color) => color !== "silver" && color !== "chrome");
@@ -7,12 +7,18 @@ const ROTATION: readonly HezuoColor[] = ["green", "blue", "red", "orange", "purp
 /** The colour of the bot made `index`-th when nothing else picks one. */
 export const rotationColor = (index: number): HezuoColor => ROTATION[index % ROTATION.length]!;
 
-/** A new bot's first look: always the mascot's own shape, in a random colour no bot here wears yet when one is left. */
+/** A new bot's first look: a random colour and a random shape, each one no bot here wears yet when one is left. */
 export function freshLook(
-  bots: ReadonlyArray<{ color: HezuoColor }>,
+  bots: ReadonlyArray<{ color: HezuoColor; mascotBody?: string | null }>,
   random: () => number = Math.random,
 ): { color: HezuoColor; mascotBody: MascotBodyId } {
-  const unworn = STARTER_COLORS.filter((color) => !bots.some((bot) => bot.color === color));
-  const pool = unworn.length ? unworn : STARTER_COLORS;
-  return { color: pool[Math.min(pool.length - 1, Math.floor(random() * pool.length))]!, mascotBody: DEFAULT_MASCOT_BODY };
+  const unworn = <T>(all: readonly T[], worn: (value: T) => boolean): T => {
+    const free = all.filter((value) => !worn(value));
+    const pool = free.length ? free : all;
+    return pool[Math.min(pool.length - 1, Math.floor(random() * pool.length))]!;
+  };
+  return {
+    color: unworn(STARTER_COLORS, (color) => bots.some((bot) => bot.color === color)),
+    mascotBody: unworn(MASCOT_BODY_IDS, (body) => bots.some((bot) => bot.mascotBody === body)),
+  };
 }

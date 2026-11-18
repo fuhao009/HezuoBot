@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
-// The setup card is drawn under a new bot's greeting in the chat itself, and settles once the person has answered.
+// In Advanced mode the setup card is drawn under a new bot's greeting in the chat itself, and settles once the person has
+// answered. Simple mode has no setup card.
 import { createElement } from "react";
 import { flushSync } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
@@ -16,6 +17,7 @@ vi.mock("./ModelPicker", () => ({ ModelPicker: () => null }));
 
 const { ChatView } = await import("./ChatView");
 const { BotEditorStore, initialState } = await import("@/state/store");
+const { setAdvancedMode } = await import("@/lib/interface-mode");
 
 const greeting: Message = { id: "g1", role: "bot", kind: "text", at: new Date(2026, 9, 3, 9, 0).getTime(), text: "Hi, I'm Pepper. What would you like me to do?", setupOffer: true };
 const profile = (extra: Partial<Bot> = {}): Bot => ({
@@ -48,13 +50,22 @@ beforeAll(() => {
   const container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
+  setAdvancedMode(true);
 });
 afterAll(() => {
+  setAdvancedMode(false);
   root.unmount();
   vi.unstubAllGlobals();
 });
 
 describe("the setup card in the chat", () => {
+  it("is not drawn in Simple mode", async () => {
+    setAdvancedMode(false);
+    await draw(profile());
+    expect(card()).toBeNull();
+    setAdvancedMode(true);
+  });
+
   it("is drawn under a blank bot's greeting and sends a pick's words for this conversation", async () => {
     await draw(profile());
     expect(card()?.textContent).toContain("What should I help you with first?");

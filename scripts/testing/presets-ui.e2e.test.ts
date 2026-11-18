@@ -81,7 +81,7 @@ describe("Preset bots in the real renderer", () => {
     await click("Done");
     await click("Close settings");
 
-    await clickWhenFree("New or share");
+    await clickWhenFree("New");
     await click("Templates");
     await click("Import");
     await evaluate(`(() => { const input = document.querySelector('[role=dialog] input[type=file]'); const transfer = new DataTransfer(); transfer.items.add(new File([window.__presetText], 'sky-1.0.0.hezuo.json', { type: 'application/json' })); input.files = transfer.files; input.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
@@ -104,7 +104,7 @@ describe("Preset bots in the real renderer", () => {
     stored.content[orgRow.installId] = stored.content[stored.presets[0].installId];
     writeFileSync(presetsFile, JSON.stringify(stored));
 
-    await clickWhenFree("New or share");
+    await clickWhenFree("New");
     await click("Templates");
     await click("Share");
     await click("Share the General department");
@@ -121,7 +121,7 @@ describe("Preset bots in the real renderer", () => {
     const bots = async () => (await api("/api/bots")).bots as Array<{ id: string; name: string; installedPackage?: Record<string, unknown> }>;
     const create = async (value: string, expected: string, shot: string) => {
       const before = await bots();
-      await clickWhenFree("New or share");
+      await clickWhenFree("New");
       await click("Templates");
       await expect.poll(snapshot, { timeout: 20_000 }).toContain("Add Scout, Researcher");
       await click("Add Scout, Researcher");

@@ -66,7 +66,7 @@ describe("bot setup and tools in the real renderer", () => {
       if ((await accessExpanded()) !== "true") await click("Access");
     };
     const reviewReadyBot = async (name: string, title: string) => {
-      await click("New or share");
+      await click("New");
       await click("Templates");
       await expect.poll(snapshot, { timeout: 20_000 }).toContain(`Add ${name}, ${title}`);
       await click(`Add ${name}, ${title}`);

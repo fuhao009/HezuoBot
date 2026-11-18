@@ -12,8 +12,7 @@ import {
 } from "@/lib/mascot";
 import { BOT_AVATAR_CROPS } from "../../../packages/shared/bot-avatar";
 import { MASCOT_BODIES, MASCOT_BODY_IDS } from "../../../packages/shared/mascot-bodies";
-import { HALLOWEEN_BODIES, HALLOWEEN_BODY_IDS } from "../../../packages/shared/halloween-bodies";
-import type { BotBodyId } from "../../../packages/shared/bot-body";
+import { bodyOfBot, type BotBodyId } from "../../../packages/shared/bot-body";
 import { BotAvatar, HezuoAvatar } from "./Avatar";
 import { AvatarImageGenerator } from "./AvatarImageGenerator";
 import { AvatarFraming, OrganizationAvatarIcons, RESET_MASCOT_PATCH, useAvatarImage, type AvatarPatch } from "./avatar-editing";
@@ -137,7 +136,7 @@ export function BotProfileAvatarCard({
                   title={expression}
                   aria-label={`Use ${expression} expression`}
                 >
-                  <HezuoAvatar color={bot.color} faceColor={bot.mascotFaceColor} bodyId={bot.mascotBody ?? undefined} state={expression} size={42} animated={false} />
+                  <HezuoAvatar color={bot.color} faceColor={bot.mascotFaceColor} bodyId={bodyOfBot(bot)} state={expression} size={42} animated={false} />
                 </button>
               ))}
             </div>
@@ -172,14 +171,6 @@ export function BotProfileAvatarCard({
                 <BodyButton key={id} id={id} name={MASCOT_BODIES[id].name} bot={bot} busy={busy} onPatch={onPatch} />
               ))}
             </div>
-            <div className="mb-2 mt-4 text-[12px] font-medium uppercase tracking-[0.08em] text-ink-secondary">
-              {t("botPanel.avatar.halloween")}
-            </div>
-            <div className="grid grid-cols-5 gap-1.5" data-halloween-bodies>
-              {HALLOWEEN_BODY_IDS.map((id) => (
-                <BodyButton key={id} id={id} name={HALLOWEEN_BODIES[id].name} bot={bot} busy={busy} onPatch={onPatch} />
-              ))}
-            </div>
           </>
         )}
 
@@ -204,7 +195,7 @@ function BodyButton({ id, name, bot, busy, onPatch }: {
   busy: boolean;
   onPatch: (patch: AvatarPatch) => void;
 }) {
-  const selected = (bot.mascotBody ?? "cursor") === id;
+  const selected = bodyOfBot(bot) === id;
   return (
     <button
       type="button"

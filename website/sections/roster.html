@@ -1,0 +1,17 @@
+<section id="bots">
+  <div class="wrap">
+    <div class="tile">
+      <h2>每个 Bot 各有各的本事</h2>
+      <div class="roster">
+        <button class="bot-card" aria-pressed="true">{{bot:drop:cyan:working}}<b>小研</b><span class="pill">深度模型</span><span class="tools">{{icon:globe}}{{icon:database}}{{icon:file}}</span><span class="live" style="--c:var(--bot-cyan)"><i></i>核对第 8 家公司</span></button>
+        <button class="bot-card" aria-pressed="false">{{bot:square:purple:thinking}}<b>阿码</b><span class="pill">代码模型</span><span class="tools">{{icon:code}}{{icon:terminal}}{{icon:folder}}</span><span class="live" style="--c:var(--bot-purple)"><i></i>在想怎么修测试</span></button>
+        <button class="bot-card" aria-pressed="false">{{bot:cloud:blue}}<b>日报君</b><span class="pill">快速模型</span><span class="tools">{{icon:calendar}}{{icon:mail}}{{icon:chat}}</span><span class="live idle"><i></i>每天 9:00</span></button>
+        <button class="bot-card" aria-pressed="false">{{bot:flower:orange:asking}}<b>小客</b><span class="pill">深度模型</span><span class="tools">{{icon:mail}}{{icon:users}}{{icon:chat}}</span><span class="live" style="--c:var(--bot-orange)"><i></i>等你确认回复</span></button>
+      </div>
+      <div class="picker">
+        <div class="pick-row" role="group" aria-label="头像形状">{{bot-choices}}</div>
+        <div class="pick-row" role="group" aria-label="头像颜色">{{color-choices}}</div>
+      </div>
+    </div>
+  </div>
+</section>

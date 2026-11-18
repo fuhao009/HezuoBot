@@ -627,7 +627,6 @@
   "settings.language.aria": "Мова застосунку",
   "settings.language.error": "Не вдалося зберегти мову.",
   "settings.toolCalls.title": "Виклики інструментів",
-  "settings.toolCalls.subtitle": "Показувати в лозі кожен інструмент, який запускає бот. Вимкнено за замовчуванням — маскот уже показує, що відбувається робота.",
   "settings.toolCalls.show": "Показувати виклики інструментів",
   "settings.toolCalls.detail": "Іменовані чіпи для Bash, пошуку та інших інструментів. Помилки і повідомлення бот-бот все одно з'являються.",
   "settings.toolCalls.aria": "Показувати виклики інструментів у чаті",
@@ -3161,5 +3160,8 @@
   "botAccess.overview.botCount.other": "Ботів: {count}",
   "botAccess.overview.noBotsForPerson": "{name}: ботів ще немає.",
   "botAccess.overview.allPeople": "Усі люди",
-  "botAccess.overview.toastRemoved": "{bot}: {name} вилучено"
+  "botAccess.overview.toastRemoved": "{bot}: {name} вилучено",
+  "botIdentity.resetMascot": "Скинути аватар",
+  "botIdentity.crop.mascot": "Фігурка",
+  "settings.toolCalls.subtitle": "Показувати в розмові кожен інструмент, який запускає бот. Типово вимкнено, бо аватар уже показує, що триває робота."
 }

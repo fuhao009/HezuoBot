@@ -65,7 +65,7 @@ describe("Share team in the real renderer", () => {
       return true;
     })()`);
 
-    await click("New or share");
+    await click("New");
     await click("Templates");
     await click("Share");
     await expect.poll(snapshot, { timeout: 10_000 }).toContain("Share the Sales desk department");

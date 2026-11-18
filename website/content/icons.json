@@ -1,0 +1,19 @@
+{
+  "globe": "<circle cx='12' cy='12' r='9'/><path d='M3 12h18M12 3c3 3.2 3 14.8 0 18M12 3c-3 3.2-3 14.8 0 18'/>",
+  "terminal": "<rect x='3' y='4' width='18' height='16' rx='3'/><path d='M7 9l3 3-3 3M13 15h4'/>",
+  "calendar": "<rect x='3' y='5' width='18' height='16' rx='3'/><path d='M3 10h18M8 3v4M16 3v4'/>",
+  "mail": "<rect x='3' y='5' width='18' height='14' rx='3'/><path d='M4 7l8 6 8-6'/>",
+  "file": "<path d='M6 3h8l5 5v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z'/><path d='M14 3v5h5'/>",
+  "folder": "<path d='M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z'/>",
+  "lock": "<rect x='5' y='11' width='14' height='10' rx='3'/><path d='M8 11V8a4 4 0 0 1 8 0v3'/>",
+  "check": "<path d='M5 12.5l4.5 4.5L19 7'/>",
+  "cloud": "<path d='M7 18a4 4 0 0 1-.6-7.96A6 6 0 0 1 18 9.5a4.25 4.25 0 0 1-.5 8.5z'/>",
+  "moon": "<path d='M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z'/>",
+  "sun": "<circle cx='12' cy='12' r='4'/><path d='M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19'/>",
+  "database": "<ellipse cx='12' cy='6' rx='8' ry='3'/><path d='M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6'/>",
+  "chat": "<path d='M4 6a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3h-5l-5 4v-4a3 3 0 0 1-3-3z'/>",
+  "code": "<path d='M8 7l-5 5 5 5M16 7l5 5-5 5M14 4l-4 16'/>",
+  "users": "<circle cx='9' cy='8' r='3.5'/><path d='M2.5 20a6.5 6.5 0 0 1 13 0M16 4.8a3.5 3.5 0 0 1 0 6.4M18 14.5a6.5 6.5 0 0 1 3.5 5.5'/>",
+  "plug": "<path d='M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0zM12 17v4'/>",
+  "plus": "<path d='M12 5v14M5 12h14'/>"
+}

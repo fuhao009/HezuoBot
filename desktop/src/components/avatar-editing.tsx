@@ -22,7 +22,7 @@ export type AvatarPatch = Partial<
 export const RESET_MASCOT_PATCH: AvatarPatch = { avatarCrop: "mascot", color: "green", mascotExpression: null, mascotBody: "cursor", mascotFaceColor: null };
 
 export const CROP_LABEL = {
-  mascot: "Mascot",
+  mascot: "Figure",
   circle: "Circle",
   rounded: "Rounded",
   square: "Square",

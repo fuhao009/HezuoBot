@@ -78,7 +78,7 @@ function press(target: unknown) {
 }
 
 const menus = [
-  { name: "New or share", label: "New or share", item: "Create department" },
+  { name: "New", label: "New", item: "Create department" },
   { name: "Active Threads", label: "Active Threads", item: "No active threads" },
 ];
 const text = (tree: ReactElement<Props>[]) => tree.map((node) => Children.toArray(node.props.children).filter((child) => typeof child === "string").join(" ")).join(" ");
@@ -139,7 +139,7 @@ describe.each(menus)("sidebar header menu: $name", ({ label, item }) => {
 
 describe("sidebar header menu: New chat", () => {
   it("leads the + menu and opens the New chat panel in its place", () => {
-    trigger("New or share").props.onClick!();
+    trigger("New").props.onClick!();
     const first = render().find((node) => node.type === "button" && text([node]).includes("New chat"));
     expect(first).toBeDefined();
     expect(render().some((node) => node.type === SidebarNewChatPanel)).toBe(false);

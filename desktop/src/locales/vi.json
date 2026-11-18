@@ -1026,7 +1026,6 @@
   "settings.newBotEffort.aria": "Mức nỗ lực cho bot mới",
   "settings.newBotEffort.error": "Không thể lưu mức nỗ lực cho bot mới.",
   "settings.toolCalls.title": "Tool calls",
-  "settings.toolCalls.subtitle": "Hiển thị từng công cụ bot chạy trong bản ghi cuộc trò chuyện. Mặc định là tắt — linh vật đã hiển thị công việc đang diễn ra.",
   "settings.toolCalls.show": "Hiển thị tool call",
   "settings.toolCalls.detail": "Các thẻ có tên cho Bash, tìm kiếm và những công cụ khác. Lỗi và tin nhắn giữa bot với bot vẫn hiển thị.",
   "settings.toolCalls.aria": "Hiển thị tool call trong đoạn chat",
@@ -5154,5 +5153,8 @@
   "botAccess.overview.botCount.other": "{count} bot",
   "botAccess.overview.noBotsForPerson": "{name} chưa có bot nào.",
   "botAccess.overview.allPeople": "Tất cả mọi người",
-  "botAccess.overview.toastRemoved": "{bot}: đã gỡ {name}"
+  "botAccess.overview.toastRemoved": "{bot}: đã gỡ {name}",
+  "botIdentity.resetMascot": "Đặt lại ảnh đại diện",
+  "botIdentity.crop.mascot": "Hình nhân vật",
+  "settings.toolCalls.subtitle": "Hiển thị trong cuộc trò chuyện mỗi công cụ mà bot chạy. Mặc định tắt, vì ảnh đại diện đã cho thấy công việc đang diễn ra."
 }

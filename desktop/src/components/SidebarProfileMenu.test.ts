@@ -433,24 +433,38 @@ describe("Simple mode's account menu", () => {
     return all;
   }, []);
 
-  it("leads with usage, the phone app, support and Settings, then Automations and Team map, then where this window is and Cloud", () => {
-    const items = build();
-    expect(groups(items)).toEqual([
-      ["usage", "phone-app", "support", "settings"],
-      ["automations", "team-map"],
-      ["place", "switch-place", "account"],
-    ]);
-    expect(items.find((item) => item.key === "support")!.submenu!.map((item) => item.key)).toEqual(["help", "feedback", "shortcuts", "about", "update"]);
+  it("holds Settings and updates, then Archived bots while there are any, then the Cloud account and About, and nothing else", () => {
+    expect(groups(build())).toEqual([["settings", "update"], ["account", "about"]]);
+    expect(groups(build({ update: null, account: null }))).toEqual([["settings"], ["about"]]);
+
+    const open = vi.fn();
+    const withArchived = toolMenuItems({ activeView: "chat", automationsNeedYou: true, onAutomations: noop, onTeamMap: noop, onFiles: noop, archived: { count: 3, open } });
+    const items = build({
+      usageSummary: { value: "12% used", weekly: true, resets: "Resets in 3 days" },
+      simple: { tools: withArchived, places: placeMenuItems(place(), { owner: null, onCloudSettings: noop }) },
+    });
+    expect(groups(items)).toEqual([["settings", "update"], ["archived"], ["account", "about"]]);
+    expect(items.find((item) => item.key === "archived")!.value).toBe("3");
+    items.find((item) => item.key === "archived")!.onSelect();
+    expect(open).toHaveBeenCalledOnce();
+    expect(items.some((item) => item.submenu)).toBe(false);
   });
 
-  it("raises an update that is ready or failed to its own top row with a pill, and keeps it out of support", () => {
+  it("opens Settings, About and the Cloud account from their rows", () => {
+    const onSettings = vi.fn(), onAbout = vi.fn(), onAccount = vi.fn();
+    const items = build({ onSettings, onAbout, onAccount });
+    for (const key of ["settings", "about", "account"]) items.find((item) => item.key === key)!.onSelect();
+    expect(items.find((item) => item.key === "account")!.label).toBe("Hezuo Cloud");
+    expect([onSettings, onAbout, onAccount].map((handler) => handler.mock.calls.length)).toEqual([1, 1, 1]);
+  });
+
+  it("raises an update that is ready or failed to its own top row with a pill, and keeps it out of the Settings group", () => {
     const update = { key: "update", label: "Restart to update to Hezuo 0.2.0", subtitle: "notes", attention: true, onSelect: noop };
     const items = build({ update, updateTop: { label: "Update ready", action: "Restart" } });
-    expect(groups(items)[0]).toEqual(["update"]);
+    expect(groups(items)).toEqual([["update"], ["settings"], ["account", "about"]]);
     expect(items[0]).toMatchObject({ label: "Update ready", subtitle: undefined, attention: false });
     expect(renderToStaticMarkup(createElement("div", null, items[0]!.trailing))).toContain(">Restart</span>");
     expect(items[1]!.separatorBefore).toBe(true);
-    expect(items.find((item) => item.key === "support")!.submenu!.map((item) => item.key)).not.toContain("update");
   });
 
   it("raises a downloaded or failed app update and a newer server, and nothing else", () => {
@@ -462,13 +476,6 @@ describe("Simple mode's account menu", () => {
     for (const phase of ["idle", "checking", "downloading", "up-to-date"] as const) expect(simpleUpdateTop({ source: "desktop", phase })).toBeNull();
     expect(simpleUpdateTop({ source: "server", phase: "error" })).toBeNull();
     expect(simpleUpdateTop(null)).toBeNull();
-  });
-
-  it("gives the usage row a trailing meta and a chevron, with the reset as its second line", () => {
-    const usage = build({ usageSummary: { value: "12% used", weekly: true, resets: "Resets in 3 days" } })[0]!;
-    expect(usage).toMatchObject({ label: "Weekly usage", value: "12% used", subtitle: "Resets in 3 days", chevron: true });
-    expect(build()[0]).toMatchObject({ label: "Usage", chevron: true });
-    expect(build()[0]!.value).toBeUndefined();
   });
 
   it("keeps Advanced's account menu as it was", () => {
@@ -518,17 +525,12 @@ describe("Simple mode's account menu", () => {
   it("puts the move's row first, in its own group, above a raised update", () => {
     const move = [{ key: "cloud-move", label: "Try My Cloud move again", title: "My Cloud did not answer.", onSelect: noop }];
     const update = { key: "update", label: "Hezuo 0.2.0 ready, restart", onSelect: noop };
-    expect(groups(build({ move }))).toEqual([
-      ["cloud-move"],
-      ["usage", "phone-app", "support", "settings"],
-      ["automations", "team-map"],
-      ["place", "switch-place", "account"],
-    ]);
-    expect(groups(build({ move, update, updateTop: { label: "Update ready", action: "Restart" } })).slice(0, 2)).toEqual([["cloud-move"], ["update"]]);
-    expect(groups(build({ move: [] }))[0]).toEqual(["usage", "phone-app", "support", "settings"]);
+    expect(groups(build({ move }))).toEqual([["cloud-move"], ["settings", "update"], ["account", "about"]]);
+    expect(groups(build({ move, update, updateTop: { label: "Update ready", action: "Restart" } })).slice(0, 3)).toEqual([["cloud-move"], ["update"], ["settings"]]);
+    expect(groups(build({ move: [] }))[0]).toEqual(["settings", "update"]);
   });
 
-  it("gives a failing or moving move one row shaped like Usage and Settings: a label and an icon, no second line", () => {
+  it("gives a failing or moving move one row shaped like Settings: a label and an icon, no second line", () => {
     const shape = (item: SidebarMenuItem) => ({ lines: [item.subtitle, item.note].filter(Boolean).length, wrap: item.wrap === true, icon: Boolean(item.icon) });
     const failing = moveMenuItems(moveLine({ phase: "copy", failing: { error: "Some of this computer's things did not reach My Cloud." } }, "local"), { onOpen: noop, onRetry: noop, onClose: noop });
     const moving = moveMenuItems(moveLine({ phase: "copy", chats: { done: 34, total: 120 } }, "local"), { onOpen: noop, onRetry: noop, onClose: noop });

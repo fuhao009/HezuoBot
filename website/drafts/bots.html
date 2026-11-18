@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HezuoBot 形象动态稿</title>
+<style>
+*{box-sizing:border-box;margin:0}
+body{font:15px/1.5 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;background:#fff;color:#1d1d1f;padding:36px 24px 80px}
+main{max-width:1080px;margin:0 auto;display:grid;gap:22px}
+header{display:flex;align-items:center;gap:14px}
+header img{width:48px;height:48px}
+h1{font-size:30px;letter-spacing:-.02em}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;padding:0}
+:focus-visible{outline:2px solid #0071e3;outline-offset:2px}
+.bar{display:flex;flex-wrap:wrap;gap:14px;align-items:center}
+.seg{display:flex;background:#e3e3e8;border-radius:11px;padding:3px}
+.seg button{padding:7px 14px;border-radius:8px;font-size:14px;font-weight:500;white-space:nowrap}
+.seg button[aria-pressed="true"]{background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.16)}
+.swatches{display:flex;gap:8px;align-items:center}
+.swatches button{width:24px;height:24px;border-radius:50%;box-shadow:0 0 0 2px #fff,0 0 0 4px transparent}
+.swatches button[aria-pressed="true"]{box-shadow:0 0 0 2px #fff,0 0 0 4px #1d1d1f}
+.plain{padding:8px 16px;border-radius:980px;border:1px solid #0071e3;color:#0071e3;font-size:14px}
+.panels{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.panel{background:#f5f5f7;border-radius:24px;padding:26px 22px;display:grid;gap:22px}
+.panel.dark{background:#0c0c0d;color:#f5f5f7}
+.big{display:grid;grid-template-columns:repeat(4,1fr);gap:10px 8px}
+.big figure{display:grid;justify-items:center}
+.big svg{width:100%;max-width:112px;height:auto;display:block;overflow:visible}
+figcaption{font-size:12px;opacity:.5;font-variant-numeric:tabular-nums}
+.small{display:flex;flex-wrap:wrap;gap:7px}
+.small svg{width:32px;height:32px;overflow:visible}
+@media(max-width:820px){.panels{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main>
+  <header><img src="assets/logo-128.png" alt=""><h1>Bot 形象 动态稿</h1></header>
+  <div class="bar">
+    <div class="seg" id="states" role="group" aria-label="状态"></div>
+    <div class="seg" id="textures" role="group" aria-label="质感"></div>
+    <div class="swatches" id="colors" role="group" aria-label="颜色"></div>
+    <button class="plain" id="shuffle">换一批形状</button>
+  </div>
+  <div class="panels"><div class="panel"></div><div class="panel dark"></div></div>
+</main>
+<script>
+const TAU = Math.PI * 2
+const palette = {
+  cyan: ['#b9fff3', '#3fdcf2', '#1290cc'],
+  blue: ['#c3daff', '#5b95ff', '#2a5ce0'],
+  green: ['#c8f8da', '#3fd086', '#0e9160'],
+  orange: ['#ffe5bd', '#ffa246', '#e36f18'],
+  purple: ['#e5daff', '#a383f7', '#6f45d8'],
+  pink: ['#ffdaec', '#f67cba', '#cc3a88'],
+}
+const colorNames = Object.keys(palette)
+const ink = '#0d1b26'
+const states = [
+  ['idle', '等待'],
+  ['working', '工作'],
+  ['thinking', '思考'],
+  ['asking', '等你确认'],
+  ['done', '完成'],
+  ['error', '报错'],
+]
+const textures = [
+  ['gloss', '光泽'],
+  ['matte', '哑光'],
+]
+
+const rand = (lo, hi) => lo + Math.random() * (hi - lo)
+const pick = (list) => list[Math.floor(Math.random() * list.length)]
+const mod = (x, m) => ((x % m) + m) % m
+const lobe = (x, k) => Math.sign(x) * Math.pow(Math.abs(x), k)
+const UP = -Math.PI / 2
+const SAMPLES = 120
+
+const polygon = (n, rot, sharp) => (t) => {
+  const half = Math.PI / n
+  return 1 + (Math.cos(half) / Math.cos(mod(t - rot, 2 * half) - half) - 1) * sharp
+}
+const ellipse = (a, b, tilt) => (t) => (a * b) / Math.hypot(b * Math.cos(t - tilt), a * Math.sin(t - tilt))
+const petals = (n, rot, depth, k) => (t) => 1 - depth + depth * Math.pow(Math.abs(Math.cos((n * (t - rot)) / 2)), k)
+const points = (n, rot, depth, k) => (t) => 1 + depth * lobe(Math.cos(n * (t - rot)), k)
+const bump = (t, at, width) => Math.exp(-Math.pow(Math.atan2(Math.sin(t - at), Math.cos(t - at)) / width, 2))
+
+const archetypes = {
+  circle: ['圆', () => ({ radius: () => 1, soften: 0 })],
+  pill: ['胶囊', () => ({ radius: ellipse(1.32, 0.76, rand(-0.5, 0.5)), soften: 0 })],
+  egg: ['蛋', () => ({ radius: (t) => ellipse(0.86, 1.08, 0)(t) * (1 + 0.1 * Math.sin(t)), soften: 0 })],
+  triangle: ['三角', () => ({ radius: polygon(3, UP + rand(-0.25, 0.25), 0.9), soften: 10 })],
+  square: ['方', () => ({ radius: polygon(4, Math.PI / 4 + rand(-0.12, 0.12), 0.78), soften: 8 })],
+  pentagon: ['五边', () => ({ radius: polygon(5, UP + rand(-0.3, 0.3), 0.95), soften: 6 })],
+  hexagon: ['六边', () => ({ radius: polygon(6, rand(0, 1), 1), soften: 5 })],
+  star4: ['四角星', () => ({ radius: points(4, rand(-0.3, 0.3), 0.27, 1.7), soften: 3 })],
+  star5: ['五角星', () => ({ radius: points(5, UP + rand(-0.2, 0.2), 0.22, 1.5), soften: 3 })],
+  clover: ['四叶', () => ({ radius: petals(4, rand(-0.3, 0.3), 0.3, 0.6), soften: 4 })],
+  flower: ['花', () => ({ radius: petals(pick([5, 6]), UP, 0.26, 0.7), soften: 3 })],
+  cloud: [
+    '云',
+    () => {
+      const wide = ellipse(1.15, 0.9, 0)
+      const scallops = petals(pick([7, 8, 9]), rand(0, 1), 0.16, 0.8)
+      return { radius: (t) => wide(t) * scallops(t), soften: 2 }
+    },
+  ],
+  drop: [
+    '水滴',
+    () => {
+      const tip = UP + rand(-0.5, 0.5)
+      return { radius: (t) => 1 + 0.6 * bump(t, tip, 0.4), soften: 3 }
+    },
+  ],
+  bean: [
+    '豆',
+    () => {
+      const tilt = rand(-0.6, 0.6)
+      const body = ellipse(1.25, 0.85, tilt)
+      return { radius: (t) => body(t) - 0.24 * bump(t, tilt + UP, 0.5), soften: 3 }
+    },
+  ],
+  dome: ['馒头', () => ({ radius: (t) => (Math.sin(t) < 0 ? ellipse(1, 1.05, 0)(t) : ellipse(1, 0.45, 0)(t)), soften: 7 })],
+  splat: [
+    '泼溅',
+    () => {
+      const n = pick([6, 7, 8])
+      const rot = rand(0, 1)
+      const heights = Array.from({ length: n }, () => rand(0.14, 0.34))
+      return {
+        radius: (t) => {
+          const phase = (n * (t - rot)) / 2
+          return 0.82 + heights[Math.floor(mod(phase + Math.PI / 2, n * Math.PI) / Math.PI) % n] * Math.pow(Math.abs(Math.cos(phase)), 1.1)
+        },
+        soften: 2,
+      }
+    },
+  ],
+  pebble: [
+    '卵石',
+    () => {
+      const p = rand(0, TAU)
+      const q = rand(0, TAU)
+      return { radius: (t) => 1 + 0.13 * Math.cos(2 * t + p) + 0.1 * Math.cos(3 * t + q), soften: 0 }
+    },
+  ],
+}
+const makeShape = (kind) => {
+  const [label, create] = archetypes[kind]
+  const { radius, soften } = create()
+  let radii = Array.from({ length: SAMPLES }, (_, i) => radius((i / SAMPLES) * TAU))
+  for (let pass = 0; pass < soften; pass++) radii = radii.map((r, i) => (radii[(i + SAMPLES - 1) % SAMPLES] + 2 * r + radii[(i + 1) % SAMPLES]) / 4)
+  const raw = radii.map((r, i) => [r * Math.cos((i / SAMPLES) * TAU), r * Math.sin((i / SAMPLES) * TAU)])
+  const xs = raw.map((point) => point[0])
+  const ys = raw.map((point) => point[1])
+  const width = Math.max(...xs) - Math.min(...xs)
+  const height = Math.max(...ys) - Math.min(...ys)
+  const scale = 68 / Math.max(width, height)
+  const placed = raw.map(([x, y]) => [50 + (x - (Math.max(...xs) + Math.min(...xs)) / 2) * scale, 49 + (y - (Math.max(...ys) + Math.min(...ys)) / 2) * scale])
+  let area = 0
+  let cx = 0
+  let cy = 0
+  placed.forEach(([x, y], i) => {
+    const [nx, ny] = placed[(i + 1) % SAMPLES]
+    const cross = x * ny - nx * y
+    area += cross
+    cx += (x + nx) * cross
+    cy += (y + ny) * cross
+  })
+  cx /= 3 * area
+  cy /= 3 * area
+  const polar = placed.map(([x, y]) => [Math.atan2(y - cy, x - cx), Math.hypot(x - cx, y - cy)])
+  return { label, center: [cx, cy], polar, mean: polar.reduce((sum, point) => sum + point[1], 0) / SAMPLES, ground: 49 + (height * scale) / 2, width: width * scale }
+}
+const firstSet = ['circle', 'triangle', 'square', 'star4', 'clover', 'drop', 'pill', 'flower', 'hexagon', 'cloud', 'dome', 'splat']
+const randomSet = () => {
+  const pool = Object.keys(archetypes)
+  return firstSet.map(() => pool.splice(Math.floor(Math.random() * pool.length), 1)[0])
+}
+
+const outline = (shape, m) => {
+  const [cx, cy] = shape.center
+  const path = shape.polar.map(([angle, radius], i) => {
+    const r = (shape.mean + (radius - shape.mean) * m.amp) * (1 + m.ripple * 0.045 * Math.sin((3 * i * TAU) / SAMPLES - m.spin * 4))
+    return [cx + r * Math.cos(angle) * m.sx, shape.ground + (cy + r * Math.sin(angle) - shape.ground) * m.sy]
+  })
+  const mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]
+  const start = mid(path[SAMPLES - 1], path[0])
+  let d = `M${start[0].toFixed(1)} ${start[1].toFixed(1)}`
+  for (let i = 0; i < SAMPLES; i++) {
+    const next = mid(path[i], path[(i + 1) % SAMPLES])
+    d += `Q${path[i][0].toFixed(1)} ${path[i][1].toFixed(1)} ${next[0].toFixed(1)} ${next[1].toFixed(1)}`
+  }
+  return d + 'Z'
+}
+
+const neutral = { amp: 1, ripple: 0, sx: 1, sy: 1, tx: 0, ty: 0, rot: 0, ex: 0, ey: 0, es: 1, squint: 1, red: 0, work: 0 }
+const pose = {
+  idle: () => ({}),
+  working: (t, tau, o) => {
+    const s = Math.sin(t * 5 + o)
+    return { work: 1, ripple: 1, sy: 1 + 0.05 * s, sx: 1 - 0.04 * s, ex: 4 * Math.sin(t * 2.6 + o), ey: 1.6, squint: 0.82 }
+  },
+  thinking: (t, tau, o) => {
+    const breath = 1 + 0.03 * Math.sin(t * 1.5 + o)
+    return { work: 0.35, ripple: 0.5, sx: breath, sy: breath, amp: 1 + 0.1 * Math.sin(t * 1.1 + o), ex: 3.5 + 1.2 * Math.sin(t * 0.8 + o), ey: -3 }
+  },
+  asking: (t, tau, o) => {
+    const hop = Math.abs(Math.sin(t * 2.2 + o))
+    return { ty: -4 * hop, sy: 1 + 0.04 * hop, sx: 1 - 0.03 * hop, rot: 6 * Math.sin(t * 2.2 + o), es: 1.18 }
+  },
+  done: (t, tau) => {
+    const fade = Math.exp(-tau * 2.4)
+    const wobble = fade * Math.sin(tau * 16 + 1.2)
+    return { ty: -10 * fade * Math.abs(Math.sin(tau * 8)), sy: 1 + 0.1 * wobble, sx: 1 - 0.08 * wobble }
+  },
+  error: (t, tau) => ({ red: 1, sy: 0.9, sx: 1.07, amp: 0.6, rot: -3, ey: 1.5, tx: tau % 2 < 0.5 ? 1.6 * Math.sin(tau * 40) : 0 }),
+}
+const blinks = { working: true, thinking: true, asking: true }
+
+const view = { state: 'idle', texture: 'gloss', color: 'cyan', since: 0 }
+let shapes = firstSet.map(makeShape)
+let bots = []
+let serial = 0
+
+const build = () => {
+  bots = shapes.map((shape, index) => ({ shape, index, offset: index * 1.7, spin: 0, weights: Object.fromEntries(states.map(([name]) => [name, name === view.state ? 1 : 0])), nodes: [] }))
+  for (const panel of document.querySelectorAll('.panel')) {
+    const make = (bot) => {
+      const [light, base, dark] = palette[view.color === 'mixed' ? colorNames[bot.index % colorNames.length] : view.color]
+      const id = `b${serial++}`
+      const cover = 'x="-30" y="-30" width="160" height="160"'
+      const gloss =
+        view.texture === 'gloss'
+          ? `<rect ${cover} fill="url(#${id}s)"/><rect ${cover} fill="url(#${id}h)"/><ellipse cx="37" cy="27" rx="11" ry="6.5" fill="url(#${id}k)" transform="rotate(-28 37 27)"/>`
+          : ''
+      const holder = document.createElement('div')
+      holder.innerHTML = `<svg viewBox="0 0 100 100"><defs>
+<clipPath id="${id}c"><path data-outline/></clipPath>
+<linearGradient id="${id}g" gradientUnits="userSpaceOnUse" x1="78" y1="12" x2="24" y2="88"><stop offset="0" stop-color="${light}"/><stop offset=".45" stop-color="${base}"/><stop offset="1" stop-color="${dark}"/></linearGradient>
+<linearGradient id="${id}r" gradientUnits="userSpaceOnUse" x1="78" y1="12" x2="24" y2="88"><stop offset="0" stop-color="#ffd0c6"/><stop offset=".45" stop-color="#ff8177"/><stop offset="1" stop-color="#dc4352"/></linearGradient>
+<radialGradient id="${id}h" gradientUnits="userSpaceOnUse" cx="38" cy="28" r="44"><stop offset="0" stop-color="#fff" stop-opacity=".55"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+<radialGradient id="${id}s" gradientUnits="userSpaceOnUse" cx="48" cy="40" r="54"><stop offset=".6" stop-color="${ink}" stop-opacity="0"/><stop offset="1" stop-color="${ink}" stop-opacity=".42"/></radialGradient>
+<radialGradient id="${id}k"><stop offset="0" stop-color="#fff" stop-opacity=".85"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+<radialGradient id="${id}f"><stop offset="0" stop-color="#000" stop-opacity=".28"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>
+</defs>
+<ellipse data-shadow cx="50" cy="${(bot.shape.ground + 6).toFixed(1)}" rx="${(bot.shape.width * 0.36).toFixed(1)}" ry="4.5" fill="url(#${id}f)"/>
+<g data-body><g clip-path="url(#${id}c)"><rect ${cover} fill="url(#${id}g)"/><rect data-alarm ${cover} fill="url(#${id}r)" opacity="0"/>${gloss}</g>
+<g data-face><g data-open fill="${ink}"><ellipse cx="-10.5" rx="4.7" ry="6.9"/><ellipse cx="10.5" rx="4.7" ry="6.9"/><circle cx="-12" cy="-2.9" r="1.8" fill="#fff"/><circle cx="9" cy="-2.9" r="1.8" fill="#fff"/></g>
+<path data-happy d="M-15.5 2.5q5-8.5 10 0M5.5 2.5q5-8.5 10 0" fill="none" stroke="${ink}" stroke-width="3.2" stroke-linecap="round" opacity="0"/>
+<path data-hurt d="M-14.5-4.5l7 4.5-7 4.5M14.5-4.5l-7 4.5 7 4.5" fill="none" stroke="${ink}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0"/></g></g></svg>`
+      const svg = holder.firstChild
+      const find = (name) => svg.querySelector(`[data-${name}]`)
+      bot.nodes.push({ outline: find('outline'), alarm: find('alarm'), shadow: find('shadow'), body: find('body'), face: find('face'), open: find('open'), happy: find('happy'), hurt: find('hurt') })
+      return svg
+    }
+    const big = document.createElement('div')
+    big.className = 'big'
+    const small = document.createElement('div')
+    small.className = 'small'
+    for (const bot of bots) {
+      const figure = document.createElement('figure')
+      figure.append(make(bot))
+      const caption = document.createElement('figcaption')
+      caption.textContent = bot.shape.label
+      figure.append(caption)
+      big.append(figure)
+      small.append(make(bot))
+    }
+    panel.replaceChildren(big, small)
+  }
+  render(performance.now(), 0)
+}
+
+const still = matchMedia('(prefers-reduced-motion:reduce)').matches
+let last = performance.now()
+const render = (now, dt) => {
+  const t = now / 1000
+  const tau = (now - view.since) / 1000
+  const ease = 1 - Math.exp(-dt * 9)
+  for (const bot of bots) {
+    const m = { ...neutral }
+    for (const [name] of states) {
+      const goal = name === view.state ? 1 : 0
+      bot.weights[name] += (goal - bot.weights[name]) * (dt ? ease : 1)
+      const weight = bot.weights[name]
+      if (weight < 0.002) continue
+      const delta = pose[name](t, tau, bot.offset)
+      for (const key in delta) m[key] += (delta[key] - neutral[key]) * weight
+    }
+    bot.spin += dt * m.work
+    m.spin = bot.spin
+    const happy = bot.weights.done
+    const hurt = bot.weights.error
+    const blink = blinks[view.state] && (t * 0.33 + bot.offset * 0.137) % 1 < 0.035 ? 0.1 : 1
+    const d = outline(bot.shape, m)
+    const ground = bot.shape.ground
+    const faceX = bot.shape.center[0].toFixed(2)
+    const faceY = ground + (bot.shape.center[1] + 2 - ground) * m.sy
+    const lift = 1 + m.ty / 40
+    for (const node of bot.nodes) {
+      node.outline.setAttribute('d', d)
+      node.alarm.setAttribute('opacity', (m.red * 0.9).toFixed(2))
+      node.shadow.setAttribute('transform', `translate(${(50 + m.tx).toFixed(2)} 0) scale(${lift.toFixed(3)} 1) translate(-50 0)`)
+      node.shadow.setAttribute('opacity', lift.toFixed(2))
+      node.body.setAttribute('transform', `translate(${m.tx.toFixed(2)} ${m.ty.toFixed(2)}) rotate(${m.rot.toFixed(2)} ${faceX} ${ground.toFixed(1)})`)
+      node.face.setAttribute('transform', `translate(${faceX} ${faceY.toFixed(2)})`)
+      node.open.setAttribute('transform', `translate(${m.ex.toFixed(2)} ${m.ey.toFixed(2)}) scale(${m.es.toFixed(3)} ${(m.es * m.squint * blink).toFixed(3)})`)
+      node.open.setAttribute('opacity', (1 - Math.max(happy, hurt)).toFixed(2))
+      node.happy.setAttribute('opacity', happy.toFixed(2))
+      node.hurt.setAttribute('opacity', hurt.toFixed(2))
+    }
+  }
+}
+const loop = (now) => {
+  render(now, Math.min(0.05, (now - last) / 1000))
+  last = now
+  requestAnimationFrame(loop)
+}
+
+const group = (id, options, key, onPick) => {
+  const host = document.getElementById(id)
+  host.innerHTML = options.map(([value, label, style]) => `<button data-value="${value}" aria-pressed="${view[key] === value}"${style ? ` style="${style}" aria-label="${label}"` : ''}>${style ? '' : label}</button>`).join('')
+  host.addEventListener('click', (event) => {
+    const button = event.target.closest('button')
+    if (!button) return
+    view[key] = button.dataset.value
+    for (const each of host.children) each.setAttribute('aria-pressed', String(each === button))
+    onPick()
+  })
+}
+group('states', states, 'state', () => {
+  view.since = performance.now()
+  if (still) render(view.since, 0)
+})
+group('textures', textures, 'texture', build)
+group(
+  'colors',
+  [...colorNames.map((name) => [name, name, `background:linear-gradient(210deg,${palette[name][0]},${palette[name][1]} 45%,${palette[name][2]})`]), ['mixed', '混色', 'background:conic-gradient(#3fdcf2,#5b95ff,#a383f7,#f67cba,#ffa246,#3fd086,#3fdcf2)']],
+  'color',
+  build,
+)
+document.getElementById('shuffle').addEventListener('click', () => {
+  shapes = randomSet().map(makeShape)
+  build()
+})
+
+build()
+if (!still) requestAnimationFrame(loop)
+</script>
+</body>
+</html>

@@ -532,6 +532,7 @@ function Application() {
     initAnalytics();
   }, []);
   const viewer = useWelcomeViewer();
+  const advanced = useAdvancedMode();
   return (
     <DesktopCapabilitiesProvider>
       <StoreProvider>
@@ -541,7 +542,7 @@ function Application() {
         <ProductSetupGate>
           <WelcomeGate viewer={viewer} />
           <HezuoWelcome viewer={viewer} />
-          <GuidedTour />
+          {advanced && <GuidedTour />}
           <FirstConversationTour quiet={spotlightsQuiet(viewer)} />
         </ProductSetupGate>
         <CloudTimeZoneSync viewer={viewer} />

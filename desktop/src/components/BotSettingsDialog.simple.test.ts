@@ -6,6 +6,7 @@ import type { Routine } from "@/lib/routines";
 import type { MemoryDoc } from "@/lib/memory";
 import type { Bot, BotSettingsSection, InstanceInfo } from "@/state/store";
 import { AVATAR_FOCUS_CENTER, AVATAR_ZOOM_MIN } from "../../../packages/shared/bot-avatar";
+import { MASCOT_BODY_IDS } from "../../../packages/shared/mascot-bodies";
 import type { ManagedSkill } from "./bot-settings/SkillsSection";
 import type { BotApps } from "./bot-settings/useBotApps";
 
@@ -119,10 +120,11 @@ const { AvatarEditorCard } = await import("./bot-panel/AvatarEditorCard");
 const { DetailsTab } = await import("./bot-panel/DetailsTab");
 const { BotConversations } = await import("./bot-panel/Conversations");
 const { SettingsPage } = await import("./bot-panel/SettingsPage");
+const { ActsChoice } = await import("./bot-panel/ActsChoice");
 const { LibraryTab } = await import("./bot-panel/LibraryTab");
 const { ApprovalChip } = await import("./ComposerPlusMenu");
 const { callMode, setCallMode } = await import("@/lib/call-mode");
-const { ActivityPanel, ComputerPanel } = await import("./lazy-screens");
+const { ComputerPanel } = await import("./lazy-screens");
 const { ComputerTab, WherePage } = await import("./bot-panel/ComputerTab");
 const { PageBody, AppsPage, RoutinesPage, MemoryPage, SkillsPage, FolderPage, BrowserPage } = await import("./bot-panel/pages");
 const { BrowserLogins } = await import("./bot-panel/browser-logins");
@@ -190,6 +192,7 @@ const panel = (bot: Bot, linkedSection: BotSettingsSection | null = null) =>
   capture(() => BotPanel({ bot, derived: derived(), linkedSection, onClose }));
 const dialog = (bot: Bot) => capture(() => BotSettingsDialog({ bot }));
 const botTab = (bot: Bot) => capture(() => DetailsTab({ bot, derived: derived(), onOpen }));
+const actsChoice = (bot: Bot) => capture(() => ActsChoice({ bot, derived: derived() }));
 const settingsPage = (bot: Bot, editingInstructions = false) =>
   capture(() => SettingsPage({ bot, derived: derived(), onOpen, editingInstructions, onEditInstructions }));
 const library = (bot: Bot) => capture(() => LibraryTab({ bot, onOpen }));
@@ -215,9 +218,10 @@ const key = (node: Node, name: string) => {
   return event;
 };
 const shown = (rendered: Rendered) => ({
-  tab: rendered.nodes.find((node) => node.props["data-panel-tab"] !== undefined && node.props["aria-selected"] === true)?.props["data-panel-tab"],
   page: rendered.nodes.find((node) => node.type === PageBody)?.props.page,
+  prompt: has(rendered, "data-panel-prompt"),
 });
+const firstScreen = { page: undefined, prompt: true };
 const rowValue = (rendered: Rendered, page: string) => find(rendered, "data-panel-page", page).props.value;
 const skill = (name: string, enabled: boolean, origin?: ManagedSkill["origin"]): ManagedSkill =>
   ({ name, description: `${name} helper`, enabled, source: "github:x/y", warnings: [], ...(origin ? { origin } : {}) });
@@ -270,89 +274,75 @@ beforeEach(() => {
 });
 
 describe("the bot panel in Simple mode", () => {
-  it("has Share, a gear for Bot settings and a close button on top, the hero, and four tabs: Details, Activity, Library, Computer", () => {
+  it("has a close button alone on top, then the hero and the bot's instructions, with no tabs", () => {
     const bot = makeBot();
     const rendered = panel(bot);
-    expect(ofType(rendered, ChatShareMenu)!.props.bot).toBe(bot);
-    const gear = find(rendered, "data-panel-gear");
-    expect([gear.props["aria-label"], gear.props.title]).toEqual(["Bot settings", "Bot settings"]);
+    expect(ofType(rendered, ChatShareMenu)).toBeUndefined();
+    expect(has(rendered, "data-panel-gear")).toBe(false);
     click(find(rendered, "aria-label", "Close settings"));
     expect(onClose).toHaveBeenCalled();
     const hero = ofType(rendered, PanelHero)!;
     expect(hero.props.bot).toBe(bot);
     expect(hero.props.patch).toBe(patch);
-    const tabs = [...rendered.html.matchAll(/data-panel-tab="(\w+)"[^>]*><span[^>]*>([^<]+)<\/span>/g)].map((match) => [match[1], match[2]]);
-    expect(tabs).toEqual([["details", "Details"], ["activity", "Activity"], ["library", "Library"], ["computer", "Computer"]]);
-    expect(shown(rendered)).toEqual({ tab: "details", page: undefined });
-    expect(ofType(rendered, DetailsTab)!.props.bot).toBe(bot);
+    expect(has(rendered, "role", "tablist")).toBe(false);
+    expect(rendered.html).not.toContain("data-panel-tab");
+    const instructions = ofType(rendered, SoulField)!;
+    expect(nodes(find(rendered, "data-panel-prompt").props.children).map((node) => node.type)).toEqual([SoulField]);
+    expect(instructions.props).toMatchObject({
+      bot,
+      onPatch: patch,
+      simple: { label: "Instructions", placeholder: "How should Scout work? What should it always or never do?" },
+    });
+    expect(rendered.nodes.indexOf(hero)).toBeLessThan(rendered.nodes.indexOf(instructions));
+    expect(rendered.html).toContain(">Be brief.</textarea>");
+    expect(shown(rendered)).toEqual(firstScreen);
     expect(rendered.html).toContain('id="bot-settings-title"');
   });
 
-  it("switches tabs", () => {
+  it("opens Bot settings from a link, and its apps a step further with Back to Bot settings", () => {
     const bot = makeBot();
-    for (const [tab, type] of [["computer", ComputerTab], ["activity", ActivityPanel], ["library", LibraryTab], ["details", DetailsTab]] as const) {
-      click(find(panel(bot), "data-panel-tab", tab));
-      const rendered = panel(bot);
-      expect(shown(rendered).tab).toBe(tab);
-      expect(ofType(rendered, type)).toBeDefined();
-    }
-  });
-
-  it("opens Bot settings from the gear on any tab, with Back to Details, and its apps with Back to Bot settings", () => {
-    const bot = makeBot();
-    click(find(panel(bot), "data-panel-tab", "library"));
-    click(find(panel(bot), "data-panel-gear"));
-    const settings = panel(bot);
-    expect(shown(settings)).toEqual({ tab: undefined, page: "settings" });
-    expect(ofType(settings, PageHeader)!.props).toMatchObject({ back: "Details", title: "Bot settings" });
+    const settings = panel(bot, "permissions");
+    expect(shown(settings)).toEqual({ page: "settings", prompt: false });
+    expect(ofType(settings, PageHeader)!.props.title).toBe("Bot settings");
     (ofType(settings, PageBody)!.props.onOpen as (page: string) => void)("apps");
     const apps = panel(bot);
     expect(ofType(apps, PageHeader)!.props).toMatchObject({ back: "Bot settings", title: "Apps it can use", intro: "Switch on the apps Scout may use. Everything else stays off." });
     (ofType(apps, PageHeader)!.props.onBack as () => void)();
     expect(shown(panel(bot)).page).toBe("settings");
     (ofType(panel(bot), PageHeader)!.props.onBack as () => void)();
-    expect(shown(panel(bot))).toEqual({ tab: "details", page: undefined });
+    expect(shown(panel(bot))).toEqual(firstScreen);
   });
 
-  it("drills into a page with its intro and back, naming where Back goes", () => {
+  it("shows a linked page with its title and intro in place of the first screen, and Back returns there", () => {
     const bot = makeBot();
-    (ofType(panel(bot), DetailsTab)!.props.onOpen as (page: string) => void)("routines");
-    const page = panel(bot);
-    expect(shown(page)).toEqual({ tab: undefined, page: "routines" });
-    expect(has(page, "role", "tablist")).toBe(false);
-    expect(ofType(page, PageHeader)!.props).toMatchObject({ back: "Details", title: "Routines" });
+    const page = panel(bot, "routines");
+    expect(shown(page)).toEqual({ page: "routines", prompt: false });
+    expect(ofType(page, PanelHero)).toBeUndefined();
+    expect(ofType(page, PageHeader)!.props).toMatchObject({ title: "Routines", intro: undefined });
     expect(page.html).toContain('id="bot-settings-title"');
     (ofType(page, PageHeader)!.props.onBack as () => void)();
-    expect(shown(panel(bot))).toEqual({ tab: "details", page: undefined });
+    expect(shown(panel(bot))).toEqual(firstScreen);
 
-    click(find(panel(bot), "data-panel-tab", "library"));
-    (ofType(panel(bot), LibraryTab)!.props.onOpen as (page: string) => void)("memory");
-    expect(ofType(panel(bot), PageHeader)!.props).toMatchObject({ back: "Library", title: "What it remembers" });
-    (ofType(panel(bot), PageHeader)!.props.onBack as () => void)();
-
-    click(find(panel(bot), "data-panel-tab", "computer"));
-    (ofType(panel(bot), ComputerTab)!.props.onOpen as (page: string) => void)("browser");
-    expect(ofType(panel(bot), PageHeader)!.props).toMatchObject({ back: "Computer", title: "Signed-in sites", intro: undefined });
+    fresh();
+    expect(ofType(panel(bot, "memory"), PageHeader)!.props)
+      .toMatchObject({ title: "What it remembers", intro: "Scout keeps these tidy on its own. Tap one to remove it." });
   });
 
-  it("goes back on Escape from a page, and leaves Escape to the dialog on a tab", () => {
+  it("goes back on Escape from a page, and leaves Escape to the dialog on the first screen", () => {
     const bot = makeBot();
-    (ofType(panel(bot), DetailsTab)!.props.onOpen as (page: string) => void)("routines");
-    const event = key(panel(bot).nodes[0]!, "Escape");
+    const event = key(panel(bot, "routines").nodes[0]!, "Escape");
     expect(event.stopPropagation).toHaveBeenCalled();
-    expect(shown(panel(bot)).page).toBeUndefined();
-    const onTab = key(panel(bot).nodes[0]!, "Escape");
-    expect(onTab.stopPropagation).not.toHaveBeenCalled();
+    expect(shown(panel(bot))).toEqual(firstScreen);
+    const onFirstScreen = key(panel(bot).nodes[0]!, "Escape");
+    expect(onFirstScreen.stopPropagation).not.toHaveBeenCalled();
   });
 
-  it("holds the Instructions editor open on Bot settings, and closes it when the panel moves on", () => {
+  it("opens and closes the Instructions editor on Bot settings as the page asks", () => {
     const bot = makeBot();
-    click(find(panel(bot), "data-panel-gear"));
-    expect(ofType(panel(bot), PageBody)!.props.editingInstructions).toBe(false);
+    expect(ofType(panel(bot, "permissions"), PageBody)!.props.editingInstructions).toBe(false);
     (ofType(panel(bot), PageBody)!.props.onEditInstructions as (open: boolean) => void)(true);
     expect(ofType(panel(bot), PageBody)!.props.editingInstructions).toBe(true);
-    (ofType(panel(bot), PageHeader)!.props.onBack as () => void)();
-    click(find(panel(bot), "data-panel-gear"));
+    (ofType(panel(bot), PageBody)!.props.onEditInstructions as (open: boolean) => void)(false);
     expect(ofType(panel(bot), PageBody)!.props.editingInstructions).toBe(false);
   });
 
@@ -377,8 +367,8 @@ describe("the bot panel in Simple mode", () => {
   ] as const)("lands a deep link to %s on %s › %s", (section, tab, page) => {
     expect([sectionTarget(section).tab, sectionTarget(section).page]).toEqual([tab, page]);
     const rendered = panel(makeBot(), section);
-    if (page) expect(shown(rendered).page).toBe(page);
-    else expect(shown(rendered)).toEqual({ tab, page: undefined });
+    if (page) expect(shown(rendered)).toEqual({ page, prompt: false });
+    else expect(shown(rendered)).toEqual(firstScreen);
     if (page) expect(PAGES[page].home).toBe(tab);
   });
 
@@ -395,28 +385,26 @@ describe("the bot panel in Simple mode", () => {
     try {
       openBotSettings(fixture.dispatch, "access", { page });
       const rendered = panel(makeBot(), "access");
-      if (landing) expect(shown(rendered)).toEqual({ tab: undefined, page: landing });
-      else expect(shown(rendered)).toEqual({ tab: "computer", page: undefined });
+      if (landing) expect(shown(rendered)).toEqual({ page: landing, prompt: false });
+      else expect(shown(rendered)).toEqual(firstScreen);
     } finally {
       // A link without a page lands where the section does: later tests see no trace of this one.
       openBotSettings(vi.fn(), "access");
     }
     fresh();
-    expect(shown(panel(makeBot(), "access"))).toEqual({ tab: "computer", page: undefined });
+    expect(shown(panel(makeBot(), "access"))).toEqual(firstScreen);
   });
 
-  it("shows no switch on any tab or on Bot settings: memory, upkeep, browser, record steps and Work until done live elsewhere", () => {
+  it("shows no switch on the first screen or on Bot settings: memory, upkeep, browser, record steps and Work until done live elsewhere", () => {
     const bot = makeBot();
-    expect(switches(panel(bot).html)).toBe(0);
-    expect(panel(bot).html).not.toContain('aria-label="Work until done"');
-    for (const tab of ["library", "computer"]) {
-      click(find(panel(bot), "data-panel-tab", tab));
-      const rendered = panel(bot);
-      expect(switches(rendered.html), tab).toBe(0);
-      for (const text of ["Memory", "Upkeep", "Record"]) expect(rendered.html).not.toContain(`>${text}<`);
-    }
-    click(find(panel(bot), "data-panel-gear"));
-    expect(switches(panel(bot).html)).toBe(0);
+    const first = panel(bot);
+    expect(switches(first.html)).toBe(0);
+    expect(first.html).not.toContain('aria-label="Work until done"');
+    for (const text of ["Memory", "Upkeep", "Record"]) expect(first.html).not.toContain(`>${text}<`);
+    fresh();
+    const settings = panel(bot, "permissions");
+    expect(shown(settings).page).toBe("settings");
+    expect(switches(settings.html)).toBe(0);
   });
 });
 
@@ -494,15 +482,14 @@ describe("the hero", () => {
 describe("the avatar editor", () => {
   const editor = (bot: Bot) => capture(() => AvatarEditorCard({ bot, activeState: "idle", onPatch: patch, onClose }));
 
-  it("shows the ten bodies and twelve colors, with the Halloween bodies and the faces behind More looks", () => {
-    const bot = makeBot();
+  it("shows every body and the twelve colors, with the faces behind More looks", () => {
+    const bot = makeBot({ mascotBody: "cursor" });
     const rendered = editor(bot);
-    expect(rendered.html.match(/aria-label="Use the \w+ body"/g)).toHaveLength(10);
+    expect(rendered.html.match(/aria-label="Use the \w+ body"/g)).toHaveLength(MASCOT_BODY_IDS.length);
     expect(rendered.html.match(/aria-label="Use \w+ mascot color"/g)).toHaveLength(12);
-    expect(rendered.html).not.toContain(">Halloween<");
     expect(has(rendered, "data-avatar-face", "idle")).toBe(false);
-    expect(find(rendered, "aria-label", "Use the Cursor body").props["aria-pressed"]).toBe(true);
-    click(find(rendered, "aria-label", "Use the Blob body"));
+    expect(find(rendered, "aria-label", "Use the Triangle body").props["aria-pressed"]).toBe(true);
+    click(find(rendered, "aria-label", "Use the Pebble body"));
     expect(patch).toHaveBeenLastCalledWith({ mascotBody: "blob" });
     click(find(rendered, "aria-label", "Use blue mascot color"));
     expect(patch).toHaveBeenLastCalledWith({ color: "blue" });
@@ -519,19 +506,14 @@ describe("the avatar editor", () => {
     click(more);
     const open = editor(bot);
     expect(find(open, "data-avatar-more").props["aria-expanded"]).toBe(true);
-    expect(open.html.match(/aria-label="Use the \w+ body"/g)).toHaveLength(20);
-    expect(open.html).toContain(">Halloween<");
-    click(find(open, "aria-label", "Use the Pumpkin body"));
-    expect(patch).toHaveBeenLastCalledWith({ mascotBody: "pumpkin" });
+    expect(open.html.match(/aria-label="Use the \w+ body"/g)).toHaveLength(MASCOT_BODY_IDS.length);
     expect(find(open, "data-avatar-face", "idle").props["aria-pressed"]).toBe(true);
     click(find(open, "data-avatar-face", "proud"));
     expect(patch).toHaveBeenLastCalledWith({ mascotExpression: "proud" });
     expect(open.html).toContain(">Proud<");
   });
 
-  it("opens More looks at once for a Halloween body or a chosen face", () => {
-    expect(find(editor(makeBot({ mascotBody: "pumpkin" })), "data-avatar-more").props["aria-expanded"]).toBe(true);
-    fresh();
+  it("opens More looks at once for a chosen face", () => {
     expect(find(editor(makeBot({ mascotExpression: "proud" })), "data-avatar-more").props["aria-expanded"]).toBe(true);
     fresh();
     expect(find(editor(makeBot()), "data-avatar-more").props["aria-expanded"]).toBe(false);
@@ -675,7 +657,7 @@ describe("the Bot settings page", () => {
 
   it("offers Ask me first and Just do it with no hint text, and writes either for every conversation", () => {
     const rendered = settingsPage(makeBot());
-    const acts = segment(rendered, "data-approval-choice");
+    const acts = segment(actsChoice(makeBot()), "data-approval-choice");
     expect(acts.options.map((option) => [option.value, option.label])).toEqual([["ask", "Ask me first"], ["full", "Just do it"]]);
     expect(acts.value).toBe("ask");
     for (const hint of ["Checks before changes", "Acts without checking", "Acts, then tells you"]) expect(rendered.html).not.toContain(`>${hint}<`);
@@ -686,7 +668,7 @@ describe("the Bot settings page", () => {
     fixture.derived.approvalMode = "full";
     const full = settingsPage(makeBot());
     expect(pressed(full.html, "data-approval-choice")).toEqual(["full"]);
-    segment(full, "data-approval-choice").onChange("ask");
+    segment(actsChoice(makeBot()), "data-approval-choice").onChange("ask");
     expect(fixture.dispatch).toHaveBeenLastCalledWith({ type: "updateBot", botId: "scout", patch: { approvalMode: "ask", applyToAllThreads: true } });
     expect(patch).not.toHaveBeenCalled();
   });
@@ -695,7 +677,7 @@ describe("the Bot settings page", () => {
     "shows a bot in %s mode as a third, selected pill it cannot pick again, beside the two choices", (mode, label, tooltip) => {
       fixture.derived.approvalMode = mode;
       const rendered = settingsPage(makeBot());
-      const acts = segment(rendered, "data-approval-choice");
+      const acts = segment(actsChoice(makeBot()), "data-approval-choice");
       expect(acts.options.map((option) => [option.value, option.label, Boolean(option.disabled)])).toEqual([["ask", "Ask me first", false], ["full", "Just do it", false], [mode, label, true]]);
       expect((acts.options[2] as { tooltip?: string }).tooltip).toBe(tooltip);
       expect(pressed(rendered.html, "data-approval-choice")).toEqual([mode]);
@@ -710,14 +692,14 @@ describe("the Bot settings page", () => {
     fixture.derived.engine = engine({ driverKind: "antigravityAgent" });
     fixture.derived.approvalMode = "auto";
     const rendered = settingsPage(makeBot({ approvalMode: "auto" }));
-    expect(segment(rendered, "data-approval-choice").options).toHaveLength(2);
+    expect(segment(actsChoice(makeBot({ approvalMode: "auto" })), "data-approval-choice").options).toHaveLength(2);
     expect(pressed(rendered.html, "data-approval-choice")).toEqual(["ask"]);
     expect(patch).not.toHaveBeenCalled();
   });
 
   it("lets the approval level change while the bot is busy and says from when", () => {
     const rendered = settingsPage(makeBot({ busy: true }));
-    expect(segment(rendered, "data-approval-choice").options.some((option) => option.disabled)).toBe(false);
+    expect(segment(actsChoice(makeBot({ busy: true })), "data-approval-choice").options.some((option) => option.disabled)).toBe(false);
     expect(rendered.html).toContain("The bot is working. A change applies from its next step");
     expect(settingsPage(makeBot()).html).not.toContain("The bot is working");
   });

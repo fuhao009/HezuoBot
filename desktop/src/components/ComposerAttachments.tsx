@@ -30,6 +30,7 @@ export function ComposerAttachments({
   onChangeCitation,
   onDisplayInChatBox,
   allowImages = true,
+  accepts = true,
   notice,
   onNotice,
   onPendingChange,
@@ -41,6 +42,8 @@ export function ComposerAttachments({
   onChangeCitation: (citation: CitationAttachment) => void;
   onDisplayInChatBox: (attachment: PasteAttachment) => void;
   allowImages?: boolean;
+  /** Whether a file dropped on the window is attached; when not, the drop is still taken so the window does not open it. */
+  accepts?: boolean;
   notice: string | null;
   onNotice: (notice: string | null) => void;
   onPendingChange?: (pending: boolean) => void;
@@ -52,15 +55,15 @@ export function ComposerAttachments({
   const depth = useRef(0);
   // A drop past the images the message can still take is left out with a notice.
   const imageSlots = imageSlotsLeft(items);
-  const callbacks = useRef({ onAdd, onNotice, onPendingChange, allowImages, imageSlots, uploadImage });
-  callbacks.current = { onAdd, onNotice, onPendingChange, allowImages, imageSlots, uploadImage };
+  const callbacks = useRef({ onAdd, onNotice, onPendingChange, allowImages, accepts, imageSlots, uploadImage });
+  callbacks.current = { onAdd, onNotice, onPendingChange, allowImages, accepts, imageSlots, uploadImage };
   const pendingDrops = useRef(new Set<symbol>());
 
   useEffect(() => {
     const carriesFiles = (e: DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes("Files");
 
     const onEnter = (e: DragEvent) => {
-      if (!carriesFiles(e)) return;
+      if (!carriesFiles(e) || !callbacks.current.accepts) return;
       depth.current += 1;
       setDragging(true);
     };
@@ -81,6 +84,7 @@ export function ComposerAttachments({
       depth.current = 0;
       setDragging(false);
       if (overSidebar(e)) return;
+      if (!callbacks.current.accepts) return;
       const files = Array.from(e.dataTransfer?.files ?? []);
       const operation = Symbol("attachment-drop");
       pendingDrops.current.add(operation);

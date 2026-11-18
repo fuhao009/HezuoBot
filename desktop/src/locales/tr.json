@@ -1026,7 +1026,6 @@
   "settings.newBotEffort.aria": "Yeni botlar için çaba seviyesi",
   "settings.newBotEffort.error": "Yeni botlar için çaba seviyesi kaydedilemedi.",
   "settings.toolCalls.title": "Araç çağrıları",
-  "settings.toolCalls.subtitle": "Bir botun çalıştırdığı her aracı dökümde gösterin. Varsayılan olarak kapalıdır — maskot zaten çalışmanın yapıldığını gösterir.",
   "settings.toolCalls.show": "Araç çağrılarını göster",
   "settings.toolCalls.detail": "Bash, arama ve diğer araçlar için adlandırılmış butonlar. Hatalar ve bottan bota mesajlar görünmeye devam eder.",
   "settings.toolCalls.aria": "Sohbette araç çağrılarını göster",
@@ -5154,5 +5153,8 @@
   "botAccess.overview.botCount.other": "{count} bot",
   "botAccess.overview.noBotsForPerson": "{name} için henüz bot yok.",
   "botAccess.overview.allPeople": "Tüm kişiler",
-  "botAccess.overview.toastRemoved": "{bot}: {name} kaldırıldı"
+  "botAccess.overview.toastRemoved": "{bot}: {name} kaldırıldı",
+  "botIdentity.resetMascot": "Avatarı sıfırla",
+  "botIdentity.crop.mascot": "Figür",
+  "settings.toolCalls.subtitle": "Bir botun çalıştırdığı her aracı konuşmada gösterir. Avatar zaten çalışıldığını gösterdiği için varsayılan olarak kapalıdır."
 }

@@ -35,7 +35,7 @@ const render = (productManaged: boolean) => flushSync(() => root.render(createEl
   },
   children: createElement(Sidebar, { open: true, onClose: () => {} }),
 })));
-const plus = () => document.querySelector<HTMLButtonElement>('button[aria-label="New or share"]');
+const plus = () => document.querySelector<HTMLButtonElement>('button[aria-label="New"]');
 const items = () => [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].map((item) => item.textContent);
 
 beforeEach(() => {

@@ -3,13 +3,16 @@ import { Settings, X } from "lucide-react";
 
 import { cn } from "@/lib/cn";
 import { t } from "@/lib/i18n";
+import { useAdvancedMode } from "@/lib/interface-mode";
 import { browserInUse } from "@/lib/place";
 import { useStore, type Bot, type BotSettingsSection } from "@/state/store";
 import { ChatShareMenu } from "@/components/ChatMoreMenu";
 import { BotAvatar } from "../Avatar";
 import { useCaptionChrome } from "../DesktopCapabilities";
 import { ActivityPanel } from "../lazy-screens";
+import { SoulField } from "../SoulField";
 import type { useBotSettingsDerived } from "../bot-settings/useBotSettingsDerived";
+import { ActsChoice } from "./ActsChoice";
 import { AvatarEditorCard } from "./AvatarEditorCard";
 import { ComputerTab } from "./ComputerTab";
 import { DetailsTab } from "./DetailsTab";
@@ -29,6 +32,7 @@ export function BotPanel({ bot, derived, linkedSection, onClose, onOpenVmWorkspa
   onTabChange?: (tab: PanelTab) => void;
 }) {
   const { dragProps } = useCaptionChrome();
+  const advanced = useAdvancedMode();
   const { state, dispatch } = useStore();
   const { computerOpen, activityOpen, settingsOpen } = state;
   const signInRequest = state.signInFocus?.requestId;
@@ -74,7 +78,6 @@ export function BotPanel({ bot, derived, linkedSection, onClose, onOpenVmWorkspa
     setEditingInstructions(Boolean(target.editInstructions));
     scrollTop();
   };
-  const openTab = (next: PanelTab) => go({ tab: next });
   const openPage = (next: SimplePageId) => {
     setStack((current) => [...current, next]);
     setEditorOpen(false);
@@ -125,30 +128,33 @@ export function BotPanel({ bot, derived, linkedSection, onClose, onOpenVmWorkspa
     event.stopPropagation();
   };
 
-  const onComputer = tab === "computer" && page === null;
-  const backLabel = stack.length > 1 ? t(PAGES[stack[stack.length - 2]!].title, { name: bot.name }) : t(TAB_LABEL[tab]);
+  const openTab = (next: PanelTab) => go({ tab: next });
+  const onComputer = advanced && tab === "computer" && page === null;
+  const backLabel = stack.length > 1 ? t(PAGES[stack[stack.length - 2]!].title, { name: bot.name }) : advanced ? t(TAB_LABEL[tab]) : bot.name;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" onKeyDown={onKeyDown}>
       <div {...dragProps} className="flex h-[50px] shrink-0 items-start justify-end gap-2.5 px-[13px] pt-[13px]">
-        {onComputer && (
-          <div className="mr-auto flex h-[34px] min-w-0 items-center gap-2 pl-1">
-            <BotAvatar bot={bot} size={20} animated={false} />
-            <span id="bot-settings-title" className="min-w-0 truncate text-[14px] font-medium text-ink">{bot.name}</span>
-          </div>
-        )}
-        <ChatShareMenu bot={bot} className={roundButtonCls} />
-        <button
-          type="button"
-          data-panel-gear
-          aria-label={t("botPanel.page.settings")}
-          title={t("botPanel.page.settings")}
-          aria-current={page === "settings" ? "page" : undefined}
-          onClick={() => go({ tab: "details", page: "settings" })}
-          className={roundButtonCls}
-        >
-          <Settings size={16} className="pointer-events-none" />
-        </button>
+        {advanced && <>
+          {onComputer && (
+            <div className="mr-auto flex h-[34px] min-w-0 items-center gap-2 pl-1">
+              <BotAvatar bot={bot} size={20} animated={false} />
+              <span id="bot-settings-title" className="min-w-0 truncate text-[14px] font-medium text-ink">{bot.name}</span>
+            </div>
+          )}
+          <ChatShareMenu bot={bot} className={roundButtonCls} />
+          <button
+            type="button"
+            data-panel-gear
+            aria-label={t("botPanel.page.settings")}
+            title={t("botPanel.page.settings")}
+            aria-current={page === "settings" ? "page" : undefined}
+            onClick={() => go({ tab: "details", page: "settings" })}
+            className={roundButtonCls}
+          >
+            <Settings size={16} className="pointer-events-none" />
+          </button>
+        </>}
         <button type="button" onClick={onClose} aria-label={t("botSettings.simple.close")} className={roundButtonCls}>
           <X size={16} className="pointer-events-none" />
         </button>
@@ -172,41 +178,55 @@ export function BotPanel({ bot, derived, linkedSection, onClose, onOpenVmWorkspa
                 </>
               )}
             </div>}
-            <div
-              role="tablist"
-              aria-label={t("botSettings.simple.tabs")}
-              className={cn(
-                "flex shrink-0 justify-center gap-0.5 px-4 pb-2.5 pt-1",
-                onComputer ? "mt-1" : "sticky top-0 z-[1] -mx-4 mt-[15px] bg-app after:pointer-events-none after:absolute after:inset-x-0 after:top-full after:h-3 after:bg-linear-to-b after:from-app after:to-transparent",
-              )}
-            >
-              {PANEL_TABS.map((id) => (
-                <button
-                  key={id}
-                  type="button"
-                  role="tab"
-                  aria-selected={tab === id}
-                  data-panel-tab={id}
-                  data-tour={id === "computer" ? "computer" : undefined}
-                  onClick={() => openTab(id)}
-                  className={cn(
-                    "flex h-[26px] min-w-0 shrink items-center gap-1.5 rounded-full px-2 text-[13px] leading-[18px] transition-colors",
-                    tab === id ? "bg-ink/[0.07] text-ink" : "text-ink-secondary hover:text-ink",
-                  )}
-                >
-                  <span className="min-w-0 truncate">{t(TAB_LABEL[id])}</span>
-                  {id === "computer" && browserInUse(bot) && (
-                    <span role="img" aria-label={t("place.live")} className="size-1.5 shrink-0 animate-pulse rounded-full bg-success" data-testid="computer-tab-live" />
-                  )}
-                </button>
-              ))}
-            </div>
-            <div role="tabpanel" className={cn(onComputer && "flex min-h-0 flex-1 flex-col")}>
-              {tab === "details" && <DetailsTab bot={bot} derived={derived} onOpen={openPage} />}
-              {tab === "activity" && <ActivityPanel bot={bot} embedded />}
-              {tab === "library" && <LibraryTab bot={bot} onOpen={openPage} />}
-              {tab === "computer" && <ComputerTab bot={bot} derived={derived} onOpen={openPage} onOpenVmWorkspace={onOpenVmWorkspace} />}
-            </div>
+            {advanced ? (<>
+              <div
+                role="tablist"
+                aria-label={t("botSettings.simple.tabs")}
+                className={cn(
+                  "flex shrink-0 justify-center gap-0.5 px-4 pb-2.5 pt-1",
+                  onComputer ? "mt-1" : "sticky top-0 z-[1] -mx-4 mt-[15px] bg-app after:pointer-events-none after:absolute after:inset-x-0 after:top-full after:h-3 after:bg-linear-to-b after:from-app after:to-transparent",
+                )}
+              >
+                {PANEL_TABS.map((id) => (
+                  <button
+                    key={id}
+                    type="button"
+                    role="tab"
+                    aria-selected={tab === id}
+                    data-panel-tab={id}
+                    data-tour={id === "computer" ? "computer" : undefined}
+                    onClick={() => openTab(id)}
+                    className={cn(
+                      "flex h-[26px] min-w-0 shrink items-center gap-1.5 rounded-full px-2 text-[13px] leading-[18px] transition-colors",
+                      tab === id ? "bg-ink/[0.07] text-ink" : "text-ink-secondary hover:text-ink",
+                    )}
+                  >
+                    <span className="min-w-0 truncate">{t(TAB_LABEL[id])}</span>
+                    {id === "computer" && browserInUse(bot) && (
+                      <span role="img" aria-label={t("place.live")} className="size-1.5 shrink-0 animate-pulse rounded-full bg-success" data-testid="computer-tab-live" />
+                    )}
+                  </button>
+                ))}
+              </div>
+              <div role="tabpanel" className={cn(onComputer && "flex min-h-0 flex-1 flex-col")}>
+                {tab === "details" && <DetailsTab bot={bot} derived={derived} onOpen={openPage} />}
+                {tab === "activity" && <ActivityPanel bot={bot} embedded />}
+                {tab === "library" && <LibraryTab bot={bot} onOpen={openPage} />}
+                {tab === "computer" && <ComputerTab bot={bot} derived={derived} onOpen={openPage} onOpenVmWorkspace={onOpenVmWorkspace} />}
+              </div>
+            </>) : (<>
+              <div className="mt-5" data-panel-prompt>
+                <SoulField
+                  bot={bot}
+                  onPatch={derived.patch}
+                  simple={{ label: t("botSettings.simple.instructions"), placeholder: t("botSettings.simple.instructionsPlaceholder", { name: bot.name }) }}
+                />
+              </div>
+              <div className="mt-5 flex flex-col gap-1.5" data-panel-acts>
+                <span className="text-[12px] text-ink-secondary">{t("botSettings.simple.beforeActs", { name: bot.name })}</span>
+                <ActsChoice bot={bot} derived={derived} />
+              </div>
+            </>)}
           </>
         ) : (
           <div data-panel-page-view={page}>

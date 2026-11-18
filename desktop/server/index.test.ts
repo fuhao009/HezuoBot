@@ -25,7 +25,7 @@ import { startFakeOAuth } from "./testing/fake-oauth-server.ts";
 import { freePortBlock, withFreeSignInPort } from "./testing/ports.ts";
 import { openSse } from "./testing/sse.ts";
 import { STARTER_COLORS } from "./bot-look.ts";
-import { DEFAULT_MASCOT_BODY } from "../../packages/shared/mascot-bodies.ts";
+import { MASCOT_BODY_IDS } from "../../packages/shared/mascot-bodies.ts";
 import { readHandoffs } from "./testing/handoff-rows.ts";
 import { FILE_MAX_BYTES, IMAGE_MAX_BYTES } from "./attachments.ts";
 import { computerPrompt, SIGN_IN_PROMPT } from "./system-prompt.ts";
@@ -7841,7 +7841,7 @@ describe("harness HTTP API", () => {
     }
   });
 
-  it("a new bot greets its person by first name and is announced in its chosen look, or a fresh one, from the first frame", async () => {
+  it("a new bot greets its person by first name and is announced in its chosen look, or a random one, from the first frame", async () => {
     const before = (await api("GET", "/api/config")).body.profile?.name ?? "";
     expect((await api("PUT", "/api/config", { profile: { name: "Milind Soni" } })).status).toBe(200);
     const stream = await openSse(`${BASE}/api/events`);
@@ -7856,7 +7856,7 @@ describe("harness HTTP API", () => {
       const plain = (await api("POST", "/api/bots", { name: "Wren", useDefaults: false })).body.bot;
       await api("DELETE", `/api/bots/${plain.id}`);
       const fresh = (await stream.until((frame) => frame.kind === "bot" && frame.bot?.id === plain.id)).bot;
-      expect(fresh.mascotBody).toBe(DEFAULT_MASCOT_BODY);
+      expect(MASCOT_BODY_IDS).toContain(fresh.mascotBody);
       expect(STARTER_COLORS).toContain(fresh.color);
     } finally {
       stream.close();

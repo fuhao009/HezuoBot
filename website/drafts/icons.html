@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HezuoBot 应用图标方案</title>
+<style>
+*{box-sizing:border-box;margin:0}
+body{font:15px/1.5 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;background:#fff;color:#1d1d1f;padding:36px 24px 80px}
+main{max-width:1080px;margin:0 auto;display:grid;gap:26px}
+header{display:flex;align-items:center;gap:14px}
+header img{width:48px;height:48px}
+h1{font-size:30px;letter-spacing:-.02em}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.card{background:#f5f5f7;border-radius:24px;padding:26px 16px 20px;display:grid;justify-items:center;gap:18px}
+.card b{font-size:17px}
+.sizes{display:flex;align-items:flex-end;gap:12px}
+.icon{--size:128px;width:var(--size);height:var(--size);border-radius:22.5%;display:grid;place-items:center;box-shadow:0 10px 24px -10px rgba(0,0,0,.35),inset 0 0 0 .5px rgba(0,0,0,.08);flex:none}
+.icon i{width:66%;height:66%;display:block;background:url(assets/logo.png) center/contain no-repeat}
+.icon.mono i{background:#fff;-webkit-mask:url(assets/logo.png) center/contain no-repeat;mask:url(assets/logo.png) center/contain no-repeat}
+.a{background:linear-gradient(160deg,#20262c,#090b0d)}
+.b{background:linear-gradient(160deg,#ffffff,#eef2f5)}
+.c{background:linear-gradient(200deg,#8ef5ea,#35d3f0 45%,#128fcc)}
+.d{background:linear-gradient(160deg,#16354a,#07121c)}
+.dock{background:linear-gradient(#dfe6ee,#c9d3df);border-radius:24px;padding:26px;display:flex;justify-content:center}
+.dock.dark{background:linear-gradient(#2a3038,#14181d)}
+.shelf{display:flex;gap:14px;padding:10px 14px;border-radius:22px;background:rgba(255,255,255,.35);backdrop-filter:blur(20px);box-shadow:inset 0 0 0 1px rgba(255,255,255,.35)}
+.dock.dark .shelf{background:rgba(255,255,255,.1);box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)}
+.shelf .icon{--size:60px;box-shadow:0 4px 10px -4px rgba(0,0,0,.4)}
+.docks{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:820px){.grid{grid-template-columns:1fr 1fr}.docks{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main>
+  <header><img src="assets/logo-128.png" alt=""><h1>应用图标方案</h1></header>
+  <div class="grid">
+    <div class="card"><div class="sizes"><div class="icon a"><i></i></div><div class="icon a" style="--size:48px"><i></i></div><div class="icon a" style="--size:24px"><i></i></div></div><b>A 深色底</b></div>
+    <div class="card"><div class="sizes"><div class="icon b"><i></i></div><div class="icon b" style="--size:48px"><i></i></div><div class="icon b" style="--size:24px"><i></i></div></div><b>B 白底</b></div>
+    <div class="card"><div class="sizes"><div class="icon c mono"><i></i></div><div class="icon c mono" style="--size:48px"><i></i></div><div class="icon c mono" style="--size:24px"><i></i></div></div><b>C 青色底 白标志</b></div>
+    <div class="card"><div class="sizes"><div class="icon d"><i></i></div><div class="icon d" style="--size:48px"><i></i></div><div class="icon d" style="--size:24px"><i></i></div></div><b>D 深蓝底</b></div>
+  </div>
+  <div class="docks">
+    <div class="dock"><div class="shelf"><div class="icon a"><i></i></div><div class="icon b"><i></i></div><div class="icon c mono"><i></i></div><div class="icon d"><i></i></div></div></div>
+    <div class="dock dark"><div class="shelf"><div class="icon a"><i></i></div><div class="icon b"><i></i></div><div class="icon c mono"><i></i></div><div class="icon d"><i></i></div></div></div>
+  </div>
+</main>
+</body>
+</html>

@@ -1,0 +1,37 @@
+<section id="hands">
+  <div class="wrap pair">
+    <div class="tile">
+      <h2>它会自己用浏览器</h2>
+      <div class="browser scene" data-scene>
+        <div class="b-bar"><div class="lights"><i></i><i></i><i></i></div><div class="url">{{icon:lock}}crm.example.com/leads/new</div></div>
+        <div class="b-page">
+          <div class="b-label">公司<div class="field"><span class="type t1">星河科技</span></div></div>
+          <div class="b-label">联系人<div class="field"><span class="type t2">林晓</span></div></div>
+          <div class="b-label">来源<div class="field"><span class="type t3">官网表单</span></div></div>
+          <div class="b-submit">保存</div>
+          <div class="pointer">{{cursor}}<span>小研</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="tile">
+      <h2>动手之前 先问你</h2>
+      <div class="approve" data-level="edits">
+        <div class="seg" role="radiogroup" aria-label="审批级别">
+          <button role="radio" aria-checked="false" data-level="ask">每次询问</button>
+          <button role="radio" aria-checked="true" data-level="edits">自动改文件</button>
+          <button role="radio" aria-checked="false" data-level="full">完全放手</button>
+        </div>
+        <div class="perm">
+          <div>{{icon:file}}改文件<em data-perm="0" class="auto">自动</em></div>
+          <div>{{icon:terminal}}跑命令<em data-perm="1">先问</em></div>
+          <div>{{icon:mail}}发邮件<em data-perm="2">先问</em></div>
+        </div>
+        <div class="ask-card">
+          <div class="ask-head">{{bot:flower:orange:asking}}<div><b>小客</b><span>想发邮件给 12 位客户</span></div></div>
+          <div class="ask-actions"><button class="deny">拒绝</button><button class="allow">允许</button></div>
+          <div class="ask-done" aria-live="polite"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

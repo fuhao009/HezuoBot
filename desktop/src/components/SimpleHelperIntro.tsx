@@ -104,9 +104,9 @@ function useArrival(first: boolean, ai: boolean, ready: boolean): { shown: numbe
   return { shown: run ?? (animate ? 0 : ALL), staged: run !== null };
 }
 
-/** Hezuo's first messages in Simple mode, in the viewer's language: three short bubbles, its follow-up once it has looked
- * around (a real message, helperFollowup, which a first run asks the server for) and chips for what is still missing.
- * The chips go once the person writes anything after it (`answered`). */
+/** Hezuo's first messages in Simple mode, in the viewer's language: who it is and, for the Chief, what it does here.
+ * While no AI of the person's own works yet, a follow-up says so (a real message, helperFollowup, which a first run
+ * asks the server for) with a chip to connect one, which goes once the person writes anything after it (`answered`). */
 export function SimpleHelperIntro({ botId, threadId, message, answered, followup }: {
   botId: string; threadId: string; message: Message; answered: boolean; followup?: Message;
 }) {
@@ -116,7 +116,7 @@ export function SimpleHelperIntro({ botId, threadId, message, answered, followup
   const bot = state.bots.find((candidate) => candidate.id === botId);
   const team = bot?.defaultBot?.person ? state.config?.team?.name : undefined;
   const person = greetingName(state.config?.profile?.name) || undefined;
-  const lines = introLines({ name: bot?.name ?? "Hezuo", chief: Boolean(bot?.chiefOfStaff), person, team });
+  const lines = introLines({ name: bot?.name ?? "Hezuo", chief: Boolean(bot?.chiefOfStaff), person, team }).slice(0, bot?.chiefOfStaff ? 2 : 1);
   const look = useLookAround(!answered);
   const ai = thinksWith(bot, state.instances);
 
@@ -132,7 +132,7 @@ export function SimpleHelperIntro({ botId, threadId, message, answered, followup
   const [unsaved, setUnsaved] = useState(false);
   const asked = useRef(false);
   useEffect(() => {
-    if (!first || !look.settled || followup || asked.current) return;
+    if (!first || !look.settled || followup || asked.current || ai === "own") return;
     asked.current = true;
     void api<{ message?: Message }>(`/api/bots/${encodeURIComponent(botId)}/helper-followup`, {
       method: "POST",
@@ -148,7 +148,7 @@ export function SimpleHelperIntro({ botId, threadId, message, answered, followup
   const { shown, staged } = useArrival(first || due, ai !== "none", facts !== null);
   if (hidden) return null;
 
-  const bubbles = [...lines.slice(0, Math.min(shown, 3)), ...(shown >= 5 && facts ? [followupLine(facts)] : [])];
+  const bubbles = [...lines.slice(0, shown), ...(shown >= 5 && facts && facts.ai !== "own" ? [followupLine(facts)] : [])];
   const chips = answered || shown < ALL || !facts ? [] : introChips({
     aiReady: ai === "own",
     ownBots: state.bots.filter((candidate) => !candidate.hidden && !candidate.defaultBot).length,
@@ -158,8 +158,8 @@ export function SimpleHelperIntro({ botId, threadId, message, answered, followup
     appsConnected: Boolean(look.apps?.length),
     phonePaired: look.phonePaired,
     importFound: look.importFound,
-  });
-  const typing = staged && ai !== "none" && shown === 4 && Boolean(bot);
+  }).filter((chip) => chip === "ai");
+  const typing = staged && ai === "backup" && shown === 4 && Boolean(bot);
   return (
     <div data-helper-intro={message.id} className="flex w-full flex-col items-start gap-1">
       {bubbles.map((text, index) => (
@@ -167,7 +167,7 @@ export function SimpleHelperIntro({ botId, threadId, message, answered, followup
           key={index}
           data-chat-bubble="simple"
           data-helper-line={index}
-          {...(index === 3 ? { "data-helper-followup": "" } : {})}
+          {...(index === lines.length ? { "data-helper-followup": "" } : {})}
           className={cn("w-fit", SIMPLE_BUBBLE_MAX, SIMPLE_BOT_BUBBLE, joinedCorners("start", { above: index > 0, below: index < bubbles.length - 1 }),
             staged && "animate-msg-in")}
         >

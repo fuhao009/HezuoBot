@@ -482,6 +482,7 @@ export function profileMenuItems({
   onFeedback: () => void;
   onAccount: () => void;
 }): SidebarMenuItem[] {
+  const about: SidebarMenuItem = { key: "about", label: t("sidebar.menu.about"), icon: <Info size={18} />, onSelect: onAbout };
   const help: SidebarMenuItem[] = [
     { key: "help", label: t("sidebar.menu.help"), icon: <HelpCircle size={18} />, onSelect: onHelp },
     { key: "feedback", label: t("sidebar.menu.feedback"), icon: <DiscordIcon size={17} />, onSelect: onFeedback },
@@ -492,7 +493,7 @@ export function profileMenuItems({
       ...(simple ? {} : { trailing: <ShortcutHint id="shortcuts-cheat-sheet" /> }),
       onSelect: onShortcuts,
     },
-    { key: "about", label: t("sidebar.menu.about"), icon: <Info size={18} />, separatorBefore: true, onSelect: onAbout },
+    { ...about, separatorBefore: true },
   ];
   const usageItem: SidebarMenuItem | null = usage ? {
     key: "usage",
@@ -521,9 +522,9 @@ export function profileMenuItems({
   const groups = [
     move,
     present(raised),
-    [...present(usageItem), ...phone, { ...support, submenu: raised ? help : [...help, ...present(update)] }, settings],
-    simple.tools,
-    [...simple.places, ...present(accountItem)],
+    [settings, ...(raised ? [] : present(update))],
+    simple.tools.filter((item) => item.key === "archived"),
+    [...present(accountItem), about],
   ].filter((group) => group.length > 0);
   return groups.flatMap((group, at) => group.map((item, index) => (at > 0 && index === 0 ? { ...item, separatorBefore: true } : item)));
 }

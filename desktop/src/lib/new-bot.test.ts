@@ -53,7 +53,10 @@ describe("New bot", () => {
     expect(calls.map((call) => `${call.method} ${call.path}`)).toEqual(["GET /api/bot-defaults", "POST /api/bots", "PATCH /api/bots/created"]);
     expect(created()).toMatchObject({ name: "Pixel", modelSelection: { instanceId: "claude", model: "sonnet" }, requireAvailableModel: true, useDefaults: false });
     expect(created()).not.toHaveProperty("reportsTo");
-    expect(sent).toEqual([{ type: "botAdded", bot: expect.objectContaining({ id: "created", name: "Pixel" }), preserveSelection: false }]);
+    expect(sent).toEqual([
+      { type: "botAdded", bot: expect.objectContaining({ id: "created", name: "Pixel" }), preserveSelection: false },
+      { type: "toggleSettings", open: true, botId: "created" },
+    ]);
     expect(fixture.track.mock.calls).toEqual([["bot_created", { source: "blank" }]]);
   });
 
@@ -70,7 +73,7 @@ describe("New bot", () => {
     expect(created()).not.toHaveProperty("modelSelection");
     expect(created()).not.toHaveProperty("requireAvailableModel");
     expect(calls.find((call) => call.method === "PATCH")!.body).not.toHaveProperty("modelSelection");
-    expect(sent.map((action) => action.type)).toEqual(["botAdded"]);
+    expect(sent.map((action) => action.type)).toEqual(["botAdded", "toggleSettings"]);
   });
 
   it("on a team, makes it in this place, reporting to the department's person or else to its creator, in their own chat", async () => {
@@ -120,6 +123,6 @@ describe("New bot", () => {
     const { calls, request } = server();
     const sent = await newBot(request, { section: "Sales" });
     expect(calls).toEqual([{ method: "POST", path: "/api/bots", body: { section: "Sales" } }]);
-    expect(sent.map((action) => action.type)).toEqual(["botAdded"]);
+    expect(sent.map((action) => action.type)).toEqual(["botAdded", "toggleSettings"]);
   });
 });

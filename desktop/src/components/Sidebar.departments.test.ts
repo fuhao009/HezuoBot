@@ -95,7 +95,8 @@ const section = (id: string) => render().find((node) => node.props["data-sidebar
 const sectionHas = (id: string) => nodes(section(id).children).some((node) => node.props["data-bot-empty-drop"] !== undefined);
 const headers = () => render().filter((node) => node.type === SidebarSectionHeader).map((node) => node.props as unknown as HeaderProps);
 const header = (name: string) => headers().find((props) => props.name === name)!;
-const actions = () => fixture.dispatch.mock.calls.map(([action]) => action as Action);
+const dispatched = () => fixture.dispatch.mock.calls.map(([action]) => action as Action);
+const actions = () => dispatched().filter((action) => action.type !== "followSectionRoom");
 
 function transfer() {
   const data = new Map<string, string>();

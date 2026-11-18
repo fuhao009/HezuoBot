@@ -146,7 +146,7 @@ describe("bot-first sidebar", () => {
     expect(renderToStaticMarkup(createElement(BotListItem, rowProps("comfortable")))).not.toContain('data-testid="bot-role"');
   });
 
-  it("ends a Simple row's preview line with its engine's faded mark, ends the name line with the unread dot, and never moves the name", () => {
+  it("ends a Simple row's preview line without an engine mark, ends the name line with the unread dot, and never moves the name", () => {
     fixture.showThreads = false;
     fixture.state = { ...fixture.state, instances: [{ instanceId: "fake", driverKind: "claudeAgent", displayName: "Claude" }] as unknown as AppState["instances"] };
     const candidate = { ...bot, tasks: [], projects: [], unread: true, messages: [{ id: "m", role: "bot", kind: "text", text: "Done.", at: 1 }] } as Bot;
@@ -154,23 +154,21 @@ describe("bot-first sidebar", () => {
     function Capture() { tree = botRow(rowProps("comfortable", candidate)); return tree; }
     const markup = renderToStaticMarkup(createElement(Capture));
     const line = markup.slice(markup.indexOf(">Done.<"));
-    expect(line).toMatch(/^>Done\.<\/span><\/span><span data-testid="model-badge" role="img" aria-label="Model: [^"]+ \(Claude\)" class="[^"]*\bms-auto\b[^"]*"><span data-provider-mark="brand" class="[^"]*\bopacity-60\b/);
-    expect(line).toMatch(/^>Done\.<\/span><\/span><span data-testid="model-badge"[^>]*><span data-provider-mark="brand"[^>]*><svg[\s\S]*?<\/svg><\/span><\/span><\/div><span class="sr-only">Unread<\/span>/);
+    expect(line).toMatch(/^>Done\.<\/span><\/span><\/div><span class="sr-only">Unread<\/span>/);
     const name = markup.slice(markup.indexOf('class="flex items-baseline justify-between gap-2"'), markup.indexOf(">Done.<"));
     expect(name).toContain('<span aria-hidden="true" data-row-dot="" data-testid="unread-dot" title="Unread" class="size-2 shrink-0 self-center rounded-full bg-accent"></span></div>');
-    expect(markup.match(/data-provider-mark=/g)).toHaveLength(1);
-    expect(line.slice(0, line.indexOf("data-provider-mark"))).not.toContain("title=");
+    expect(markup).not.toContain("data-provider-mark");
     expect(String(findElement(tree, "data-sidebar-bot-row", bot.id)!.props.className)).not.toContain("group-hover:pr-9");
     expect(markup).not.toContain("group-hover:pr-7");
     expect(markup).not.toContain("data-bot-actions");
   });
 
-  it("fades the collapsed rail's engine badge in both modes", () => {
+  it("fades the collapsed rail's engine badge in Advanced mode, and draws none in Simple mode", () => {
     fixture.showThreads = false;
     fixture.state = { ...fixture.state, instances: [{ instanceId: "fake", driverKind: "claudeAgent", displayName: "Claude" }] as unknown as AppState["instances"] };
     const candidate = { ...bot, tasks: [], projects: [] };
     const rail = renderToStaticMarkup(createElement(BotListItem, rowProps("icons", candidate)));
-    expect(rail).toMatch(/<span data-testid="model-badge"[^>]*><span data-provider-mark="brand" class="[^"]*\bopacity-60\b/);
+    expect(rail).not.toContain('data-testid="model-badge"');
     fixture.advanced = true;
     const advanced = renderToStaticMarkup(createElement(BotListItem, rowProps("icons", candidate)));
     expect(advanced).toMatch(/<span data-testid="model-badge"[^>]*><span data-provider-mark="brand" class="[^"]*\bopacity-60\b/);
@@ -269,7 +267,7 @@ describe("bot-first sidebar", () => {
     expect(advanced).toMatch(/data-testid="model-badge"[^>]*><span data-provider-mark="brand" class="[^"]*\bopacity-60\b/);
   });
 
-  it("keeps a Simple row to its name, preview and one faded engine mark, naming role, Chief and engine in its tooltip", () => {
+  it("keeps a Simple row to its name and preview, naming role, Chief and engine in its tooltip", () => {
     fixture.showThreads = false;
     const instances = [{ instanceId: "fake", driverKind: "claude", displayName: "Claude", models: { options: [{ id: "test", label: "Sonnet" }] } }] as unknown as AppState["instances"];
     fixture.state = { ...fixture.state, instances, selectedId: bot.id };
@@ -278,8 +276,8 @@ describe("bot-first sidebar", () => {
     function Capture() { tree = botRow(rowProps("comfortable", candidate)); return tree; }
     const markup = renderToStaticMarkup(createElement(Capture));
     expect(markup).not.toContain('data-testid="bot-role"');
-    expect(markup.match(/data-testid="model-badge"/g)).toHaveLength(1);
-    expect(markup.match(/data-provider-mark=/g)).toHaveLength(1);
+    expect(markup).not.toContain('data-testid="model-badge"');
+    expect(markup).not.toContain("data-provider-mark");
     expect(markup).toMatch(/<span class="absolute -left-1 -top-1 flex rounded-full bg-raised p-\[3px\]"><svg[^>]*role="img"[^>]*aria-label="Chief of Staff"[^>]*data-testid="chief-crown"/);
     expect(markup).not.toContain("lucide-pin");
     expect(markup).not.toMatch(/tabular-nums text-ink-secondary transition-opacity group-hover:opacity-0/);
@@ -397,7 +395,7 @@ describe("bot-first sidebar", () => {
     expect(disabled).toContain("Move to department");
   });
 
-  it("gives the Simple bot menu New thread, View threads and Set as main thread", () => {
+  it("keeps thread items out of the Simple bot menu", () => {
     let tree: ReactNode;
     function Capture() {
       tree = BotContextMenu({
@@ -421,50 +419,9 @@ describe("bot-first sidebar", () => {
     fixture.state = { ...fixture.state, bots: [{ ...bot, mainThreadId: "idle-history" }], selectedId: bot.id };
     renderToStaticMarkup(createElement(Capture));
 
-    named("New thread")!.props.onClick!({} as MouseEvent);
-    expect(fixture.dispatch.mock.calls).toEqual([[{ type: "newTask", botId: bot.id }]]);
-
-    fixture.dispatch.mockClear();
-    named("View threads")!.props.onClick!({} as MouseEvent);
-    expect(fixture.dispatch.mock.calls).toEqual([
-      [{ type: "select", id: bot.id }],
-      [{ type: "toggleSettings", open: true, section: "history", botId: bot.id }],
-    ]);
-
-    fixture.dispatch.mockClear();
-    const setMain = named("Set as main thread")!;
-    expect(setMain.props.disabled).toBeFalsy();
-    setMain.props.onClick!({} as MouseEvent);
-    expect(fixture.dispatch.mock.calls).toEqual([[{ type: "updateBot", botId: bot.id, patch: { mainThreadChoice: "last-selected" } }]]);
-
-    // Not offered until the person is known to be the owner or an admin.
-    for (const admin of [null, false]) {
-      fixture.admin = admin;
-      renderToStaticMarkup(createElement(Capture));
-      expect(named("Set as main thread")).toBeUndefined();
-    }
-    fixture.admin = true;
-
-    // Already main: offered but off. Another bot's open thread, or a routine run, is never offered.
-    fixture.state = { ...fixture.state, bots: [{ ...bot, mainThreadId: "last-selected" }] };
-    renderToStaticMarkup(createElement(Capture));
-    expect(named("Set as main thread")!.props.disabled).toBe(true);
-    fixture.state = { ...fixture.state, selectedId: "other-bot" };
-    renderToStaticMarkup(createElement(Capture));
-    expect(named("Set as main thread")).toBeUndefined();
-    expect(named("New thread")).toBeDefined();
-    fixture.state = { ...fixture.state, selectedId: bot.id, bots: [{ ...bot, threadId: "run", tasks: [...bot.tasks!, { threadId: "run", title: "Run", createdAt: 9, routineRunId: "r" }] }] };
-    renderToStaticMarkup(createElement(Capture));
-    expect(named("Set as main thread")).toBeUndefined();
-    // A Team Cloud private thread can't be the main thread either (the host refuses it).
-    fixture.state = { ...fixture.state, selectedId: bot.id, bots: [{ ...bot, threadId: "mine", tasks: [...bot.tasks!, { threadId: "mine", title: "Mine", createdAt: 9, private: true }] }] };
-    renderToStaticMarkup(createElement(Capture));
-    expect(named("Set as main thread")).toBeUndefined();
-    // A view-only teammate can look at the threads but not start one.
-    fixture.state = { ...fixture.state, bots: [{ ...bot, yourAccess: "view" }] };
-    renderToStaticMarkup(createElement(Capture));
-    expect(named("New thread")).toBeUndefined();
-    expect(named("View threads")).toBeDefined();
+    expect(items().length).toBeGreaterThan(0);
+    for (const gone of ["New thread", "View threads", "Set as main thread", "Copy conversation ID", "More"]) expect(named(gone), gone).toBeUndefined();
+    expect(fixture.dispatch).not.toHaveBeenCalled();
   });
 
   it("Edit profile opens the panel without naming a section", () => {
@@ -553,7 +510,7 @@ describe("bot-first sidebar", () => {
     expect(markup).toContain('data-sidebar-thread-row="last-selected"');
   });
 
-  it("does not change group collaboration histories or creation", () => {
+  it("keeps a group chat's earlier conversations listed, with no button to start or fold them", () => {
     fixture.showThreads = false;
     const group: Group = {
       id: "group", name: "Planning", threadId: "group-thread", memberIds: [], defaultResponder: { kind: "mentions" }, bulletin: "", unread: false, createdAt: 0, messages: [],
@@ -563,7 +520,11 @@ describe("bot-first sidebar", () => {
     const markup = renderToStaticMarkup(createElement(GroupListItem, { group, density: "comfortable", onMenu: vi.fn() }));
     expect(markup).toContain('data-sidebar-thread-row="group-thread"');
     expect(markup).not.toContain('aria-label="New thread"');
-    expect(markup).toContain('aria-label="Collapse Planning threads"');
+    expect(markup).not.toContain('aria-label="Collapse Planning threads"');
+    fixture.advanced = true;
+    const advanced = renderToStaticMarkup(createElement(GroupListItem, { group, density: "comfortable", onMenu: vi.fn() }));
+    expect(advanced).toContain('aria-label="Collapse Planning threads"');
+    fixture.advanced = false;
     const single = renderToStaticMarkup(createElement(GroupListItem, { group: { ...group, tasks: [group.tasks![0]] }, density: "comfortable", onMenu: vi.fn() }));
     expect(single).not.toContain("Planning threads");
     expect(single).not.toContain('data-sidebar-thread-row=');

@@ -236,20 +236,14 @@ describe("persistence patches", () => {
 });
 
 describe("the first run's screens", () => {
-  it("is two screens, meeting the app and then the Chief of Staff, whatever this computer has", () => {
-    expect(beatsFor({})).toEqual(["meet", "chief"]);
-    expect(beatsFor({ hosted: false })).toEqual(["meet", "chief"]);
+  it("is one screen: meeting the app", () => {
+    expect(beatsFor()).toEqual(["meet"]);
   });
 
-  it("gives a hosted place's admin only the first: their team's bots and Chief are set up already", () => {
-    expect(beatsFor({ hosted: true })).toEqual(["meet"]);
-  });
-
-  it("resumes the saved screen while it is offered, else starts at the first", () => {
-    expect(resumeBeat(beatsFor({}), "chief")).toBe("chief");
-    expect(resumeBeat(beatsFor({}), undefined)).toBe("meet");
-    expect(resumeBeat(beatsFor({ hosted: true }), "chief")).toBe("meet");
-    expect(resumeBeat(beatsFor({}), "engines" as never), "a step from the longer welcome").toBe("meet");
+  it("starts at that screen whatever was saved", () => {
+    expect(resumeBeat(beatsFor(), "chief")).toBe("meet");
+    expect(resumeBeat(beatsFor(), undefined)).toBe("meet");
+    expect(resumeBeat(beatsFor(), "engines" as never), "a step from the longer welcome").toBe("meet");
   });
 });
 

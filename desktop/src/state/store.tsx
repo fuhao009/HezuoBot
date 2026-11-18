@@ -31,6 +31,7 @@ export { awayFromMainThread, botOpensTo, openBot, openBotThread, openNotificatio
 import type { TurnDigest } from "../../../packages/shared/digest";
 import type { ToolScope } from "../../../packages/shared/tool-scope";
 import type { ModelVariantOption, RuntimeEvent } from "../../../packages/shared/runtime-events";
+import { sectionRoomSteps } from "@/lib/section-rooms";
 import type { HezuoColor, HezuoMotion } from "@/lib/mascot";
 import type { BotAvatarCrop } from "../../../packages/shared/bot-avatar";
 import { approvalModeFor, type ApprovalMode } from "../../../packages/shared/approval-mode";
@@ -681,6 +682,7 @@ export type Action =
     }
   | { type: "groupDeleted"; groupId: string }
   | { type: "createGroup"; memberIds: string[]; name?: string; section?: string }
+  | { type: "followSectionRoom"; botIds: string[]; section: string }
   | {
       type: "sendGroup";
       groupId: string;
@@ -1793,6 +1795,7 @@ export function reducer(state: AppState, action: Action): AppState {
     case "reorderProjects":
     case "interrupt":
     case "createGroup":
+    case "followSectionRoom":
     case "deleteGroup":
     case "interruptGroup":
     case "setGroupHold":
@@ -2694,6 +2697,29 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               rawDispatch({ type: "select", id: group.id });
             })
             .catch(showError);
+          break;
+        case "followSectionRoom":
+          for (const step of sectionRoomSteps(stateRef.current.bots, stateRef.current.groups, action.botIds, action.section)) {
+            if (step.kind === "create") {
+              api(`/api/groups`, {
+                method: "POST",
+                body: JSON.stringify({
+                  memberIds: step.memberIds,
+                  name: step.section,
+                  section: step.section,
+                  setup: { bulletin: "", defaultResponder: { kind: "everyone" } },
+                }),
+              })
+                .then(({ group }) => rawDispatch({ type: "groupPatched", group }))
+                .catch(showError);
+            } else if (step.kind === "members") {
+              rawDispatch({ type: "patchGroup", groupId: step.groupId, patch: { memberIds: step.memberIds } });
+              api(`/api/groups/${step.groupId}`, { method: "PATCH", body: JSON.stringify({ memberIds: step.memberIds }) })
+                .catch(showSavedState({ groupId: step.groupId }));
+            } else {
+              api(`/api/groups/${step.groupId}`, { method: "DELETE" }).catch(showError);
+            }
+          }
           break;
         case "sendGroup": {
           const threadId =

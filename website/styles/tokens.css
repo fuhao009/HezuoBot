@@ -1,0 +1,30 @@
+/* 设计变量：换配色、圆角、宽度只改这里
+   主题：默认跟随系统；<html data-theme="light|dark"> 可强制指定 */
+:root{
+  color-scheme:light dark;
+  --bg:#fff; --bg-alt:#f5f5f7; --surface:#fff; --ink:#1d1d1f; --muted:#6e6e73; --line:#d2d2d7;
+  --accent:#0071e3; --accent-ink:#0058b0;
+  --tile-dark:#000; --seg:#e3e3e8;
+  --nav-bg:rgba(255,255,255,.72); --nav-line:rgba(0,0,0,.08); --nav-ink:#424245;
+  --win:#0c0c0d; --win-side:#141415; --win-2:#1a1a1c; --win-3:#29292c; --win-ink:#f5f5f7; --win-muted:#98989f; --win-line:rgba(255,255,255,.09);
+  --bot-cyan:#22c3e6; --bot-green:#12a05c; --bot-blue:#3b82f6; --bot-orange:#f08c2e; --bot-purple:#8b5cf6; --bot-pink:#e55ba4;
+  --ok:#28c840;
+  --radius:28px; --max:1120px; --nav-h:48px;
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","PingFang SC","Helvetica Neue",sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#000; --bg-alt:#161617; --surface:#2a2a2c; --ink:#f5f5f7; --muted:#a1a1a6; --line:#424245;
+    --accent:#2997ff; --accent-ink:#0071e3;
+    --tile-dark:#161617; --seg:#3a3a3c;
+    --nav-bg:rgba(22,22,23,.72); --nav-line:rgba(255,255,255,.12); --nav-ink:#d2d2d7;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#000; --bg-alt:#161617; --surface:#2a2a2c; --ink:#f5f5f7; --muted:#a1a1a6; --line:#424245;
+  --accent:#2997ff; --accent-ink:#0071e3;
+  --tile-dark:#161617; --seg:#3a3a3c;
+  --nav-bg:rgba(22,22,23,.72); --nav-line:rgba(255,255,255,.12); --nav-ink:#d2d2d7;
+}
+:root[data-theme="light"]{color-scheme:light}
