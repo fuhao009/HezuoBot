@@ -19,6 +19,30 @@ server's browser egress allowlist, so its local test page can be opened without
 allowing other loopback services. The recovery hook matches the live stream's
 URL pathname, including streams with viewport or resume query parameters.
 
+## Hidden browser and chat takeover
+
+Append `?takeover` to the printed preview URL to mount the real ChatView and
+ComputerPanel against the same disposable fake-model fixture. No user profile
+or running user session is used. Capture screenshots before takeover, while
+holding control, and after closing the panel.
+
+1. The chat starts without a browser surface. Click **Take over browser**
+   (**接管浏览器** in Chinese): the Browser tab opens and obtains the existing
+   browser control lease, pausing the bot's browser tools.
+2. Navigate to the printed local test-page URL and type into its name field.
+   Close the side panel with its X. The browser surface disappears immediately
+   and control returns immediately, not after the disconnected-view timeout.
+   No browser restart, sleep, or tab-close command is issued.
+3. Click **Take over browser** again. The same page and entered text remain.
+   Close it, then reopen the screen panel via the monitor button: it must not
+   restore the Browser tab. Bot activity must never foreground the browser.
+4. Switch conversation while holding control: the old native surface detaches
+   and its lease is released; the next conversation does not inherit the old
+   takeover. Returning does not automatically reopen the browser.
+
+## Browser controls
+
+
 1. The panel contains two browser-chrome rows and a live blank page. There is
    no “coming next” card. While the bot has the browser, nothing is sent until
    you interact or press **Take control**; hovering never takes it.
@@ -45,10 +69,10 @@ URL pathname, including streams with viewport or resume query parameters.
    **Take control**, then wait a minute: it stays yours until **Hand back**,
    which returns it at once. Leave it untouched for 5 minutes: control goes
    back to the bot by itself, kept or not. Close the panel while you hold it:
-   the bot gets it back 2 minutes later, unless you open the panel again
-   first, on any device, which carries on with your hold. **Type a password or code…** shows a masked
-   field; its text reaches the selected page field and appears in no log,
-   response or other view.
+   the bot gets it back immediately; opening the panel again keeps the page
+   and browser session, but must acquire control again. **Type a password or code…**
+   shows a masked field; its text reaches the selected page field and appears
+   in no log, response or other view.
    Holding a mouse button or key down must never hand back. Reconnect the
    view, then leave it connected for at least 30 seconds on the same static
    image. It must not stall waiting for an ACK. The page remains intact and
@@ -132,21 +156,21 @@ from the menu (new engine) still shows bands on purpose.
 | ![Before](images/browser-fill/before-midnight-maximized.png) | ![After](images/browser-fill/after-midnight-maximized.png) | ![Wide](images/browser-fill/after-midnight-advanced-wide.png) | ![Tablet](images/browser-fill/after-new-engine-tablet-preset.png) |
 
 `scripts/testing/browser-fill.e2e.test.ts` runs the agent-browser side against the pinned engine and
-`server/browser/viewers/viewers.e2e.test.ts` the new engine's (`OMB_CDP_CHROME`).
+`desktop/server/browser/viewers/viewers.e2e.test.ts` the new engine's (`OMB_CDP_CHROME`).
 
 Focused automated coverage:
 
 ```sh
-pnpm exec vitest run server/browser-engine.test.ts server/browser-runtime.test.ts server/browser-page-size.test.ts \
-  server/harness-mcp-proxy.test.ts server/browser-live.test.ts server/browser-dialogs.test.ts \
-  server/browser-live-routes.test.ts server/browser-codex-path.integration.test.ts \
-  src/lib/browser-stream-v1.test.ts src/lib/browser-stream-client.test.ts src/lib/browser-control.test.ts \
-  src/lib/browser-profiles.test.ts src/components/BrowserProfilesManager.test.ts \
-  src/components/browser/StreamSurface.test.ts server/routes/browser-viewers.test.ts \
-  src/components/BrowserPanel.test.ts src/components/SignInRequestCard.test.ts \
-  server/sign-in-request.e2e.test.ts server/login-fill.test.ts server/login-store.test.ts \
-  server/totp.test.ts server/routes/logins.test.ts src/components/LoginsSettings.test.ts \
-  server/saved-login.e2e.test.ts server/onepassword.test.ts scripts/prepare-duckdb.test.mjs
+pnpm exec vitest run desktop/server/browser-engine.test.ts desktop/server/browser-runtime.test.ts desktop/server/browser-page-size.test.ts \
+  desktop/server/harness-mcp-proxy.test.ts desktop/server/browser-live.test.ts desktop/server/browser-dialogs.test.ts \
+  desktop/server/browser-live-routes.test.ts desktop/server/browser-codex-path.integration.test.ts \
+  desktop/src/lib/browser-stream-v1.test.ts desktop/src/lib/browser-stream-client.test.ts desktop/src/lib/browser-control.test.ts \
+  desktop/src/lib/browser-profiles.test.ts desktop/src/components/BrowserProfilesManager.test.ts \
+  desktop/src/components/browser/StreamSurface.test.ts desktop/server/routes/browser-viewers.test.ts \
+  desktop/src/components/BrowserPanel.test.ts desktop/src/components/SignInRequestCard.test.ts \
+  desktop/server/sign-in-request.e2e.test.ts desktop/server/login-fill.test.ts desktop/server/login-store.test.ts \
+  desktop/server/totp.test.ts desktop/server/routes/logins.test.ts desktop/src/components/LoginsSettings.test.ts \
+  desktop/server/saved-login.e2e.test.ts desktop/server/onepassword.test.ts scripts/prepare-duckdb.test.mjs
 ```
 
 Those tests cover native transport lifecycle, owner/session scoping, gate races,
@@ -233,6 +257,6 @@ composer and panel must keep the real destination highlighted during sends.
 
 Ctrl-C closes the exact fixture and removes the copied sign-in and browser
 data. VM/cloud transport and turn-bound switching are separately covered by
-`server/group-local-vm.e2e.test.ts`, `server/vps-routing.test.ts` and
-`server/index.test.ts` with
+`desktop/server/group-local-vm.e2e.test.ts`, `desktop/server/vps-routing.test.ts` and
+`desktop/server/index.test.ts` with
 isolated providers. These are not evidence of real cloud provisioning.

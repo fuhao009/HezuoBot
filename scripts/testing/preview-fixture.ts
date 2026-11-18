@@ -1,6 +1,6 @@
 // The one Vite preview every verify-* fixture mounts: an isolated page for a
 // single entry module whose /api calls reach only the disposable fake-engine
-// server. vite.config.ts is inherited on purpose (react, tailwind, the @ alias)
+// server. desktop/vite.config.ts is inherited on purpose (react, tailwind, the @ alias)
 // so the page renders exactly what the app renders; only the host, the port
 // and the /api target are pinned here.
 import { realpathSync } from "node:fs";
@@ -59,6 +59,7 @@ export async function mountPreview(
   const { entry, route, title, extraRoutes = [], viewport = "width=device-width, initial-scale=1", logLevel, proxyHeaders } = options;
   const page = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="${escapeHtml(viewport)}"><title>${escapeHtml(title)}</title></head><body><div id="root"></div><script type="module" src="${escapeHtml(entry)}"></script></body></html>`;
   const ui = await createServer({
+    configFile: join(REPO_ROOT, "desktop/vite.config.ts"),
     root: REPO_ROOT,
     ...(logLevel ? { logLevel } : {}),
     // A worktree's node_modules may be a link to another checkout's: its files (the fonts) are served from there.

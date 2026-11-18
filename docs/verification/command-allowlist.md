@@ -58,7 +58,7 @@ and that eligible cards send one atomic remember-and-allow action. They also
 cover owner/admin gating and the existing once/session/peer choices:
 
 ```sh
-pnpm exec vitest run src/components/ApprovalModeSelector.allowlist.test.ts src/components/PendingApproval.command-allowlist.test.ts src/components/ApprovalModeSelector.test.ts
+pnpm exec vitest run desktop/src/components/ApprovalModeSelector.allowlist.test.ts desktop/src/components/PendingApproval.command-allowlist.test.ts desktop/src/components/ApprovalModeSelector.test.ts
 ```
 
 ## Evidence and cleanup
@@ -76,8 +76,8 @@ The printed server log and screenshots remain.
 ## Server and provider verification
 
 ```sh
-pnpm exec vitest run server/command-allowlist.e2e.test.ts server/command-allowlist.test.ts server/auto-approve.test.ts server/workspace-backup-policy.test.ts
-pnpm exec vitest run server/drivers/claude.test.ts server/drivers/codex.test.ts server/drivers/acp/acp.test.ts
+pnpm exec vitest run desktop/server/command-allowlist.e2e.test.ts desktop/server/command-allowlist.test.ts desktop/server/auto-approve.test.ts desktop/server/workspace-backup-policy.test.ts
+pnpm exec vitest run desktop/server/drivers/claude.test.ts desktop/server/drivers/codex.test.ts desktop/server/drivers/acp/acp.test.ts
 ```
 
 The first test launches the real server in an isolated home, sends prompts to
@@ -88,6 +88,9 @@ and decision receipts. Provider tests cover complete command transport,
 questions/MCP exclusion and actual allow/deny outcomes (including ACP requests
 with no allow option). Storage tests exercise bot/provider scope, disk failures
 and malformed files. Backup policy tests exclude these installation-local rules.
+
+The time-command regression requests `date '+%Y-%m-%d %H:%M:%S %Z'`, accepts and remembers it once, and requests it again without another card. A different `date -u` request is denied and must not acquire a grant. This exercises the real permission broker with a fake engine, not the user's terminal. The local computer prompt separately distinguishes background shell execution from foreground graphical control: shell commands do not require terminal activation or another foreground question; denial must be reported as “未授权，无法执行” in Chinese. Model adherence still requires an isolated product-account run and cannot be established by the fake engine.
+
 
 These checks do not prove live-account model behavior or the Electron privileged
 Full access bridge. See [Full Access verification](full-access.md) for its

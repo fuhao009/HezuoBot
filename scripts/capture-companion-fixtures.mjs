@@ -2,8 +2,8 @@
 // Capture the companion apps' test fixtures through a real harness and sidecar,
 // against a temporary HOME and the fake engine:
 //
-//   node scripts/capture-companion-fixtures.mjs
-//   node scripts/capture-companion-fixtures.mjs --overview-only
+//   node scripts/capture-companion-fixtures.mjs --out mobile/ios/Tests/CompanionCoreTests/Fixtures
+//   node scripts/capture-companion-fixtures.mjs --out mobile/ios/Tests/CompanionCoreTests/Fixtures --overview-only
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -134,13 +134,13 @@ async function main() {
       claude: {
         driver: "claudeAgent",
         displayName: "Fixture engine",
-        config: { cli: join(ROOT, "server", "testing", "fake-claude-cli.ts") },
+        config: { cli: join(ROOT, "desktop", "server", "testing", "fake-claude-cli.ts") },
       },
     },
   }));
 
   console.log(`harness on ${HARNESS_PORT}, companion on ${COMPANION_PORT}`);
-  const harness = start("harness", [join(ROOT, "server", "index.ts")], {
+  const harness = start("harness", [join(ROOT, "desktop", "server", "index.ts")], {
     HOME: home,
     USERPROFILE: home,
     OMB_PORT: String(HARNESS_PORT),
@@ -151,7 +151,7 @@ async function main() {
 
   // Client-facing fixtures go through the sidecar, which scrubs, rewrites SSE
   // frames and refuses device routes; the harness directly only for setup.
-  const sidecar = start("companion", [join(ROOT, "companion", "src", "index.ts")], {
+  const sidecar = start("companion", [join(ROOT, "desktop", "companion", "src", "index.ts")], {
     HOME: home,
     USERPROFILE: home,
     OMB_PORT: String(HARNESS_PORT),

@@ -4,8 +4,8 @@
 // the build before signing.
 import { open, readFile, rm, stat } from "node:fs/promises";
 import path from "node:path";
-import { normalizeProductCa, productCaBindsOrigin } from "../electron/product-ca.mjs";
-import { validateProductOrigin } from "../electron/product-service.mjs";
+import { normalizeProductCa, productCaBindsOrigin } from "../desktop/electron/product-ca.mjs";
+import { validateProductOrigin } from "../desktop/electron/product-service.mjs";
 
 export const PRODUCT_NAME = "Hezuo";
 export const PRODUCT_APP_ID = "com.hezuo.product";
@@ -45,6 +45,16 @@ export function isLoopbackHost(hostname) {
   return host === "127.0.0.1" || host === "::1" || host === "localhost";
 }
 
+/** An IPv4 literal in 10.0.0.0/8, 172.16.0.0/12 or 192.168.0.0/16. */
+export function isPrivateLanHost(hostname) {
+  const match = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(String(hostname ?? ""));
+  if (!match) return false;
+  const octets = match.slice(1).map(Number);
+  if (octets.some((octet) => octet > 255)) return false;
+  const [first, second] = octets;
+  return first === 10 || (first === 172 && second >= 16 && second <= 31) || (first === 192 && second === 168);
+}
+
 /**
  * A pinnable origin.
  *
@@ -60,15 +70,19 @@ export function isLoopbackHost(hostname) {
  * on, so no build can drift to loopback by accident and the packaged app still
  * reads exactly one pinned origin from its resource.
  *
+ * `allowPrivateLan` is the explicit LAN deployment (`--lan-origin`): the origin
+ * may be an IPv4 literal in a private range, on any port.
+ *
  * Throws a stable reason code for the caller's message.
  */
-export function operatorOrigin(value, { allowReserved = false, allowLoopback = false } = {}) {
+export function operatorOrigin(value, { allowReserved = false, allowLoopback = false, allowPrivateLan = false } = {}) {
   const origin = validateProductOrigin(String(value ?? "").trim());
   const url = new URL(origin);
   if (isLoopbackHost(url.hostname)) {
     if (!allowLoopback) throw new Error("product_origin_loopback");
     return origin;
   }
+  if (allowPrivateLan && isPrivateLanHost(url.hostname)) return origin;
   if (!url.hostname.includes(".") || /^[0-9.]+$/.test(url.hostname) || url.hostname.includes(":")) {
     throw new Error("product_origin_public_host");
   }
@@ -183,18 +197,27 @@ async function bundleIdentifier(appDir) {
  * the upstream build over this one — so the hook deletes it before signing and
  * this check refuses any bundle that still has one.
  */
-export async function verifyProductApp({ appDir, resourcesDir, removeFeed = false, expectOrigin = null }) {
+export async function verifyProductApp({ appDir, resourcesDir, removeFeed = false, expectOrigin = null, expectDebug = null }) {
   const asarFile = path.join(resourcesDir, "app.asar");
   if (!(await exists(asarFile))) throw new Error(`product_app_missing_asar: ${asarFile}`);
   const metadata = await readAsarPackageJson(asarFile);
   if (metadata.ombProductManaged !== true) throw new Error(`product_app_not_managed: ${appDir}`);
-  if (metadata.main !== "electron/main.mjs") throw new Error(`product_app_unexpected_main: ${String(metadata.main)}`);
+  if (metadata.main !== "desktop/electron/main.mjs") throw new Error(`product_app_unexpected_main: ${String(metadata.main)}`);
   if (typeof metadata.productName === "string" && metadata.productName !== PRODUCT_NAME) {
     throw new Error(`product_app_product_name: ${metadata.productName}`);
   }
   const resource = await readProductServiceResource(resourcesDir);
   if (expectOrigin !== null && resource.origin !== expectOrigin) {
     throw new Error(`product_app_origin_mismatch: ${resource.origin}`);
+  }
+  if (expectDebug !== null) {
+    const debugPath = path.join(resourcesDir, "product-debug.json");
+    if (expectDebug) {
+      const marker = JSON.parse(await readFile(debugPath, "utf8"));
+      if (marker?.enabled !== true) throw new Error(`product_app_debug_marker_invalid: ${debugPath}`);
+    } else if (await exists(debugPath)) {
+      throw new Error(`product_app_debug_marker_present: ${debugPath}`);
+    }
   }
   const feed = path.join(resourcesDir, "app-update.yml");
   if (removeFeed) await rm(feed, { force: true });

@@ -31,7 +31,7 @@ environment into that child, so a recipe can script the fake engine's mode,
 replies and tool calls without writing a wrapper CLI. Live calls add one
 exception: `OMB_OPENAI_LIVE_URL` crosses when it is a loopback
 `http://127.0.0.1:PORT` (the fake GPT-Live that
-`node --experimental-strip-types server/testing/fake-openai-live.ts` prints),
+`node --experimental-strip-types desktop/server/testing/fake-openai-live.ts` prints),
 and `OMB_OPENAI_LIVE_KEY` crosses only with it, so that key can only ever
 reach the fake.
 
@@ -61,10 +61,10 @@ an authenticated loopback execution service with repository-owned fake Claude,
 Codex and ACP CLIs. It checks local tasks, actual bot MCP dispatch, remote tasks,
 native approval/denial decisions, cancellation, stale approval rejection and
 disconnection. It never uses a personal CLI login or a production server.
-Run `pnpm exec vitest run server/execution-connectors.test.ts` for lifecycle
+Run `pnpm exec vitest run desktop/server/execution-connectors.test.ts` for lifecycle
 regressions, and `pnpm typecheck` for the shared frontend/backend contract.
 Both owner-facing and bot-internal execution connector handlers live in
-`server/routes/execution-connectors.ts`; internal dispatch retains the active
+`desktop/server/routes/execution-connectors.ts`; internal dispatch retains the active
 turn's owner attribution and limits task access to its bot.
 
 For the actual Apps surface, use the isolated connected-apps preview with this
@@ -191,6 +191,19 @@ real account Worker locally: emailed sign-in, operator enable/grant, an exact
 billed hello, a real MCP file write behind approval, account isolation, and the
 three viewport sizes. It needs no operator domain, Cloudflare account or model
 key.
+
+The gateway-only admin and task-billing fixture uses the real Worker/CLI with a
+disposable database and a local TLS fake upstream:
+`node scripts/verify-gateway-admin.mjs --task-billing --smoke`. It verifies three
+complexity tiers across Chat/Responses JSON and SSE: free quotes, pre-dispatch
+budget rejection, exact in-flight reservations, wallet/ledger charges and refunds,
+upstream refusal release with unknown procurement cost, and restart persistence.
+It prints per-request receipts and the opening/closing wallet totals.
+Omit `--smoke` to inspect the actual `/admin` billing surface using the printed
+disposable credentials; interrupt the launcher after browser verification. This
+does not contact a personal upstream or prove production billing. See the
+[billing delivery evidence](../archive/gateway-v1-delivery.md#任务感知计费增量2026-11-13).
+
 
 The [desktop server connection smoke](desktop-server-connection.md) mounts the
 real Settings connection component in disposable Electron windows.
@@ -383,6 +396,32 @@ run on a disposable VPS: what passed, what was corrected, and what it does not p
 Keep the JSON from `wait` and `messages`, the exact command sequence, and the
 fixture's printed log path. Evidence must show both the action and the resulting
 state. A green unit test alone does not prove a user workflow.
+
+## Product account lifecycle regressions
+
+The desktop account lifecycle uses a private main/utility-process channel for
+model-token renewal and shutdown drain. Only a complete gateway
+`401 ai_token_invalid` response permits one model-request replay; interrupted
+responses and other failures must not be replayed. Closing a product window or
+signing out keeps its runtime alive for at most `SIGN_OUT_DRAIN_MS` (15 seconds)
+while admitted work finishes.
+
+Installation credentials are rotated seven days before expiry, with exponential
+retry delays after failure. A relay close code 4000 stops automatic reconnects;
+the account page's continue action creates a fresh installation identity.
+Gateway password discovery currently specifies 10–128 characters. Registration
+conflict recovery handles only `409 installation_exists`, once, by looking up
+and rotating that installation; other conflicts are not replayed.
+
+Run the focused isolated regressions from `desktop/`:
+
+```sh
+npx vitest run --root .. --config desktop/vite.config.ts desktop/electron/product-account.test.mjs desktop/electron/control-plane-client.test.mjs desktop/electron/product-gateway-host.test.mjs desktop/electron/gateway-companion-tunnel.test.mjs desktop/electron/product-runtime-drain.test.mjs
+node --test electron/product-account-ipc.node-test.mjs electron/product-preload.node-test.mjs
+```
+
+Unit regressions are not evidence of production settlement. Use only disposable
+fixture accounts when separately checking drain and ledger settlement.
 
 ## Cleanup
 

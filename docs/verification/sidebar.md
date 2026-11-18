@@ -17,7 +17,7 @@ The preview mounts the actual Sidebar and StoreProvider. Verify:
    remaining bots are unchanged and keyboard focus remains in the sidebar.
 
 Verified on 2026-09-05 against the isolated renderer. Static regression coverage
-in `src/components/SidebarBotListItem.test.ts` checks dialog semantics/copy,
+in `desktop/src/components/SidebarBotListItem.test.ts` checks dialog semantics/copy,
 chief labels, role badges, and working/waiting indicators. The interaction checks
 above are manual browser verification, not assertions made by those unit tests.
 This fixture covers the sidebar confirmation and bot-row result only; it does
@@ -43,9 +43,9 @@ Open only the printed `previewUrl`:
    app it also remains available with **Show threads** off; thread-pinned
    remote clients do not receive an action that targets their siblings.
 
-`src/lib/bot-read.test.ts` covers legacy state, all folders/unfiled/archived
+`desktop/src/lib/bot-read.test.ts` covers legacy state, all folders/unfiled/archived
 threads, work and approval preservation, ordered requests for 250 threads,
-partial failure/retry and new-thread arrivals. `src/components/SidebarBotRead.test.ts` mounts
+partial failure/retry and new-thread arrivals. `desktop/src/components/SidebarBotRead.test.ts` mounts
 the actual menu to check progress, duplicate-click protection, error recovery,
 Portuguese copy, hidden thread trees and a menu reopened during a read.
 Folder reads use the same request helper and retain their existing tests.
@@ -76,7 +76,7 @@ checks deletion directly from a sidebar section header:
   order and collapsed state, and its delete action retains pending/retry guards.
 
 The fixture reports its log path and keeps a snapshot and screenshot on failure.
-`src/components/SidebarSectionHeader.test.ts` separately checks that the optional
+`desktop/src/components/SidebarSectionHeader.test.ts` separately checks that the optional
 delete control coexists with the context menu and does not replace or nest inside
 the collapse button. Server safeguards still reject deletion during active work,
 with an assigned team computer, or when moving the Chief would conflict with
@@ -91,8 +91,8 @@ sole thread must still appear during search even when its normal tree is hidden.
 
 In Settings → Appearance, **Notification sounds** controls the operating
 system alert sound on this computer only; it does not disable notification
-banners or the bot's own notification setting. `src/lib/notification-preferences.test.ts`
-and `src/lib/notify.test.ts` cover persisted preferences, blocked storage, cross-window
+banners or the bot's own notification setting. `desktop/src/lib/notification-preferences.test.ts`
+and `desktop/src/lib/notify.test.ts` cover persisted preferences, blocked storage, cross-window
 reads after Settings unmounts, and the silent flag sent to the desktop bridge.
 Actual operating-system sound delivery requires a native Electron smoke test;
 the isolated browser cannot prove it.
@@ -110,10 +110,12 @@ the page's own drag events, and exits.
 1. With no department, Simple's sidebar is unchanged.
 2. Drag a bot over the top or bottom quarter of another: a line shows where it
    lands, and dropping saves the order (`PUT /api/bots/order`) for every client.
-3. Drag it over the middle of a bot in no department: that row is ringed.
-   Dropping shows a new department with both bots and its name field focused,
-   "New department" selected. Enter keeps the typed name, or the default when
-   it is empty; Escape puts the bots back.
+3. Drag a bot over the middle of a bot in no department: that row is ringed.
+   Dropping immediately creates **Untitled group**, then **Untitled group 2**
+   when that name already exists. The target bot precedes the dragged bot.
+   Dragging between pinned tiles also creates a group and unpins both bots.
+   The context-menu **New department…** action still opens the name input;
+   Escape cancels that pending creation.
 4. Drag a bot over a department's heading to put it at its end, between its
    rows to place it there, and between the rows outside any department to take
    it out. With every bot in a department, a "Remove from department" place
@@ -126,8 +128,102 @@ the page's own drag events, and exits.
 7. Switch to Advanced: the same departments and order show, and rows drag the
    same way.
 
-`src/lib/sidebar-bot-drop.test.ts` covers where a drop lands,
-`src/components/Sidebar.departments.test.ts` the sidebar's wiring, and
-`src/components/SidebarSectionHeader.naming.dom.test.ts` the name field. The
+Departments with no unpinned bots are automatically removed when sections are
+read, including historical empty departments and legacy pinned memberships.
+Pinned bots lose stale department membership. Group chats in a removed
+department move to General without deleting their conversations. Archived
+unpinned bots still count as members. Authority for removed names is revoked.
+
+The all-empty-groups build was installed directly into `/Applications/Hezuo.app`
+without a new backup, per the user's test-environment instruction. In the
+existing `beta-a@hezuo.test` workspace, the historical empty **未命名分组 3**
+disappeared on startup. Actual mouse dragging moved Ivy, the final unpinned
+member of **xq**, into the pinned grid; **xq** disappeared after synchronization.
+The server section list contained only **未命名分组 4**, its four bots remained,
+and a page reload preserved this result. No AI message was sent; displayed
+balance remained 509.009120 points. This follow-up is not committed yet.
+
+
+The vacated-section and membership regression selection passes nine isolated
+Store tests, including reload persistence, authority revocation, archived bots,
+group chats and failed membership writes. Server TypeScript compilation passes.
+The complete Store file also reports two unrelated locale failures (`es-MX`
+setup choices and `pt-PT` greeting); those are not hidden by this selection.
+The installed package later exposed a separate drag-to-pin defect: a pinned bot
+kept its previous department even though it left that department's visible list.
+The drag-to-pin action now clears its section while pinning; remote clients use
+the existing section-membership endpoint before the pin patch. The 48 sidebar
+department regressions, renderer typecheck and targeted lint pass. The follow-up
+package `release/pin-vacated-followup/mac-arm64/Hezuo.app` passed the isolated
+22-step account flow including page DragEvents from a one-bot department to the
+pinned grid: the bot persisted as pinned with no section, the vacated department
+disappeared, and a nonempty department remained after reload. Evidence is under
+`/private/var/folders/s0/5h112y2d3495p65t6p7cph400000gn/T/omb-product-verify-1CYQ5l/evidence`.
+The follow-up was installed and its account workspace loaded successfully.
+
+The macOS arm64 package containing `763d56be9` was rebuilt under
+`release/empty-group-763d56be9/mac-arm64/Hezuo.app` and tested in an isolated
+packaged Electron workspace. Moving the last bot through its **Move to
+department → Remove from department** menu removed **Vacated Test**; **Retained
+Test** and its bot remained. Both results survived a completed page reload.
+The account fixture reported 22 steps passed using the task-billing backend
+worktree and a loopback upstream, with screenshots and receipt under
+`/private/var/folders/s0/5h112y2d3495p65t6p7cph400000gn/T/omb-product-verify-4wRd42/evidence`.
+Its cleanup exit was `SIGKILL`, so this run does not prove graceful shutdown.
+This is an unsigned `.app`, not a signed/notarized installer. The test used the
+menu path; native OS drag-and-drop and a full app restart were not exercised.
+
+
+
+
+`desktop/src/lib/sidebar-bot-drop.test.ts` covers where a drop lands,
+`desktop/src/components/Sidebar.departments.test.ts` the sidebar's wiring, and
+`desktop/src/components/SidebarSectionHeader.naming.dom.test.ts` the name field. The
 headless pictures cannot prove the operating system's own drag image or a drag
 between two windows.
+
+The 2026-11-13 isolated browser check exercised both ungrouped rows and the
+right half of a pinned tile through actual page DragEvents. Both groups survived
+reload, retained target-first order, and the pinned pair left the pinned area.
+The context-menu action opened a selected **New department** name input.
+Alt+Up and Alt+Down reordered a group, survived reload, and updated a second
+browser client without a reload. This does not prove native OS dragging,
+packaged Electron, paired remote authentication, or a phone's gateway connection.
+The screenshot script's `naming-simple` and `named-simple` scenarios still expect
+the old drag-to-name flow; use the interactions above for the current contract.
+
+
+## Fewer buttons, more dragging
+
+Run `node --experimental-strip-types scripts/verify-sidebar-drag.ts`. It starts
+a disposable fake-engine server with two bots, gives Research a **Launch**
+folder and two extra conversations, and prints the address of the real app.
+Ctrl-C closes both servers and removes only the fixture data. With
+`--shots <dir>` it drives a headless Chrome in a throwaway profile through the
+steps below, checks each one against the fixture's API, saves a picture of each
+and exits.
+
+1. No bot, folder or conversation row draws ⋯, + or folder buttons. A
+   right-click, a long press on touch or pen, or the menu key (Shift+F10) on a
+   row opens its menu, which still holds New thread, New folder and the rest.
+2. A folder's menu offers New thread in it, Folder settings and Mark folder as
+   read. Its order comes from dragging the row or Alt+Up/Down.
+3. Drag a conversation onto a folder: the folder is ringed, and dropping saves
+   its `projectId` (the fixture checks `/api/bots`). Hovering a closed folder
+   for a moment opens it.
+4. Drag a conversation out of its folder onto **Drop here to take it out of the
+   folder**: it is saved with no folder.
+5. Drag files onto a bot in the sidebar: the bot is ringed, and dropping opens
+   it with the files in its composer. The full-window **Drop to attach** sheet
+   leaves the sidebar alone.
+6. Drag a bot from the sidebar into a one-to-one chat: the chat shows **Drop to
+   start a channel with …**, and dropping creates a channel with both bots. In a
+   channel, a newcomer is added and named in the composer; a member is named.
+7. A conversation's menu in the sidebar has no Move to folder list; the bot
+   panel's Conversations, which has no folders to drop on, keeps it.
+
+`desktop/src/lib/thread-folder-drop.test.ts`, `desktop/src/lib/bot-chat-drop.test.ts` and
+`desktop/src/hooks/use-long-press.dom.test.ts` cover where drops land and the long
+press. The headless pictures cannot prove the operating system's drag image,
+a drag of real files from Finder or Explorer, or a long press on a real touch
+screen.

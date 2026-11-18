@@ -1,20 +1,20 @@
 # Running the gateway on this machine
 
-`scripts/local-gateway.mjs` runs the **real** account Worker — the same code
-and migrations `cloudflare/control-plane` deploys — on one machine, over TLS,
+`gateway/local/local-gateway.mjs` runs the **real** account Worker — the same code
+and migrations `gateway/control-plane` deploys — on one machine, over TLS,
 against a persistent database. Accounts, sign-in, operator permissions, model
 tokens, the points ledger and the inference proxy are the production paths;
 only the process around them belongs to this deployment.
 
 ```sh
-node scripts/local-gateway.mjs init \
+node gateway/local/local-gateway.mjs init \
   --open-models ~/.omp/agent/models.yml \
   --default-model gpt-6-astra \
   --rate 1000000000 \
   --operator-id <your account id, after whoami>
-node scripts/local-gateway.mjs start --config .omb-scratch/local-gateway/gateway.json
-node scripts/local-gateway.mjs status --config .omb-scratch/local-gateway/gateway.json
-node scripts/local-gateway.mjs stop  --config .omb-scratch/local-gateway/gateway.json
+node gateway/local/local-gateway.mjs start --config .omb-scratch/local-gateway/gateway.json
+node gateway/local/local-gateway.mjs status --config .omb-scratch/local-gateway/gateway.json
+node gateway/local/local-gateway.mjs stop  --config .omb-scratch/local-gateway/gateway.json
 ```
 
 `init` writes `.omb-scratch/local-gateway/gateway.json` (mode 0600), which is
@@ -91,7 +91,7 @@ paths avoid importing it anywhere:
   [the product release](product-release.md#2-package-the-app).
 * **Trust it for one CLI run.** `NODE_EXTRA_CA_CERTS` (or
   `trustGatewayCertificate()`) helps CLI clients such as the gateway's own
-  `whoami`, `scripts/account-ai-admin.mjs` and smoke scripts. Nothing in the
+  `whoami`, `gateway/scripts/account-ai-admin.mjs` and smoke scripts. Nothing in the
   Electron process reads it for its own network stack.
 
 An app built without `--gateway-ca` needs the certificate in the operating
@@ -172,10 +172,10 @@ instead of a silent success).
 comes back at login, install it as a LaunchAgent:
 
 ```sh
-node scripts/local-gateway.mjs service install \
+node gateway/local/local-gateway.mjs service install \
   --config "$HOME/Library/ApplicationSupport/HezuoGateway/gateway.json"
-node scripts/local-gateway.mjs service status  --config <same file>
-node scripts/local-gateway.mjs service uninstall --config <same file>
+node gateway/local/local-gateway.mjs service status  --config <same file>
+node gateway/local/local-gateway.mjs service uninstall --config <same file>
 ```
 
 What the installed job uses:
@@ -185,7 +185,7 @@ What the installed job uses:
 | LaunchAgent | `~/Library/LaunchAgents/com.openmausbot.gateway.plist` (0600) |
 | Node it runs | `<data-dir>/service/node` — an APFS clone (`cp -c`), not `/tmp` |
 | Log | `<data-dir>/logs/gateway.log` (0600, bounded — see below) |
-| Service command | the same `node <checkout>/scripts/local-gateway.mjs start --config …` |
+| Service command | the same `node <checkout>/gateway/local/local-gateway.mjs start --config …` |
 
 The plist carries **paths only**: no key, token, password, or SMTP
 credential. Secrets keep living in `<data-dir>/secrets/` (0600) and are read by
@@ -201,7 +201,7 @@ the gateway at start, exactly as in the foreground.
   for good. `ThrottleInterval` is 10s, so a crash loop cannot spin.
 * The log is opened by launchd, which never reopens it and never rotates it.
   The gateway therefore trims it in place once it exceeds 8 MiB, keeping the
-  last 512 KiB from a line boundary (`scripts/local-gateway/log-bounding.mjs`).
+  last 512 KiB from a line boundary (`gateway/local/local-gateway/log-bounding.mjs`).
   `Umask 63` plus a pre-created file keep it 0600.
 * `Umask` and `WorkingDirectory` are the data directory, so a relative path
   never resolves somewhere unexpected.
@@ -216,7 +216,7 @@ that, any supervisor that expects `stop` to end the process. Use
 
 To upgrade after editing the gateway, run `service install` again; it stops the
 old job, replaces the plist and the Node copy, and starts the new one. The job
-runs the checkout's own `scripts/local-gateway.mjs`, so it picks up whatever
+runs the checkout's own `gateway/local/local-gateway.mjs`, so it picks up whatever
 that path holds at the next start — run `service install` after a move.
 
 `service install` waits (up to three minutes) for the gateway to publish its
@@ -247,17 +247,17 @@ ways to name the operator's account id.
 **Online** (needs the gateway running and that account's password or code):
 
 ```sh
-node scripts/local-gateway.mjs whoami --config <config> --operator-email you@example.com
-node scripts/local-gateway.mjs init   --config <config> --operator-id <id>
+node gateway/local/local-gateway.mjs whoami --config <config> --operator-email you@example.com
+node gateway/local/local-gateway.mjs init   --config <config> --operator-id <id>
 ```
 
 **Offline, by exact registered address** (reads the D1 store read-only; it does
 not need the gateway running, and it does not disturb it):
 
 ```sh
-node scripts/local-gateway.mjs operator --config <config> --operator-email you@example.com
+node gateway/local/local-gateway.mjs operator --config <config> --operator-email you@example.com
 # then restart whatever runs the gateway so the new list is read:
-node scripts/local-gateway.mjs service install --config <config>   # launchd job
+node gateway/local/local-gateway.mjs service install --config <config>   # launchd job
 # or: stop, then start, for a foreground gateway
 ```
 
@@ -271,7 +271,7 @@ AI permission or grants points:
 * `--remove` takes the id back out of the list.
 
 Enabling AI and granting balance remain separate, explicit calls to
-`scripts/account-ai-admin.mjs` (`enable`, then `grant`), as in the hosted
+`gateway/scripts/account-ai-admin.mjs` (`enable`, then `grant`), as in the hosted
 deployment. That CLI signs in with `OMB_OPERATOR_TOKEN` when set, otherwise an
 account **password** (non-echoing prompt, or `OMB_OPERATOR_PASSWORD` for
 unattended runs; never an argument), otherwise an emailed code. A deployment
@@ -285,26 +285,26 @@ without needing `--password`.
 3. Name the operator explicitly: `operator --operator-email you@example.com`
    (offline, needs the gateway stopped) or `whoami --operator-email …` plus
    `init --operator-id <id>` (online). Both print the account id.
-4. `enable`, then `grant` through `scripts/account-ai-admin.mjs` — the same CLI
+4. `enable`, then `grant` through `gateway/scripts/account-ai-admin.mjs` — the same CLI
    the hosted deployment uses. Sign-ups start `pending` with zero points and
    no grant happens automatically.
 
 ## Verification
 
 ```sh
-node scripts/local-gateway.mjs init --config /tmp/gw/gateway.json \
+node gateway/local/local-gateway.mjs init --config /tmp/gw/gateway.json \
   --open-models ~/.omp/agent/models.yml --default-model gpt-6-astra \
   --rate 1000000000 --port 8901
-node scripts/local-gateway.mjs start --config /tmp/gw/gateway.json &
-node scripts/local-gateway.mjs status --config /tmp/gw/gateway.json
-node scripts/local-gateway.mjs migrate --config /tmp/gw/gateway.json
-node scripts/local-gateway.mjs stop --config /tmp/gw/gateway.json
+node gateway/local/local-gateway.mjs start --config /tmp/gw/gateway.json &
+node gateway/local/local-gateway.mjs status --config /tmp/gw/gateway.json
+node gateway/local/local-gateway.mjs migrate --config /tmp/gw/gateway.json
+node gateway/local/local-gateway.mjs stop --config /tmp/gw/gateway.json
 ```
 
 Programmatic supervision uses the same code:
 
 ```js
-import { startLocalGateway, readGatewayConfig, trustGatewayCertificate } from "./scripts/local-gateway.mjs";
+import { startLocalGateway, readGatewayConfig, trustGatewayCertificate } from "./gateway/local/local-gateway.mjs";
 const { config } = readGatewayConfig("/tmp/gw/gateway.json");
 const gateway = await startLocalGateway({ config, configPath: "/tmp/gw/gateway.json" });
 trustGatewayCertificate(gateway.certificate);
@@ -350,7 +350,7 @@ The origin remains `https://127.0.0.1:18487` for the standard installation.
 3. From the new checkout run (substitute your actual source config):
 
    ```sh
-   node scripts/local-gateway.mjs identity-migrate \
+   node gateway/local/local-gateway.mjs identity-migrate \
      --config "/actual/old/data/gateway.json" \
      --data-dir "$HOME/Library/Application Support/HezuoGateway"
    ```
@@ -375,3 +375,28 @@ rollback, uninstall the new service first and restore the complete offline
 backup and old checkout together before reinstalling the old service. Never
 restore only the config or run the backup as a second gateway.
 
+
+
+## Phone access
+
+The desktop Hezuo and the native phone app connect by signing into the **same
+Hezuo account** on this gateway. After the phone signs in, it can reach each
+desktop installation already registered to that account at:
+
+```
+https://<public-host>:<port>/v1/companion/<installation-id>
+```
+
+No pairing code, QR code, or iOS handoff code is required for this path, and
+it does not use a Cloudflare tunnel or Tailscale.
+
+A phone cannot reach a loopback origin. Start the gateway with `--host` and
+`--public-host` set to an address the phone can resolve, and give the phone
+that HTTPS origin. For a generated certificate, paste the gateway CA
+(`<data-dir>/tls/gateway-cert.pem`) into the phone app's optional certificate
+field, or install that CA on the phone. Desktop sign-in on the same machine
+still uses the bundled or pinned CA described above.
+
+The phone holds an account session only. It does not create a desktop
+installation, and the companion surface it receives is the existing
+client-equivalent API — not an admin session.

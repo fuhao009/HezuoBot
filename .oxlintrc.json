@@ -15,10 +15,11 @@
     "dist-electron/**",
     "dist-native/**",
     "dist-server/**",
-    "electron/vendor/**",
+    "desktop/electron/vendor/**",
     "release/**",
     "third_party/**",
-    "electron/resources/**",
-    "server/core-engine/**"
+    "desktop/electron/resources/**",
+    "server/core-engine/**",
+    "desktop/server/core-engine/**"
   ]
 }
