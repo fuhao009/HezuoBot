@@ -112,14 +112,13 @@ describe("Data result receipt", () => {
       expect(container.querySelector("pre code")!.textContent).toBe(sql);
       expect(container.querySelector("pre")!.parentElement!.id).toBe(disclosure.getAttribute("aria-controls"));
       expect(dispatch).not.toHaveBeenCalled();
-      container.querySelector<HTMLButtonElement>("button:not([aria-expanded])")!.click();
-      expect(dispatch).toHaveBeenCalledWith({ type: "openDataResult", botId: "bot", cardId: "c_1" });
+      expect(container.querySelector("button:not([aria-expanded])")).toBeNull();
       flushSync(() => disclosure.click());
       expect(container.querySelector("pre")).toBeNull();
     } finally { root.unmount(); }
   });
 
-  it("opens the exact result, and a table result draws nothing in the chat", () => {
+  it("keeps a table receipt without a removed Data panel entry", () => {
     store.state.bots = [{ id: "bot" }];
     const message: Message = { ...receipt("bot", "c_1", "table"), dataResult: { botId: "bot", cardId: "c_1", title: "Revenue", kind: "table" } };
     const container = document.createElement("div");
@@ -127,17 +126,8 @@ describe("Data result receipt", () => {
     try {
       flushSync(() => root.render(createElement(DataResultChip, { message })));
       expect(container.textContent).toContain("Revenue");
-      expect(container.textContent).toContain("Open in Data");
-      expect(container.querySelector("button[aria-expanded]")).toBeNull();
-      container.querySelector("button")!.click();
-      expect(dispatch).toHaveBeenCalledWith({ type: "openDataResult", botId: "bot", cardId: "c_1" });
+      expect(container.querySelector("button")).toBeNull();
       expect(container.querySelector("canvas,table,iframe")).toBeNull();
-      flushSync(() => root.render(createElement(DataResultChip, { message: { ...message, dataResult: { ...message.dataResult!, botId: "deleted" } } })));
-      expect(container.querySelector("button")!.disabled).toBe(true);
-      vi.stubGlobal("ogb", { remoteClient: { active: true } });
-      flushSync(() => root.render(createElement(DataResultChip, { message })));
-      expect(container.querySelector("button")!.disabled).toBe(true);
-      expect(container.querySelector("button")!.title).toContain("companion");
     } finally { root.unmount(); vi.unstubAllGlobals(); }
   });
 

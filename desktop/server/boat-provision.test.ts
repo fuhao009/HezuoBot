@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { createServer, type IncomingMessage, type Server } from "node:http";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -18,11 +17,7 @@ describe("cloud computer provisioning cleanup", () => {
   let createdName = "";
   const requests: RequestRecord[] = [];
 
-  const nameFor = (botId: string) => {
-    const prefix = botId.slice(0, 8).toLowerCase().replace(/[^a-z0-9]/g, "");
-    const hash = createHash("sha256").update(botId).digest("hex").slice(0, 6);
-    return `ogb-${prefix}-${hash}`;
-  };
+  let existingName = "";
 
   beforeAll(async () => {
     api = createServer((req, res) => {
@@ -36,7 +31,7 @@ describe("cloud computer provisioning cleanup", () => {
         if (url.pathname === "/api/v1/sandboxes" && req.method === "GET") {
           const boats =
             scenario === "existing-desktop-failure"
-              ? [{ id: "bx_456789ab", name: nameFor("existing-bot"), state: "ready" }]
+              ? [{ id: "bx_456789ab", name: existingName, state: "ready" }]
               : [];
           res.writeHead(200).end(JSON.stringify({ ok: true, type: "sandbox.list", sandboxes: boats, pageInfo: { nextCursor: null } }));
         } else if (url.pathname === "/api/v1/sandboxes" && req.method === "POST") {
@@ -90,7 +85,7 @@ describe("cloud computer provisioning cleanup", () => {
           }));
         } else if (url.pathname === "/api/v1/sandboxes/bx_456789ab" && req.method === "GET") {
           res.writeHead(200).end(
-            JSON.stringify({ ok: true, sandbox: { id: "bx_456789ab", name: nameFor("existing-bot"), state: "ready" } }),
+            JSON.stringify({ ok: true, sandbox: { id: "bx_456789ab", name: existingName, state: "ready" } }),
           );
         } else if (url.pathname.endsWith("/commands")) {
           res.writeHead(200).end(JSON.stringify({ ok: true, exitCode: 0, stdout: "bootstrapped", stderr: "" }));
@@ -103,9 +98,11 @@ describe("cloud computer provisioning cleanup", () => {
     });
     await new Promise<void>((resolve) => api.listen(0, "127.0.0.1", resolve));
     const port = (api.address() as any).port;
-    vi.stubEnv("OMB_BOAT_API", `http://127.0.0.1:${port}/api/v1`);
+    vi.stubEnv("HEZUO_BOAT_API", `http://127.0.0.1:${port}/api/v1`);
     vi.resetModules();
-    ({ provisionBoat } = await import("./boat.ts"));
+    const boat = await import("./boat.ts");
+    ({ provisionBoat } = boat);
+    existingName = await boat.boatNameFor("existing-bot");
   });
 
   afterAll(async () => {

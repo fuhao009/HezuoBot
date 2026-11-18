@@ -91,7 +91,7 @@ connections or directly invoke switching, forgetting, or host-only controls.
 
 **Computer sharing is disabled by default.** The exception is a Mac lending
 itself to the person's own Clouds, which happens by itself with a gate of its
-own; see `docs/cloud-pro.md`, "This computer works for your Clouds".
+own; see the retired cloud-pro guide (historical only), "This computer works for your Clouds".
 Connecting and switching hosted workspaces still works, but does not offer
 local file, terminal, or screen access. The flow below is maintainer-only
 verification with `features.sharedComputers: true` on both servers, not a

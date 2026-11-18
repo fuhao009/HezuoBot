@@ -63,7 +63,7 @@ describe("LimitResetClock", () => {
   const dirs: string[] = [];
   afterEach(() => {
     vi.useRealTimers();
-    delete process.env.OMB_TEST_PLAN_USAGE_FILE;
+    delete process.env.HEZUO_TEST_PLAN_USAGE_FILE;
     for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
   });
   const accounts = [{ id: "claude", name: "Claude", driver: "claude" as const, environment: {} }];
@@ -140,10 +140,10 @@ describe("LimitResetClock", () => {
     await instance.ensureFresh();
     expect(load).toHaveBeenCalledTimes(2);
 
-    const dir = mkdtempSync(join(tmpdir(), "omb-limit-fixture-"));
+    const dir = mkdtempSync(join(tmpdir(), "hezuo-limit-fixture-"));
     dirs.push(dir);
-    process.env.OMB_TEST_PLAN_USAGE_FILE = join(dir, "usage.json");
-    writeFileSync(process.env.OMB_TEST_PLAN_USAGE_FILE, JSON.stringify(report(claude([91, NOW + 5 * HOUR], [1, NOW + 90 * HOUR]))));
+    process.env.HEZUO_TEST_PLAN_USAGE_FILE = join(dir, "usage.json");
+    writeFileSync(process.env.HEZUO_TEST_PLAN_USAGE_FILE, JSON.stringify(report(claude([91, NOW + 5 * HOUR], [1, NOW + 90 * HOUR]))));
     const fixture = clock().instance;
     await fixture.refresh(true);
     expect(fixture.limit("claude")).toMatchObject({ usedPercent: 91, resetsAt: NOW + 5 * HOUR });
@@ -274,7 +274,7 @@ describe("LimitResetClock and the turns that follow a refusal", () => {
   });
 
   it("keeps a refusal's hold through a restart, so a new conversation does not go to the limited engine first", () => {
-    const dir = mkdtempSync(join(tmpdir(), "omb-limit-holds-"));
+    const dir = mkdtempSync(join(tmpdir(), "hezuo-limit-holds-"));
     try {
       const file = join(dir, "limit-holds.json");
       let now = NOW;

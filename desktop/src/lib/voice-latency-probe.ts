@@ -1,10 +1,10 @@
 // Inert voice-latency recorder. Every exported function is a no-op unless the
-// measurement harness installed a sink array at `window.__ombVoiceProbe` — with
+// measurement harness installed a sink array at `window.__hezuoVoiceProbe` — with
 // the probe off, the speak path runs exactly as it did before the probe existed.
 import type { RuntimeEvent, ThreadId } from "../../../packages/shared/runtime-events";
 import type { VoiceProbeSample } from "../../../packages/shared/voice-latency-probe";
 
-const PROBE_KEY = "__ombVoiceProbe";
+const PROBE_KEY = "__hezuoVoiceProbe";
 
 type ProbeWindow = Window & { [PROBE_KEY]?: VoiceProbeSample[] };
 

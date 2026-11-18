@@ -91,7 +91,7 @@ function knownRoomResponder(value: unknown): unknown {
 }
 
 const backupSchema = z.object({
-  format: z.preprocess((value) => value === "openmaus.backup" ? "hezuo.backup" : value, z.literal("hezuo.backup")),
+  format: z.literal("hezuo.backup"),
   version: z.literal(1),
   name,
   exportedAt: timestamp,

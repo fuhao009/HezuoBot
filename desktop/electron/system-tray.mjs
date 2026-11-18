@@ -13,11 +13,11 @@ export function createSystemTray({ Tray, Menu, nativeImage, iconPath, getWindow,
     win.focus();
     return true;
   };
-  tray.setToolTip("Hezuo");
+  tray.setToolTip("HezuoBot");
   tray.setContextMenu(Menu.buildFromTemplate([
-    { label: "Open Hezuo", click: show },
+    { label: "Open HezuoBot", click: show },
     { type: "separator" },
-    { label: "Quit Hezuo", click: onQuit },
+    { label: "Quit HezuoBot", click: onQuit },
   ]));
   tray.on("click", show);
   tray.on("double-click", show);

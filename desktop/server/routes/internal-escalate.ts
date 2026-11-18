@@ -1,5 +1,5 @@
 import type { EscalationOutcome } from "../host/chief-notices.ts";
-import { PASS, type RouteContext, type RouteHandler } from "./table.ts";
+import { PASS, type RouteContext, type InternalRouteHandler } from "./table.ts";
 
 const WAIT = "Say plainly that you stopped at this gate and why, then end your turn and wait; do not retry the gated work until the person lifts the gate.";
 
@@ -8,7 +8,7 @@ export function createInternalEscalateRoutes(deps: {
   readBody(): ReturnType<RouteContext["readBody"]>;
   requireActive(): void;
   report(reason: string): EscalationOutcome;
-}): RouteHandler {
+}): InternalRouteHandler {
   return async ({ res, path, method, json }) => {
     if (method !== "POST" || path !== "/api/internal/escalate") return PASS;
     const body = await deps.readBody();

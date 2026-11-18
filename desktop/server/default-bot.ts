@@ -74,8 +74,8 @@ export function forgetDefaultBot(dataDir: string, person: string): void {
 export function seededHezuo(bots: readonly BotRecord[]): BotRecord | undefined {
   const oldest = bots.reduce<BotRecord | undefined>((first, bot) => !first || bot.createdAt < first.createdAt ? bot : first, undefined);
   if (!oldest || oldest.hidden || oldest.movedTo || oldest.section?.trim() || oldest.installedPackage) return undefined;
-  // Historical seeded helpers retain their persisted id and Chief assignment across the rename.
-  return oldest.name === DEFAULT_BOT_NAME || oldest.name === "MausBot" || oldest.color === STARTER_COLOR ? oldest : undefined;
+  // Seeded helpers retain their persisted id and Chief assignment.
+  return oldest.name === DEFAULT_BOT_NAME || oldest.color === STARTER_COLOR ? oldest : undefined;
 }
 
 /** Puts the intro where its person sees it next: in its open conversation while nobody has written there, else at the

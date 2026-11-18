@@ -4,9 +4,9 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { BOX_DENY_ENV } from "../../bot-box/boot.ts";
-import { botBox, BoxRunner, BOX_EGRESS_PORT } from "../../bot-box/box.ts";
-import type { BoxRequest } from "../../bot-box/plan.ts";
+import { BOX_DENY_ENV } from "../../execution-sandbox/boot.ts";
+import { botBox, BoxRunner, BOX_EGRESS_PORT } from "../../execution-sandbox/box.ts";
+import type { BoxRequest } from "../../execution-sandbox/plan.ts";
 import type { ProviderInstance } from "../../contracts.ts";
 import { engineInstallRoots } from "../../engine-roots.ts";
 import { removeTempDir } from "../../testing/cleanup.ts";
@@ -32,7 +32,7 @@ afterEach(async () => {
 });
 
 async function open(driver: ReturnType<typeof createOpenCodeDriver>, instanceId: string, environment: (scratch: string) => Record<string, string>) {
-  const scratch = mkdtempSync(join(tmpdir(), "omb-opencode-cloud-"));
+  const scratch = mkdtempSync(join(tmpdir(), "hezuo-opencode-cloud-"));
   const instance = await driver.create({
     instanceId, displayName: instanceId, enabled: true,
     config: { cli: FAKE_CLI, fullAuto: false, workspace: scratch },
@@ -88,7 +88,7 @@ describe("the keys saved for OpenCode inside the Cloud bot box", () => {
     await (await open(createOpenCodeDriver(async () => ({ default: "", options: [] })), "opencodeGo", () => ({
       NANO_GPT_API_KEY: "nano-secret", OPENCODE_API_KEY: "go-secret",
     }))).run("t-raw");
-    const broker = { port: 18080, mintForProcess: () => ({ token: "omb_t0_token" }), revoke: () => {} };
+    const broker = { port: 18080, mintForProcess: () => ({ token: "hezuo_t0_token" }), revoke: () => {} };
     const brokered = new BoxRunner({ bwrap: "/usr/bin/bwrap", bridge: { socat: null, bridgeScript: "/app/box-bridge.js", node: "/usr/bin/node" }, setup, denyEnv: BOX_DENY_ENV, broker })
       .wrap(requests.at(-1)!);
     expect(brokered.env).toMatchObject({ OPENCODE_API_KEY: "go-secret", NANO_GPT_API_KEY: "nano-secret" });

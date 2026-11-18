@@ -1,6 +1,6 @@
 import type { ExecutionConnectorHost } from "../execution-connectors.ts";
 import type { RequestAuth } from "../request-auth.ts";
-import { PASS, type RouteHandler } from "./table.ts";
+import { PASS, type RouteHandler, type InternalRouteHandler } from "./table.ts";
 export function createExecutionConnectorRoutes(deps: { host: ExecutionConnectorHost; owner(auth: RequestAuth): string | null }): RouteHandler {
   return async ctx => {
     if (!ctx.path.startsWith("/api/execution-connectors")) return PASS;
@@ -39,7 +39,7 @@ export function createInternalExecutionConnectorRoutes(deps: {
   botId: string;
   readBody(): Promise<Record<string, any>>;
   owner(): string | null;
-}): RouteHandler {
+}): InternalRouteHandler {
   return async ctx => {
     if (ctx.path !== "/api/internal/execution-connectors" || ctx.method !== "POST") return PASS;
     const body = await deps.readBody();

@@ -22,7 +22,7 @@ files it links, and writes everything to `./rehearsal`.
 
 - `--url URL` or `HEZUO_URL`: a workspace somewhere else. Use `https://`
   unless it is this computer (`ALLOW_INSECURE_HTTP=true` allows plain `http://`).
-- `--port N` or `OMB_PORT`: this computer, on that port.
+- `--port N` or `HEZUO_PORT`: this computer, on that port.
 - Otherwise the command looks on this computer's usual ports (8799, 18799,
   28799), as the desktop app uses them.
 
@@ -34,7 +34,9 @@ hezuo connect https://hezuo.example.com --code ABCD1234 --out ~/.hezuo-token
 hezuo doctor --url https://hezuo.example.com --token-file ~/.hezuo-token
 ```
 
-Get the code in the app under **Settings → Phone → Set up a phone**. On this
+> Legacy authentication UI: references below to **Settings → Phone** describe the retained pairing/token surface, not a supported native mobile setup flow. The desktop/headless or MCP client still requires an appropriate scoped token; do not bypass authentication if the UI is unavailable.
+
+The legacy UI exposes a code under **Settings → Phone → Set up a phone**. On this
 computer's own server, `connect` makes the code itself (`--client` gives a
 token that can chat but not change settings). The token goes to a file only
 you can read, and is never printed. Pass it with `--token-file FILE` or
@@ -376,7 +378,7 @@ bots:
       You are Priya, 41, who buys software for a 200-person company. You distrust vague
       claims and look for pricing, security and who else uses it before anything else.
   - name: Marcus
-    title: Rushed founder on a phone-sized screen
+    title: Rushed founder on a compact screen
     soul: |
       You are Marcus, 29, running a two-person startup. You give a site 30 seconds,
       skim headlines, and try the main button first. Use a 390x844 viewport.
@@ -403,8 +405,8 @@ an engine that can limit built-in tools.
 ```yaml
 # .github/workflows/rehearse.yml (a sketch)
 - run: npm install -g hezuo @anthropic-ai/claude-code
-- run: hezuo serve --no-pair --data-dir "$RUNNER_TEMP/omb" &
-  env: { OMB_ANTHROPIC_API_KEY: "${{ secrets.ANTHROPIC_API_KEY }}" }   # the workspace's Claude key from the start
+- run: hezuo serve --no-pair --data-dir "$RUNNER_TEMP/hezuo" &
+  env: { HEZUO_ANTHROPIC_API_KEY: "${{ secrets.ANTHROPIC_API_KEY }}" }   # the workspace's Claude key from the start
 - run: hezuo doctor --wait 2m          # the server answers and an engine is ready
 - run: hezuo team apply team.yaml
 - run: hezuo run "Release checker" "Check the deploy at ${{ env.URL }}" --timeout 20m --strict --export ./out
@@ -413,7 +415,7 @@ an engine that can limit built-in tools.
 ```
 
 `doctor --wait` waits for an engine too, so the server gets its key in its
-own environment, as here (`OMB_ANTHROPIC_API_KEY`; the team file's `engines:`
+own environment, as here (`HEZUO_ANTHROPIC_API_KEY`; the team file's `engines:`
 section, or `hezuo engine set`, can set it later instead).
 
 The step fails when the job fails (exit 1), needs someone (exit 3) or runs out

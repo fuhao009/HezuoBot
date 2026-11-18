@@ -1,51 +1,46 @@
-// The isolated fake-engine fixture with a stand-in enterprise layer granting `budgets` and `billing`; no real licence, engine or provider.
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { launchVerificationServer, runControlOmb, type VerificationServer } from "../../scripts/control-omb.ts";
-import { removeTempDir } from "./testing/cleanup.ts";
+import { launchVerificationServer, runControlHezuo, type VerificationServer } from "../../scripts/control-hezuo.ts";
 import { openSse } from "./testing/sse.ts";
 import { CAPTURE_MARKER } from "./memory-capture.ts";
 import { ORGANIZE_MARKER } from "./memory-organize.ts";
 import { TIDY_MARKER } from "./memory-tidy.ts";
 import { readUsage } from "./usage-ledger.ts";
+import { removeTempDir } from "./testing/cleanup.ts";
 
 describe("spend cap and prices through real turns", () => {
   let session: VerificationServer;
-  let layerDir: string;
+  let fixtureDir: string;
 
   beforeEach(async () => {
-    // The folder shape core looks for: <dir>/server/index.js exporting register().
-    layerDir = mkdtempSync(join(tmpdir(), "omb-fake-layer-"));
-    mkdirSync(join(layerDir, "server"));
-    writeFileSync(join(layerDir, "server", "index.js"), 'export async function register() { return { customer: "Fixture Co", features: ["budgets", "billing"], expiresAt: "2099-01-01" }; }\n');
-    session = await launchVerificationServer(process.env, undefined, undefined, undefined, { dir: layerDir, licenseKey: "fixture-key" });
+    fixtureDir = mkdtempSync(join(tmpdir(), "hezuo-spend-fixture-"));
+    session = await launchVerificationServer(process.env);
   }, 60_000);
 
   afterEach(async () => {
     console.info(JSON.stringify(session.info));
     await session.close();
-    await removeTempDir(layerDir);
+    await removeTempDir(fixtureDir);
   });
 
-  const control = (args: string[]) => runControlOmb([...args, "--url", session.info.url]) as Promise<any>;
+  const control = (args: string[]) => runControlHezuo([...args, "--url", session.info.url]) as Promise<any>;
   const api = (path: string, init: RequestInit = {}) => fetch(`${session.info.url}${path}`, init);
   const put = (body: unknown) => api("/api/config", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
   const send = (botId: string, text: string) => api(`/api/bots/${encodeURIComponent(botId)}/messages`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text }) });
 
   it("books memory helper usage and checks the cap before every background call", async () => {
     await session.close();
-    const routes = join(layerDir, "memory-replies.json");
-    const dump = join(layerDir, "memory-call.json");
+    const routes = join(fixtureDir, "memory-replies.json");
+    const dump = join(fixtureDir, "memory-call.json");
     writeFileSync(routes, JSON.stringify({
       [CAPTURE_MARKER]: '[{"text":"Project codename is Bluebird","kind":"fact","evidence":"project codename is Bluebird","confidence":0.9}]',
       [ORGANIZE_MARKER]: '{"moves":[]}',
       [TIDY_MARKER]: '{"pairs":[]}',
     }));
-    session = await launchVerificationServer({ ...process.env, FAKE_CLAUDE_TEXT_ROUTES: routes, FAKE_CLAUDE_TEXT_DUMP: dump },
-      undefined, undefined, undefined, { dir: layerDir, licenseKey: "fixture-key" });
+    session = await launchVerificationServer({ ...process.env, FAKE_CLAUDE_TEXT_ROUTES: routes, FAKE_CLAUDE_TEXT_DUMP: dump });
     const created = await api("/api/bots", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: "Budgeted memory" }) });
     expect(created.status).toBe(201);
     const { bot } = await created.json() as any;
@@ -120,7 +115,7 @@ describe("spend cap and prices through real turns", () => {
     await session.close();
     session = await launchVerificationServer({ ...process.env,
       FAKE_CLAUDE_TEXT_RESULT: JSON.stringify({ type: "result", result: '{"moves":[]}', ...metadata }),
-    }, undefined, undefined, undefined, { dir: layerDir, licenseKey: "fixture-key" });
+    });
     const { bot } = await control(["new-bot", "--name", "Helper usage"]);
     expect((await api(`/api/bots/${bot.id}/memory/file`, {
       method: "PUT", headers: { "content-type": "application/json" },
@@ -134,8 +129,6 @@ describe("spend cap and prices through real turns", () => {
   }, 60_000);
 
   it("refuses the next turn once the month reaches the cap, prices turns, and lets a raised cap through", async () => {
-    const edition = (await (await api("/api/edition")).json()) as { edition: string; features: string[] };
-    expect(edition).toMatchObject({ edition: "enterprise", features: ["billing", "budgets"] });
 
     // The fake engine reports $0.01 per turn: a $0.015 cap allows two turns and refuses the third.
     expect((await put({ budgets: { monthlyUsd: 0.015, warnAtPercent: 50 }, billing: { currency: "USD", prices: { default: { inputPerMillion: 1000, outputPerMillion: 2000 } } } })).status).toBe(200);
@@ -190,7 +183,7 @@ describe("spend cap and prices through real turns", () => {
 
   it.each([1, 2])("blocks a goal after %i paid turn(s) without retrying or spending another turn", async (allowedTurns) => {
     await session.close();
-    const replyState = join(layerDir, "reply-state");
+    const replyState = join(fixtureDir, "reply-state");
     session = await launchVerificationServer({
       ...process.env,
       FAKE_CLAUDE_REPLIES: JSON.stringify([
@@ -198,7 +191,7 @@ describe("spend cap and prices through real turns", () => {
         "The draft has been checked.",
       ]),
       FAKE_CLAUDE_REPLY_STATE: replyState,
-    }, undefined, undefined, undefined, { dir: layerDir, licenseKey: "fixture-key" });
+    });
     expect((await put({ budgets: { monthlyUsd: allowedTurns * 0.01 } })).status).toBe(200);
     const lead = (await control(["new-bot", "--name", "Lead"])).bot;
     const worker = (await control(["new-bot", "--name", "Worker"])).bot;
@@ -230,8 +223,6 @@ describe("spend cap and prices through real turns", () => {
   }, 150_000);
 
   it("refuses the next room member at execution time once the cap is reached", async () => {
-    const edition = (await (await api("/api/edition")).json()) as { edition: string; features: string[] };
-    expect(edition).toMatchObject({ edition: "enterprise", features: ["billing", "budgets"] });
 
     // The fake engine reports $0.01 per turn: a $0.01 cap lets the first room member finish, then blocks the second before dispatch.
     expect((await put({

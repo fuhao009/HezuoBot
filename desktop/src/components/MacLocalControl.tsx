@@ -17,7 +17,7 @@ export function MacLocalControl() {
     setPending(true);
     setError(null);
     try {
-      await window.ogb?.localControl?.retry();
+      await window.hezuo?.localControl?.retry();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason));
     } finally {
@@ -29,8 +29,8 @@ export function MacLocalControl() {
     setError(null);
     setAwaitingGrant(true);
     try {
-      await window.ogb?.permOpenSettings?.("accessibility");
-      await window.ogb?.permOpenSettings?.("screen");
+      await window.hezuo?.permOpenSettings?.("accessibility");
+      await window.hezuo?.permOpenSettings?.("screen");
     } catch (reason) {
       setAwaitingGrant(false);
       setError(reason instanceof Error ? reason.message : String(reason));

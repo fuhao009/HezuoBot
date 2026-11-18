@@ -8,8 +8,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
 
-const root = mkdtempSync(join(tmpdir(), "omb-chatgpt-plan-"));
-process.env.OMB_DATA_DIR = join(root, "omb");
+const root = mkdtempSync(join(tmpdir(), "hezuo-chatgpt-plan-"));
+process.env.HEZUO_DATA_DIR = join(root, "hezuo");
 const { chatgptPlanCodexArgs } = await import("../desktop/server/drivers/codex.ts");
 const home = join(root, "home");
 const cwd = join(root, "workspace");

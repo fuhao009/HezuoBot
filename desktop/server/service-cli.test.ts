@@ -12,7 +12,7 @@ describe("hezuo service", () => {
   const err: string[] = [];
   const io = { log: (l: string) => out.push(l), error: (l: string) => err.push(l) };
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), "omb-service-"));
+    dir = mkdtempSync(join(tmpdir(), "hezuo-service-"));
     out.length = 0;
     err.length = 0;
   });

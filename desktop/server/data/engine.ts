@@ -51,9 +51,9 @@ export interface DataEngineOptions {
 
 /** Null means the server's own node_modules. */
 export function duckdbDirectory(env: NodeJS.ProcessEnv = process.env): string | null {
-  if (env.OMB_DUCKDB_DIR) return env.OMB_DUCKDB_DIR;
-  if (env.OMB_RESOURCES_PATH) {
-    const staged = join(env.OMB_RESOURCES_PATH, "duckdb");
+  if (env.HEZUO_DUCKDB_DIR) return env.HEZUO_DUCKDB_DIR;
+  if (env.HEZUO_RESOURCES_PATH) {
+    const staged = join(env.HEZUO_RESOURCES_PATH, "duckdb");
     if (existsSync(staged)) return staged;
   }
   return null;
@@ -73,9 +73,9 @@ export function instanceSettings(folder: string, dataDir: string, duckdbVersion:
   const quarterOfRam = Math.floor(totalmem() / 4);
   const memoryMiB = Math.max(256, Math.floor(Math.min(2 * 1024 ** 3, quarterOfRam) / 1024 ** 2));
   return {
-    memory_limit: env.OMB_DUCKDB_MEMORY_LIMIT || `${memoryMiB}MiB`,
+    memory_limit: env.HEZUO_DUCKDB_MEMORY_LIMIT || `${memoryMiB}MiB`,
     temp_directory: join(folder, DATA_TMP_DIR),
-    max_temp_directory_size: env.OMB_DUCKDB_MAX_TEMP_SIZE || "20GB",
+    max_temp_directory_size: env.HEZUO_DUCKDB_MAX_TEMP_SIZE || "20GB",
     threads: String(Math.max(1, Math.min(4, cpus().length || 1))),
     // Extensions are tied to the exact DuckDB version.
     extension_directory: join(dataDir, "duckdb-extensions", duckdbVersion),
@@ -523,7 +523,7 @@ class BotDb implements BotDatabase {
     const text = target.trim().replace(/;+\s*$/, "");
     const looksLikeName = /^[\w."$ -]+$/.test(text) && !/\s(?:from|select|with|values)\s/i.test(text) && !/^(?:select|with|from|values|pivot|unpivot|show|describe)\b/i.test(text);
     if (looksLikeName) return this.resolveTable(text);
-    return `(${text}) AS omb_described`;
+    return `(${text}) AS hezuo_described`;
   }
 
   async describe(target: string, options: RunOptions): Promise<DescribeResult> {
@@ -579,9 +579,9 @@ class BotDb implements BotDatabase {
 
     if (numeric || temporal) {
       const value = numeric ? `CAST(${id} AS DOUBLE)` : `epoch(CAST(${id} AS TIMESTAMP))`;
-      const sql = `WITH omb_range AS (SELECT min(${value}) AS lo, max(${value}) AS hi FROM ${from} WHERE ${id} IS NOT NULL)
-SELECT coalesce(LEAST(floor((${value} - omb_range.lo) / nullif(omb_range.hi - omb_range.lo, 0) * ${bins}), ${bins - 1}), 0)::INTEGER AS bin, count(*) AS n, min(omb_range.lo), min(omb_range.hi)
-FROM ${from}, omb_range WHERE ${id} IS NOT NULL GROUP BY bin ORDER BY bin`;
+      const sql = `WITH hezuo_range AS (SELECT min(${value}) AS lo, max(${value}) AS hi FROM ${from} WHERE ${id} IS NOT NULL)
+SELECT coalesce(LEAST(floor((${value} - hezuo_range.lo) / nullif(hezuo_range.hi - hezuo_range.lo, 0) * ${bins}), ${bins - 1}), 0)::INTEGER AS bin, count(*) AS n, min(hezuo_range.lo), min(hezuo_range.hi)
+FROM ${from}, hezuo_range WHERE ${id} IS NOT NULL GROUP BY bin ORDER BY bin`;
       const rows = (await this.statement("panel", sql, options, (o, conn) => this.read(o, conn, sql))).rows;
       if (!rows.length) return result;
       const lo = Number(rows[0][2]);
@@ -727,8 +727,8 @@ class Engine implements DataEngine {
       const detail = (error instanceof Error ? error.message : String(error)).split("\n")[0].trim();
       const where = directory ? `from ${directory}` : "from the server's node_modules";
       const action = directory
-        ? "Reinstall Hezuo, or point OMB_DUCKDB_DIR at a folder holding node_modules/@duckdb."
-        : "Run pnpm install, or set OMB_DUCKDB_DIR to a folder holding node_modules/@duckdb.";
+        ? "Reinstall Hezuo, or point HEZUO_DUCKDB_DIR at a folder holding node_modules/@duckdb."
+        : "Run pnpm install, or set HEZUO_DUCKDB_DIR to a folder holding node_modules/@duckdb.";
       this.loaded = { reason: `DuckDB did not load ${where}: ${detail}. ${action}` };
     }
     return this.loaded;

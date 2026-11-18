@@ -40,9 +40,17 @@ describe("a bot's ask to turn on what it needs from the person's computer", () =
     expect(markup).not.toContain("Allow once");
   });
 
-  it("when the app there is the fix, links to it instead of a Turn on that can't work", () => {
-    const markup = panel(ask({ reason: "closed" }));
-    expect(markup).toContain('href="https://www.openmausbot.com/download"');
+  it.each(["paused", "permissions", "blocked", "off", "not-running", "terminal-off"] as const)("offers an actionable desktop permission request for %s", (reason) => {
+    const markup = panel(ask({ reason, ...(reason === "terminal-off" ? { need: "terminal" } : {}) }));
+    expect(markup).toContain(">Turn on</button>");
+    expect(markup).toContain(">Not now</button>");
+    expect(markup).not.toContain('href="https://github.com/fuhao009/HezuoBot/releases"');
+    expect(markup).not.toContain("Always allow");
+  });
+
+  it.each(["closed", "never", "update"] as const)("when the app there is the fix (%s), links to it instead of a Turn on that can't work", (reason) => {
+    const markup = panel(ask({ reason }));
+    expect(markup).toContain('href="https://github.com/fuhao009/HezuoBot/releases"');
     expect(markup).not.toContain(">Turn on</button>");
   });
 

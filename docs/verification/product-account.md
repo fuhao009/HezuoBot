@@ -35,7 +35,7 @@ migrations to a fresh D1 database, sends its one-time codes through the Worker's
 real `EMAIL` binding (a disposable mailbox), and reaches a loopback upstream
 through the Worker's own egress. The desktop app is the real
 `desktop/electron/main.mjs`, started with its explicit fixture entry
-(`OMB_PRODUCT_FIXTURE=1` and `--omb-product-fixture-root=`), so its product gate,
+(`HEZUO_PRODUCT_FIXTURE=1` and `--hezuo-product-fixture-root=`), so its product gate,
 account window, workspace window, server child and product AI provider are the
 production ones.
 
@@ -55,8 +55,9 @@ workspace with an insufficient balance, cannot reach the upstream, and signing
 back in as the first account restores its history. Screenshots (always kept
 under the run's `evidence` directory) are taken at 1440×900, 1000×800 and
 390×844. The script checks overflow, unobscured input, fixed sidebar widths,
-the docked third column, the medium-width overlay, and the phone drawer's
-Escape/close-button behavior with focus return.
+the docked third column, the medium-width overlay, and the narrow desktop
+renderer drawer's Escape/close-button behavior with focus return. These viewport
+sizes are not native-client evidence.
 
 Account switching transfers Electron's local-server ownership to the active
 partition, removes the previous partition's owner header, and blocks that old
@@ -80,15 +81,15 @@ tail.
 
 ## Product prompt and tool budget
 
-Managed desktop requests default to the existing tool-discovery bridge. Core and permission-sensitive outbound tools stay advertised; other enabled capabilities are discovered through `find_tool` and loaded with their exact schema when needed. Explicit tool selections and engine permission policies still disable bridging when names must remain visible. The operator's explicit `OMB_AGENTS_TOOL_BRIDGE=0` remains authoritative.
+Managed desktop requests default to the existing tool-discovery bridge. Core and permission-sensitive outbound tools stay advertised; other enabled capabilities are discovered through `find_tool` and loaded with their exact schema when needed. Explicit tool selections and engine permission policies still disable bridging when names must remain visible. The operator's explicit `HEZUO_AGENTS_TOOL_BRIDGE=0` remains authoritative.
 
 Product prompts omit the developer skill-authoring paragraph and replace the long credential, automation, profile and shell guidance with compact product instructions. Custom standing instructions, active task context, security boundaries and enabled computer/browser instructions remain intact. The system-prompt preview includes a byte count and a per-section `approxTokens` value.
 
-`desktop/server/prompt-token-breakdown.ts` provides per-section and per-tool byte counts with `approxTokens = ceil(UTF-8 bytes / 4)`. This is an estimate, not the model's tokenizer; history and provider framing add input tokens. The helper returns identifiers and counts only, never raw prompts or credentials. For a before/after comparison, call it with the full prompt/catalog and then the product prompt/discovery catalog from the same isolated bot settings. Include every row, not only totals. The compact-prompt regression lives in `system-prompt.test.ts`; bridge defaults and permission exclusions live in `agents-bridge-switch.test.ts`.
+`desktop/server/prompt-token-breakdown.ts` provides per-section and per-tool byte counts with `approxTokens = ceil(UTF-8 bytes / 4)`. This is an estimate, not the model's tokenizer; history and provider framing add input tokens. The helper returns identifiers and counts only, never raw prompts or credentials. For a before/after comparison, call it with the full prompt/catalog and then the product prompt/discovery catalog from the same isolated bot settings. Include every row, not only totals. The compact-prompt regression lives in `desktop/server/system-prompt.test.ts`; bridge defaults and permission exclusions live in `desktop/server/agents-bridge-switch.test.ts`.
 
 Only a gateway ledger entry for a new default bot's `你好` request can prove the 8,000-input-token acceptance limit. Record its request ID, measured input usage and the corresponding before/after estimated tables; a passing synthetic upstream fixture does not establish the real provider's token count.
 
-Set `OMB_REQUEST_TOKEN_DIAGNOSTICS=1` on the Electron main process to emit
+Set `HEZUO_REQUEST_TOKEN_DIAGNOSTICS=1` on the Electron main process to emit
 `[request-token-diagnostics]` from the actual inference dispatch. The opt-in
 report counts system messages, history, every serialized tool, framing and
 parameters; it excludes quote requests and never prints prompt content or

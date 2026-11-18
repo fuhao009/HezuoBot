@@ -5,12 +5,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, expect, it } from "vitest";
-import { runControlOmb, verificationServerEnvironment } from "../../scripts/control-omb.ts";
+import { runControlHezuo, verificationServerEnvironment } from "../../scripts/control-hezuo.ts";
 import { removeTempDir, waitForExit } from "./testing/cleanup.ts";
 import { freePortBlock } from "./testing/ports.ts";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
-const FAKE_CLI = join(ROOT, "server/testing/fake-claude-cli.ts");
+const FAKE_CLI = join(ROOT, "desktop/server/testing/fake-claude-cli.ts");
 
 const homes: string[] = [];
 const children: ChildProcess[] = [];
@@ -21,7 +21,7 @@ afterEach(async () => {
 });
 
 function freshHome(): string {
-  const home = mkdtempSync(join(tmpdir(), "omb-engine-status-"));
+  const home = mkdtempSync(join(tmpdir(), "hezuo-engine-status-"));
   homes.push(home);
   mkdirSync(join(home, "tmp"), { recursive: true });
   writeFileSync(join(home, "config.json"), JSON.stringify({
@@ -33,7 +33,7 @@ function freshHome(): string {
 async function boot(home: string, knobs: Record<string, string> = {}) {
   const port = await freePortBlock([0, 1]);
   const base = `http://127.0.0.1:${port}`;
-  const child = spawn(process.execPath, ["--experimental-strip-types", join(ROOT, "server/index.ts")], {
+  const child = spawn(process.execPath, ["--experimental-strip-types", join(ROOT, "desktop/server/index.ts")], {
     cwd: ROOT,
     env: verificationServerEnvironment({ ...process.env, ...knobs }, home, port),
     stdio: ["ignore", "pipe", "pipe"],
@@ -55,7 +55,7 @@ async function boot(home: string, knobs: Record<string, string> = {}) {
     return response.json() as Promise<any>;
   };
   const stop = () => waitForExit(child, { signal: "SIGTERM" });
-  return { call, control: (...args: string[]) => runControlOmb([...args, "--url", base]) as Promise<any>, stop };
+  return { call, control: (...args: string[]) => runControlHezuo([...args, "--url", base]) as Promise<any>, stop };
 }
 
 const probeCount = (log: string, probe: "version" | "help" | "auth") =>

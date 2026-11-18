@@ -292,7 +292,7 @@ function LocalVmPane({
   }, [obscured]);
 
   useEffect(() => {
-    const bridge = window.ogb?.desktopWorkspace;
+    const bridge = window.hezuo?.desktopWorkspace;
     return bridge?.onState((next) => {
       if (next.contextId !== contextId) return;
       setNativeState(next);
@@ -301,7 +301,7 @@ function LocalVmPane({
   }, [contextId]);
 
   useEffect(() => {
-    const bridge = window.ogb?.desktopWorkspace;
+    const bridge = window.hezuo?.desktopWorkspace;
     let alive = true;
     const controller = new AbortController();
     setStatus(null);
@@ -389,7 +389,7 @@ function LocalVmPane({
   }, [botId, refreshStatus]);
 
   const updateLayout = useCallback(() => {
-    const bridge = window.ogb?.desktopWorkspace;
+    const bridge = window.hezuo?.desktopWorkspace;
     const bounds = elementBounds(viewportRef);
     if (!bridge || !bounds || !nativeState.open) return;
     void bridge
@@ -591,7 +591,7 @@ export function LocalVmWorkspace({
         return snapshot;
       },
       async setInteractive(contextId) {
-        const bridge = window.ogb?.desktopWorkspace;
+        const bridge = window.hezuo?.desktopWorkspace;
         if (!bridge) throw new Error(t("vm.workspace.bridgeUnavailable"));
         return bridge.setInteractive(contextId);
       },
@@ -643,7 +643,7 @@ export function LocalVmWorkspace({
     return () => {
       mountedRef.current = false;
       const controlled = controlledBotIdRef.current;
-      const bridge = window.ogb?.desktopWorkspace;
+      const bridge = window.hezuo?.desktopWorkspace;
       if (!bridge) {
         if (controlled) bestEffortRelease(controlled, controlLeaseId);
         return;
@@ -690,7 +690,7 @@ export function LocalVmWorkspace({
   const takeControl = useCallback(
     async (botId: string) => {
       if (controlBusyRef.current || controlledBotIdRef.current === botId) return;
-      const bridge = window.ogb?.desktopWorkspace;
+      const bridge = window.hezuo?.desktopWorkspace;
       const contextId = contextForBot(botId);
       if (!bridge || !contextId) return;
       controlBusyRef.current = true;

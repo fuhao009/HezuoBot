@@ -11,7 +11,7 @@ import { executeSharedOperation, sharedCommand, createSharedCua } from "./shared
 import { createComputerSharing, validateSharedFolders } from "./computer-sharing.mjs";
 
 async function fixture(t) {
-  const dir = await realpath(await mkdtemp(path.join(tmpdir(), "omb-shared-access-")));
+  const dir = await realpath(await mkdtemp(path.join(tmpdir(), "hezuo-shared-access-")));
   // Windows keeps a just-ended shell's working folder busy for a moment after the command's result.
   t.after(() => rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }));
   const folder = { id: randomUUID(), name: "Fixture", path: dir, write: false };
@@ -142,7 +142,7 @@ test("a passage is edited, lines appended and a file deleted only where writes a
   await assert.rejects(stat(path.join(dir, "old.tmp")), { code: "ENOENT" });
 
   if (process.platform !== "win32") {
-    const outside = path.join(await realpath(await mkdtemp(path.join(tmpdir(), "omb-outside-"))), "secret.txt");
+    const outside = path.join(await realpath(await mkdtemp(path.join(tmpdir(), "hezuo-outside-"))), "secret.txt");
     t.after(() => rm(path.dirname(outside), { recursive: true, force: true }));
     await writeFile(outside, "kept");
     await symlink(outside, path.join(dir, "pointer.txt"));
@@ -181,7 +181,7 @@ test("a new file's missing folders are made inside the shared folder, never in a
   await assert.rejects(run({ action: "write_file", path: "vault/deep/planted.json", content: "{}" }), /Desktop credentials|sharing settings/);
   await assert.rejects(stat(path.join(dir, "vault", "deep")), { code: "ENOENT" });
   if (process.platform !== "win32") {
-    const outside = await realpath(await mkdtemp(path.join(tmpdir(), "omb-shared-outside-")));
+    const outside = await realpath(await mkdtemp(path.join(tmpdir(), "hezuo-shared-outside-")));
     t.after(() => rm(outside, { recursive: true, force: true }));
     await symlink(outside, path.join(dir, "linked"));
     await assert.rejects(run({ action: "write_file", path: "linked/deep/planted.md", content: "x" }), /Symbolic links/);
@@ -234,7 +234,7 @@ test("text that escapes past the server's body limit is refused with the way to 
 
 test("no folder grant reaches a browser's saved passwords, the Windows credential vault and its keys, startup programs or ~/.cua", async t => {
   const { personalSecretPaths } = await import("./shared-computer-access.mjs");
-  const home = await realpath(await mkdtemp(path.join(tmpdir(), "omb-secrets-home-")));
+  const home = await realpath(await mkdtemp(path.join(tmpdir(), "hezuo-secrets-home-")));
   t.after(() => rm(home, { recursive: true, force: true }));
   const secret = (relative) => path.join(home, ...relative.split("/"));
   const windows = [
@@ -519,15 +519,15 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n'); });`
 test("a protected directory spelled in another case is still refused", async t => {
   const { dir, folder, grant, run } = await fixture(t);
   if (!(await spellings(dir)).case) return t.skip("this filesystem is case-sensitive, so no case variant names the same directory");
-  await mkdir(path.join(dir, "Hezuo"));
-  await writeFile(path.join(dir, "Hezuo", "credentials.bin"), "credential blob");
-  grant.protectedPaths = [path.join(dir, "Hezuo")];
+  await mkdir(path.join(dir, "HezuoBot"));
+  await writeFile(path.join(dir, "HezuoBot", "credentials.bin"), "credential blob");
+  grant.protectedPaths = [path.join(dir, "HezuoBot")];
   folder.write = true;
-  await assert.rejects(run({ action: "read_file", path: "Hezuo/credentials.bin" }), /Desktop credentials/);
-  await assert.rejects(run({ action: "read_file", path: "hezuo/credentials.bin" }), /Desktop credentials/);
-  await assert.rejects(run({ action: "read_file", path: "HEZUO/credentials.bin" }), /Desktop credentials/);
-  await assert.rejects(run({ action: "list_files", path: "hezuo" }), /Desktop credentials/);
-  await assert.rejects(run({ action: "write_file", path: "hezuo/computer-sharing.json", content: "{}" }), /sharing settings/);
+  await assert.rejects(run({ action: "read_file", path: "HezuoBot/credentials.bin" }), /Desktop credentials/);
+  await assert.rejects(run({ action: "read_file", path: "hezuobot/credentials.bin" }), /Desktop credentials/);
+  await assert.rejects(run({ action: "read_file", path: "HEZUOBOT/credentials.bin" }), /Desktop credentials/);
+  await assert.rejects(run({ action: "list_files", path: "hezuobot" }), /Desktop credentials/);
+  await assert.rejects(run({ action: "write_file", path: "hezuobot/computer-sharing.json", content: "{}" }), /sharing settings/);
 });
 
 test("a protected directory spelled in another Unicode normalization is still refused", async t => {
@@ -652,7 +652,7 @@ test("filesystem identities keep all 64 bits instead of rounding distinct inode 
 });
 
 test("with the whole home folder lent, keys, a browser profile and this app's data are still refused, while ordinary files read", async () => {
-  const home = await realpath(await mkdtemp(path.join(tmpdir(), "omb-lent-home-")));
+  const home = await realpath(await mkdtemp(path.join(tmpdir(), "hezuo-lent-home-")));
   const saved = { HOME: process.env.HOME, USERPROFILE: process.env.USERPROFILE };
   let sharing;
   try {
@@ -668,11 +668,11 @@ test("with the whole home folder lent, keys, a browser profile and this app's da
     await put("Documents/plan.txt", "an ordinary file");
     const stub = stubWorkspace();
     stub.state.work.push(...secrets.map(relative => ({ action: "read_file", path: relative })),
-      { action: "read_file", path: "Library/Application Support/Hezuo/computer-sharing.json" },
+      { action: "read_file", path: "Library/Application Support/HezuoBot/computer-sharing.json" },
       { action: "read_file", path: "Documents/plan.txt" }, { action: "list_files" });
     // Wired as main wires it: the grants file under the app's own profile, and this app's data folder in protectedPaths.
     sharing = createComputerSharing({
-      file: path.join(home, "Library", "Application Support", "Hezuo", "computer-sharing.json"), fetch: stub.fetchImpl, home,
+      file: path.join(home, "Library", "Application Support", "HezuoBot", "computer-sharing.json"), fetch: stub.fetchImpl, home,
       environments: () => [stub.env], enabled: async () => true, cuaConnection: async () => null, protectedPaths: [path.join(home, ".hezuo")],
     });
     const info = await sharing.identity(stub.env);

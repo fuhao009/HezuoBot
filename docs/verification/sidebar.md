@@ -59,7 +59,7 @@ were not exercised by this browser check.
 
 ## Section deletion
 
-Run `OMB_UI_E2E=1 pnpm exec vitest run scripts/testing/team-lifecycle-ui.e2e.test.ts --maxWorkers=1`.
+Run `HEZUO_UI_E2E=1 pnpm exec vitest run scripts/testing/team-lifecycle-ui.e2e.test.ts --maxWorkers=1`.
 The test launches its own isolated server and real renderer; never point it at
 the user's live workspace. It retains the Team map lifecycle checks and also
 checks deletion directly from a sidebar section header:
@@ -158,7 +158,7 @@ package `release/pin-vacated-followup/mac-arm64/Hezuo.app` passed the isolated
 22-step account flow including page DragEvents from a one-bot department to the
 pinned grid: the bot persisted as pinned with no section, the vacated department
 disappeared, and a nonempty department remained after reload. Evidence is under
-`/private/var/folders/s0/5h112y2d3495p65t6p7cph400000gn/T/omb-product-verify-1CYQ5l/evidence`.
+`/private/var/folders/s0/5h112y2d3495p65t6p7cph400000gn/T/omb-product-verify-1CYQ5l/evidence` (historical original path).
 The follow-up was installed and its account workspace loaded successfully.
 
 The macOS arm64 package containing `763d56be9` was rebuilt under
@@ -168,7 +168,7 @@ department → Remove from department** menu removed **Vacated Test**; **Retaine
 Test** and its bot remained. Both results survived a completed page reload.
 The account fixture reported 22 steps passed using the task-billing backend
 worktree and a loopback upstream, with screenshots and receipt under
-`/private/var/folders/s0/5h112y2d3495p65t6p7cph400000gn/T/omb-product-verify-4wRd42/evidence`.
+`/private/var/folders/s0/5h112y2d3495p65t6p7cph400000gn/T/omb-product-verify-4wRd42/evidence` (historical original path).
 Its cleanup exit was `SIGKILL`, so this run does not prove graceful shutdown.
 This is an unsigned `.app`, not a signed/notarized installer. The test used the
 menu path; native OS drag-and-drop and a full app restart were not exercised.

@@ -12,7 +12,7 @@ let memory: TeamMemory;
 const source = { botId: "b1", botName: "Scout", threadId: "t1", at: 1_757_000_000_000 };
 
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), "omb-team-memory-"));
+  dir = mkdtempSync(join(tmpdir(), "hezuo-team-memory-"));
   memory = new TeamMemory(join(dir, "team-memory.json"));
 });
 

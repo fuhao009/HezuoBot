@@ -15,6 +15,7 @@ import { z } from "zod";
 import { createInterface } from "node:readline";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
+const SERVER = fileURLToPath(new URL(".", import.meta.url));
 
 describe("surface pin provenance against the real server", () => {
   let home = "";
@@ -64,8 +65,8 @@ describe("surface pin provenance against the real server", () => {
   }, Boolean);
   const mountedComputer = (sent: any) => sent.mcpConfig.mcpServers.computer;
   // The first screen tools/call, exactly as the mounted proxy issues it: a claim and its pin land on use, not on mount.
-  const gate = (c: any) => fetch(c.env.OMB_CONTROL_URL, {
-    headers: { authorization: `Bearer ${c.env.OMB_CONTROL_TOKEN}` },
+  const gate = (c: any) => fetch(c.env.HEZUO_CONTROL_URL, {
+    headers: { authorization: `Bearer ${c.env.HEZUO_CONTROL_TOKEN}` },
   }).then(response => response.json() as Promise<any>);
   const threadState = (botId: string, threadId: string) =>
     api("GET", "/api/bots?messages=0").then(({ body }) =>
@@ -86,18 +87,18 @@ describe("surface pin provenance against the real server", () => {
     const port = await freePortBlock([0, 1]);
     base = `http://127.0.0.1:${port}`;
     output = "";
-    const proc = spawn(process.execPath, ["--import", pathToFileURL(join(ROOT, "server/testing/group-local-vm-hooks.mjs")).href,
-      "--import", pathToFileURL(join(ROOT, "server/testing/desktop-parent.mjs")).href, join(ROOT, "server/index.ts")], {
+    const proc = spawn(process.execPath, ["--import", pathToFileURL(join(SERVER, "testing/group-local-vm-hooks.mjs")).href,
+      "--import", pathToFileURL(join(SERVER, "testing/desktop-parent.mjs")).href, join(SERVER, "index.ts")], {
       cwd: ROOT, env: {
         PATH: dirname(process.execPath), ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}),
-        HOME: home, USERPROFILE: home, OMB_DATA_DIR: data,
+        HOME: home, USERPROFILE: home, HEZUO_DATA_DIR: data,
         APPDATA: join(home, "appdata"), LOCALAPPDATA: join(home, "localappdata"),
         TEMP: home, TMP: home, TMPDIR: home,
-        OMB_PORT: String(port), OMB_WEBHOOK_PORT: String(port + 1), OMB_STATIC_DIR: ui, OMB_TEST_VM_STATE: stateFile,
-        OMB_BOAT_API: boatApi, OMB_USER_DATA: join(home, "user-data"), OMB_TEST_DESKTOP_CUA_CONNECTION: cuaDescriptor,
-        ...(withComputerPolicy ? { OMB_TEST_DESKTOP_OWNER_TOKEN: "p".repeat(43), OMB_TEST_COMPUTER_DEVICE: computerDevice,
-          OMB_TEST_COMPUTER_POLICY_FILE: computerPolicyFile } : {}),
-        ...(withBrowser ? { OMB_AGENT_BROWSER_PATH: inertBrowser, AGENT_BROWSER_EXECUTABLE_PATH: inertBrowser } : {}),
+        HEZUO_PORT: String(port), HEZUO_WEBHOOK_PORT: String(port + 1), HEZUO_STATIC_DIR: ui, HEZUO_TEST_VM_STATE: stateFile,
+        HEZUO_BOAT_API: boatApi, HEZUO_USER_DATA: join(home, "user-data"), HEZUO_TEST_DESKTOP_CUA_CONNECTION: cuaDescriptor,
+        ...(withComputerPolicy ? { HEZUO_TEST_DESKTOP_OWNER_TOKEN: "p".repeat(43), HEZUO_TEST_COMPUTER_DEVICE: computerDevice,
+          HEZUO_TEST_COMPUTER_POLICY_FILE: computerPolicyFile } : {}),
+        ...(withBrowser ? { HEZUO_AGENT_BROWSER_PATH: inertBrowser, AGENT_BROWSER_EXECUTABLE_PATH: inertBrowser } : {}),
       }, stdio: ["ignore", "pipe", "pipe"],
     });
     child = proc;
@@ -122,7 +123,7 @@ describe("surface pin provenance against the real server", () => {
   }
 
   beforeAll(async () => {
-    home = mkdtempSync(join(tmpdir(), "omb-surface-pins-"));
+    home = mkdtempSync(join(tmpdir(), "hezuo-surface-pins-"));
     data = join(home, "data");
     ui = join(home, "static");
     stateFile = join(home, "vm.json");
@@ -147,7 +148,7 @@ describe("surface pin provenance against the real server", () => {
     await new Promise<void>(resolve => boatServer.listen(0, "127.0.0.1", resolve));
     boatApi = `http://127.0.0.1:${(boatServer.address() as { port: number }).port}`;
     writeFileSync(join(data, "config.json"), JSON.stringify({ instances: { claude: {
-      driver: "claudeAgent", config: { cli: join(ROOT, "server/testing/fake-claude-cli.ts") },
+      driver: "claudeAgent", config: { cli: join(SERVER, "testing/fake-claude-cli.ts") },
       // The first computer call is what reaches the Boat, as with a real model.
       environment: { FAKE_CLAUDE_MODE: "slow", FAKE_CLAUDE_DUMP: dumpFile, FAKE_CLAUDE_SLOW_FINISH_GATE: finishFile, FAKE_CLAUDE_USES_CLOUD_COMPUTER: "1" },
     } } }));
@@ -385,7 +386,7 @@ describe("surface pin provenance against the real server", () => {
         await apiOk("POST", `/api/bots/${bot.id}/messages`, { text: "Stay where I pinned you.", threadId: task.threadId });
         const sent = await dump();
         expect(sent.systemPrompt).toContain("You can act on the user's computer");
-        expect(mountedComputer(sent).env.OMB_CUA_COMMAND).toBe("/fixture/cua-driver");
+        expect(mountedComputer(sent).env.HEZUO_CUA_COMMAND).toBe("/fixture/cua-driver");
         expect(mountedComputer(sent).args.some((arg: string) => arg.includes("container-mcp"))).toBe(false);
         writeFileSync(finishFile, "finish");
         await idle(bot.id, task.threadId);
@@ -407,31 +408,65 @@ describe("surface pin provenance against the real server", () => {
       require("node:readline").createInterface({ input: process.stdin }).on("line", line => {
         const message = JSON.parse(line);
         if (message.id === undefined) return;
-        if (message.method === "tools/call") fs.appendFileSync(process.env.FIXTURE_CALLS, JSON.stringify(message.params) + "\\n");
-        process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: message.id, result: { content: [{ type: "text", text: "isolated driver performed call" }] } }) + "\\n");
+        let result;
+        if (message.method === "initialize") {
+          result = { protocolVersion: message.params.protocolVersion, capabilities: { tools: {} },
+            serverInfo: { name: "surface-pin-fixture-driver", version: "1.0.0" } };
+        } else if (message.method === "tools/list") {
+          result = { tools: [{ name: "screenshot", inputSchema: { type: "object", properties: {} } }] };
+        } else if (message.method === "tools/call" && message.params.name === "screenshot") {
+          fs.appendFileSync(process.env.FIXTURE_CALLS, JSON.stringify(message.params) + "\\n");
+          result = { content: [{ type: "text", text: "isolated driver performed call" }] };
+        } else {
+          process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: message.id,
+            error: { code: -32601, message: "Method not found" } }) + "\\n");
+          return;
+        }
+        process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: message.id, result }) + "\\n");
       });`;
     const callCount = () => existsSync(driverCalls) ? readFileSync(driverCalls, "utf8").trim().split("\n").length : 0;
     const proxyCall = async (raw: unknown) => {
       const computer = z.object({ command: z.string(), args: z.array(z.string()), env: z.record(z.string(), z.string()) }).parse(raw);
       // Keep the mounted real proxy and real gate capability; replace only the OS driver process boundary.
       const proxy = spawn(computer.command, computer.args, { cwd: ROOT, env: { ...computer.env,
-        HOME: home, USERPROFILE: home, PATH: dirname(process.execPath), OMB_EXTRA_PATH: dirname(process.execPath),
-        OMB_CUA_COMMAND: process.execPath, OMB_CUA_ARGS: JSON.stringify(["-e", fakeDriver]), FIXTURE_CALLS: driverCalls,
+        HOME: home, USERPROFILE: home, PATH: dirname(process.execPath), HEZUO_EXTRA_PATH: dirname(process.execPath),
+        HEZUO_CUA_COMMAND: process.execPath, HEZUO_CUA_ARGS: JSON.stringify(["-e", fakeDriver]), FIXTURE_CALLS: driverCalls,
       }, stdio: ["pipe", "pipe", "pipe"] });
       const lines = createInterface({ input: proxy.stdout! });
       const result = (Promise as PromiseConstructor & { withResolvers<T>(): { promise: Promise<T>; resolve(value: T): void; reject(error: unknown): void } }).withResolvers<unknown>();
+      const initialized = (Promise as PromiseConstructor & { withResolvers<T>(): { promise: Promise<T>; resolve(value: T): void; reject(error: unknown): void } }).withResolvers<void>();
       let diagnostics = "";
       proxy.stderr!.on("data", chunk => { diagnostics += chunk; });
-      proxy.once("error", result.reject);
-      proxy.once("exit", () => result.reject(new Error(`Proxy exited before reply: ${diagnostics}`)));
+      const reject = (error: unknown) => { initialized.reject(error); result.reject(error); };
+      proxy.once("error", reject);
+      proxy.once("exit", () => reject(new Error(`Proxy exited before reply: ${diagnostics}`)));
       lines.on("line", line => {
-        const reply = z.object({ id: z.number().optional(), result: z.unknown().optional() }).parse(JSON.parse(line));
-        if (reply.id === 1) result.resolve(reply.result);
+        try {
+          const reply = z.object({ id: z.number().optional(), result: z.unknown().optional(), error: z.unknown().optional() }).parse(JSON.parse(line));
+          if (reply.id !== 0 && reply.id !== 1) return;
+          if (reply.error !== undefined) throw new Error(`MCP request failed: ${JSON.stringify(reply.error)}`);
+          if (reply.id === 0) {
+            z.object({ protocolVersion: z.literal("2024-11-05"), capabilities: z.object({ tools: z.object({}) }),
+              serverInfo: z.object({ name: z.string(), version: z.string() }) }).parse(reply.result);
+            initialized.resolve();
+          } else result.resolve(reply.result);
+        } catch (error) { reject(error); }
       });
       // Real child processes cannot share Vitest's fake clock; this is only a failure watchdog, never a synchronization sleep.
-      const timer = setTimeout(() => result.reject(new Error(`Proxy call timed out: ${diagnostics}`)), 55_000);
-      proxy.stdin!.write(JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "screenshot", arguments: {} } }) + "\n");
-      try { return await result.promise; }
+      const timer = setTimeout(() => reject(new Error(`Proxy call timed out: ${diagnostics}`)), 55_000);
+      const response = Promise.all([initialized.promise, result.promise]);
+      proxy.stdin!.write(JSON.stringify({ jsonrpc: "2.0", id: 0, method: "initialize", params: {
+        protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "surface-pin-fixture", version: "1.0.0" },
+      } }) + "\n");
+      try {
+        await initialized.promise;
+        proxy.stdin!.write(JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }) + "\n");
+        proxy.stdin!.write(JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "screenshot", arguments: {} } }) + "\n");
+        return (await response)[1];
+      } catch (error) {
+        await response.catch(() => {});
+        throw error;
+      }
       finally { clearTimeout(timer); lines.close(); await waitForExit(proxy, { signal: "SIGTERM" }); }
     };
     const setPolicy = async (policy: "ask" | "allow" | "deny") => {
@@ -449,7 +484,7 @@ describe("surface pin provenance against the real server", () => {
       vmState({ noContainers: true, imageMissing: true });
       await apiOk("POST", `/api/bots/${bot.id}/messages`, { text: "Use the available computer.", threadId: task.threadId });
       const computer = mountedComputer(await dump());
-      expect(computer.env.OMB_CUA_COMMAND).toBe("/fixture/cua-driver");
+      expect(computer.env.HEZUO_CUA_COMMAND).toBe("/fixture/cua-driver");
       return computer;
     };
     try {
@@ -506,7 +541,7 @@ describe("surface pin provenance against the real server", () => {
     resetTurn();
     await apiOk("POST", `/api/bots/${bot.id}/messages`, { text: "Open Chrome on the cloud computer.", threadId: task.threadId });
     const sent = await dump();
-    const token = sent.mcpConfig.mcpServers.agents.env.OMB_COMMS_TOKEN;
+    const token = sent.mcpConfig.mcpServers.agents.env.HEZUO_COMMS_TOKEN;
     const selected = await fetch(base + "/api/internal/computer/select", { method: "POST",
       headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ surface: "cloud" }) });
     expect(await selected.json()).toMatchObject({ status: "pending", surface: "cloud" });
@@ -553,7 +588,7 @@ describe("surface pin provenance against the real server", () => {
       threadId: task.threadId, sendId: randomUUID(), text: "Check the dashboard on the cloud computer.", expectedActiveLeafId: null,
     });
     const sent = await dump();
-    const token = sent.mcpConfig.mcpServers.agents.env.OMB_COMMS_TOKEN;
+    const token = sent.mcpConfig.mcpServers.agents.env.HEZUO_COMMS_TOKEN;
     const selected = await fetch(base + "/api/internal/computer/select", { method: "POST",
       headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ surface: "cloud" }) });
     expect(await selected.json()).toMatchObject({ status: "pending", surface: "cloud" });

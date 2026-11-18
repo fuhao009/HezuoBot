@@ -24,8 +24,8 @@ import { sha256 } from "./installations";
  * in `ai-wallet.ts`; upstream routing lives in `ai-config.ts`.
  */
 
-export const PRODUCT_AI_TOKEN_PREFIX = "omb_product_ai_";
-const PRODUCT_AI_TOKEN = /^omb_product_ai_([A-Za-z0-9_-]{22})\.([A-Za-z0-9_-]{43})$/;
+export const PRODUCT_AI_TOKEN_PREFIX = "hezuo_product_ai_";
+const PRODUCT_AI_TOKEN = /^hezuo_product_ai_([A-Za-z0-9_-]{22})\.([A-Za-z0-9_-]{43})$/;
 const MODEL_TOKEN_TTL_MS = 15 * 60 * 1_000;
 /** One previous credential per device survives a renewal so the hand-off has
  * no gap; the database trigger enforces the same ceiling atomically. */

@@ -12,7 +12,7 @@
 //   node scripts/account-ai-admin.mjs requests --origin … --operator-email … --user-id ID [--cursor CURSOR]
 //   node scripts/account-ai-admin.mjs settle --origin … --operator-email … --request-id ID --points 0 --operation-id UUID --reason TEXT
 //
-// Non-interactive deployments may set OMB_OPERATOR_TOKEN to a signed account
+// Non-interactive deployments may set HEZUO_OPERATOR_TOKEN to a signed account
 // bearer instead of answering the OTP prompt. Mutations are never retried: a
 // lost response is resolved by looking the account or request up again, never
 // by resending the same write blindly.
@@ -44,14 +44,14 @@ options:
   --json                  print the server result as JSON
   --help                  this text
 
-signing in: OMB_OPERATOR_TOKEN if set, else this account's password, else the
+signing in: HEZUO_OPERATOR_TOKEN if set, else this account's password, else the
 emailed code. A password is read from the terminal without echo (or from
-OMB_OPERATOR_PASSWORD for unattended runs) and is never written to argv, a
+HEZUO_OPERATOR_PASSWORD for unattended runs) and is never written to argv, a
 file, or the output.
 
 environment:
-  OMB_OPERATOR_TOKEN      signed account bearer for unattended runs; never printed
-  OMB_OPERATOR_PASSWORD   password for unattended runs; never printed
+  HEZUO_OPERATOR_TOKEN      signed account bearer for unattended runs; never printed
+  HEZUO_OPERATOR_PASSWORD   password for unattended runs; never printed
 `;
 
 class CliError extends Error {}
@@ -155,7 +155,7 @@ export async function askHidden(question, input, output, { mask = null, maximum 
 /** The account password for this run: the environment when set (unattended
  * deployments), otherwise a non-echoing prompt. Never argv, never a file. */
 async function accountPassword(io, environment = process.env) {
-  const fromEnvironment = environment.OMB_OPERATOR_PASSWORD;
+  const fromEnvironment = environment.HEZUO_OPERATOR_PASSWORD;
   if (typeof fromEnvironment === "string" && fromEnvironment !== "") return fromEnvironment;
   return await askHidden("Password: ", io.stdin, io.stdout, { mask: "[\\s\\S]", maximum: 256 });
 }
@@ -170,14 +170,14 @@ async function accountPassword(io, environment = process.env) {
 export async function signedInOperator(options, io, { client: injected = null, environment = process.env } = {}) {
   const origin = requireText(options, "origin");
   const client = injected ?? createControlPlaneClient({ baseURL: origin });
-  const provided = environment.OMB_OPERATOR_TOKEN?.trim();
+  const provided = environment.HEZUO_OPERATOR_TOKEN?.trim();
   if (provided) {
     const user = await client.me(provided);
     return { origin: client.origin ?? origin, token: provided, user };
   }
 
   const email = normalizeAccountEmail(options.operatorEmail);
-  if (!email) fail("--operator-email is required unless OMB_OPERATOR_TOKEN is set");
+  if (!email) fail("--operator-email is required unless HEZUO_OPERATOR_TOKEN is set");
   // The account and the operator address are separate permissions: signing in
   // proves the operator identity, which AI_OPERATOR_USER_IDS must also list.
   let emailCode = true;
@@ -187,7 +187,7 @@ export async function signedInOperator(options, io, { client: injected = null, e
     // A deployment too old to answer /v1/auth/methods is the OTP-only one.
     if (!(error instanceof ControlPlaneError)) throw error;
   }
-  if (options.password || !emailCode || environment.OMB_OPERATOR_PASSWORD) {
+  if (options.password || !emailCode || environment.HEZUO_OPERATOR_PASSWORD) {
     const password = await accountPassword(io, environment);
     try {
       const signedIn = await client.signInWithPassword(email, password);

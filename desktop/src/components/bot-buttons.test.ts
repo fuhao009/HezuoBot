@@ -99,7 +99,8 @@ describe("a bot's cards answer in its own colour", () => {
       signIn: { url: "https://example.com/login", site: "example.com", place: "browser" } as Message["signIn"],
     };
     const signInHtml = renderToStaticMarkup(createElement(SignInRequestCard, { botId: "scout", botName: "Scout", color: "green", threadId: "t", message: signIn }));
-    expectOwn(button(signInHtml, t("signIn.done")), "green");
+    expectOwn(button(signInHtml, t("signIn.takeover")), "green");
+    expect(signInHtml).not.toContain(t("signIn.done"));
     expectPlain(button(signInHtml, t("signIn.cancel")));
 
     const connector: Message = {

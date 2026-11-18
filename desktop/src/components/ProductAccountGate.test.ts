@@ -146,7 +146,7 @@ const windowKind = () => all(render().tree).find(node => node.props["data-produc
 beforeEach(() => {
   setLocale("en");
   bridge = makeBridge();
-  vi.stubGlobal("window", { ogb: { productAccount: bridge } });
+  vi.stubGlobal("window", { hezuo: { productAccount: bridge } });
   hooks.values = [];
   hooks.index = 0;
   hooks.effects = [];
@@ -309,7 +309,7 @@ describe("the account window", () => {
   });
 
   it("says the window is unavailable in a build without the account bridge", async () => {
-    vi.stubGlobal("window", { ogb: {} });
+    vi.stubGlobal("window", { hezuo: {} });
     await mount();
     expect(windowKind()).toBe("unavailable");
     expect(text()).toContain("The account window is not available in this build");

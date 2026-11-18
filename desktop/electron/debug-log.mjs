@@ -3,10 +3,11 @@ import path from "node:path";
 
 let sink = null;
 let redactSink = true;
-// Match credential names, not arbitrary occurrences of "token" or a "key" suffix.
-// Token counters/limits and identifiers (including tokenId) are diagnostic data.
-const SECRET_NAME = /^(?:password|passwd|passphrase|secret|credentials?|api[-_.]?key|private[-_.]?key|secret[-_.]?key|signing[-_.]?key|encryption[-_.]?key|client[-_.]?secret|(?:access|refresh|id|session|account|model|api|auth|authentication|bearer|security|csrf|xsrf)[-_.]?token)$/i;
 const EXACT_SECRET_NAME = /^(?:token|key|authorization|proxy[-_.]?authorization|cookie|set[-_.]?cookie)$/i;
+const SECRET_SUFFIX = /(?:^|[-_.])(?:token|key|password|passwd|passphrase|secret|credentials?|(?:api|private|secret|signing|encryption)[-_.]?key|client[-_.]?secret|(?:access|refresh|id|session|account|model|api|auth|authentication|bearer|security|csrf|xsrf)[-_.]?token)$/i;
+const DIAGNOSTIC_NAME = /^(?:cache[-_.]key|per[-_.]token)$/i;
+const HEADER_SECRET_SUFFIX = /(?:token|key|password|passwd|passphrase|secret|credentials?)$/i;
+const HEADER_DIAGNOSTIC_NAME = /^(?:cache[-_.]?key|per[-_.]?token)$/i;
 
 function redactAssignments(value) {
   let result = "";
@@ -79,14 +80,13 @@ function redactJsonSecrets(value) {
 
 export function isDebugSecretKey(name) {
   const normalized = name.replace(/([a-z0-9])([A-Z])/g, "$1-$2");
-  if (EXACT_SECRET_NAME.test(normalized)) return true;
-  // Only a fixed-size credential suffix can match. Prefix separators between
-  // word groups are unambiguous here, unlike the old nested underscore regex.
-  for (let index = Math.max(0, normalized.length - 32); index < normalized.length; index += 1) {
-    if (index > 0 && !/[-_.]/.test(normalized[index - 1])) continue;
-    if (SECRET_NAME.test(normalized.slice(index)) && (index === 0 || /^\w+(?:[-.]\w+)*[-_.]$/.test(normalized.slice(0, index)))) return true;
-  }
-  return false;
+  if (DIAGNOSTIC_NAME.test(normalized)) return false;
+  return EXACT_SECRET_NAME.test(normalized) || SECRET_SUFFIX.test(normalized);
+}
+
+function isDebugSecretHeader(name) {
+  // Headers lowercases names, erasing camelCase credential boundaries.
+  return isDebugSecretKey(name) || (!HEADER_DIAGNOSTIC_NAME.test(name) && HEADER_SECRET_SUFFIX.test(name));
 }
 
 export function setDebugLogSink(value, { redact = true } = {}) {
@@ -168,7 +168,7 @@ function redactMultipart(value) {
   }).join("");
 }
 
-function redact(value, seen = new WeakSet()) {
+function redact(value, seen = new WeakSet(), headers = false) {
   if (typeof value === "string") return redactText(value);
   if (value === null || typeof value !== "object") return typeof value === "bigint" ? String(value) : value;
   if (seen.has(value)) return "[Circular]";
@@ -181,12 +181,12 @@ function redact(value, seen = new WeakSet()) {
     }
   } else if (value instanceof Headers) {
     result = {};
-    for (const [key, item] of value) result[key] = isDebugSecretKey(key) ? "***" : redact(item, seen);
+    for (const [key, item] of value) result[key] = isDebugSecretHeader(key) ? "***" : redact(item, seen);
   } else if (Array.isArray(value)) {
     result = value.map((item) => redact(item, seen));
   } else {
     result = {};
-    for (const [key, item] of Object.entries(value)) result[key] = isDebugSecretKey(key) ? "***" : redact(item, seen);
+    for (const [key, item] of Object.entries(value)) result[key] = (headers ? isDebugSecretHeader(key) : isDebugSecretKey(key)) ? "***" : redact(item, seen, /headers$/i.test(key));
   }
   seen.delete(value);
   return result;

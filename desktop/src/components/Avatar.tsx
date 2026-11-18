@@ -216,6 +216,7 @@ export const HezuoAvatar = memo(forwardRef(HezuoAvatarComponent));
 
 export type BotAvatarProps = Omit<HezuoAvatarProps, "color" | "gradient"> & {
   readable?: boolean;
+  temporaryPreviewUrl?: string;
   bot: {
     name?: string;
     color: HezuoColor;
@@ -244,16 +245,17 @@ export function resolveBotAvatarOutcome(params: {
   return "flatImage";
 }
 
-export function BotAvatar({ bot, size = 44, label, readable = false, ...mascotProps }: BotAvatarProps) {
+export function BotAvatar({ bot, size = 44, label, readable = false, temporaryPreviewUrl, ...mascotProps }: BotAvatarProps) {
   const profile = botAvatarProfile(bot);
+  const avatarUrl = temporaryPreviewUrl?.startsWith("blob:") ? temporaryPreviewUrl : profile.avatarUrl;
   const dressed = useHalloweenDressed();
   const [imageFailed, setImageFailed] = useState(false);
 
-  useEffect(() => setImageFailed(false), [profile.avatarUrl]);
+  useEffect(() => setImageFailed(false), [avatarUrl]);
 
   const outcome = resolveBotAvatarOutcome({
     avatarCrop: profile.avatarCrop,
-    hasUrl: Boolean(profile.avatarUrl),
+    hasUrl: Boolean(avatarUrl),
     imageFailed,
   });
 
@@ -282,7 +284,7 @@ export function BotAvatar({ bot, size = 44, label, readable = false, ...mascotPr
       style={{ width: size, height: size, borderRadius: radius }}
     >
       <img
-        src={profile.avatarUrl}
+        src={avatarUrl}
         alt={label ?? (bot.name ? `${bot.name} avatar` : "Bot avatar")}
         width={size}
         height={size}

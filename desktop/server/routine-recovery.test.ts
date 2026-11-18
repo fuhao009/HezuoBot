@@ -30,7 +30,7 @@ const NO_HOURS = "This month's cloud desktop hours are used up. See your plan on
 type EventBody = RuntimeEvent extends infer E ? E extends RuntimeEvent ? Omit<E, "eventId" | "provider" | "threadId" | "createdAt"> : never : never;
 
 function harness(extra: Partial<RoutineManagerOptions> = {}) {
-  const dir = mkdtempSync(join(tmpdir(), "omb-routine-recovery-"));
+  const dir = mkdtempSync(join(tmpdir(), "hezuo-routine-recovery-"));
   dirs.push(dir);
   let now = START;
   let tasks = 0;

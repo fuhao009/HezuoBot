@@ -22,7 +22,7 @@ directly; it serves the same tools:
 ```json
 {
   "mcpServers": {
-    "hezuo": { "command": "hezuo", "args": ["mcp"], "env": { "OMB_PORT": "8799" } }
+    "hezuo": { "command": "hezuo", "args": ["mcp"], "env": { "HEZUO_PORT": "8799" } }
   }
 }
 ```
@@ -48,11 +48,13 @@ Start Hezuo, then configure the MCP client to run:
 Packaged desktop builds require a paired session for tools that create,
 change, send, switch, interrupt, or run anything. Read-only tools work on
 loopback without one. A hosted or shared server with service loopback trust
-([self-hosting](self-hosting.md#loopback-trust-owner-or-service)) needs a
+(self-hosting (retired guide; historical only)) needs a
 session for almost every tool, reads included. To authorize an external MCP
 client:
 
-1. In Hezuo, open **Settings → Phone → Set up a phone** and reveal the
+> Legacy authentication UI: references below to **Settings → Phone** describe the retained pairing/token surface, not a supported native mobile setup flow. The desktop/headless or MCP client still requires an appropriate scoped token; do not bypass authentication if the UI is unavailable.
+
+1. In the retained desktop UI, open **Settings → Phone → Set up a phone** and reveal the
    one-time pairing code.
 2. Exchange it locally (remove spaces from the displayed code):
 
@@ -69,12 +71,12 @@ client:
    ```json
    "env": {
      "ELECTRON_RUN_AS_NODE": "1",
-     "OMB_PORT": "8799",
-     "HEZUO_TOKEN": "omb_sess_..."
+     "HEZUO_PORT": "8799",
+     "HEZUO_TOKEN": "hezuo_sess_..."
    }
    ```
 
-The paired client appears with phones under **Settings → Phone** and can be
+The paired client appears in the legacy device list under **Settings → Phone** and can be
 revoked there. Do not share the token or commit it to a repository.
 
 ## From the installed desktop app
@@ -109,10 +111,10 @@ With no configuration, the MCP process probes Hezuo's three desktop ports (`8799
 and accepts only a health response that identifies itself as Hezuo. This handles the desktop's normal
 fallback when another local process already owns port 8799.
 
-Set `OMB_PORT` to force one local port, or `HEZUO_URL` to use an explicit HTTP(S) origin. Cleartext remote
+Set `HEZUO_PORT` to force one local port, or `HEZUO_URL` to use an explicit HTTP(S) origin. Cleartext remote
 HTTP is rejected unless `ALLOW_INSECURE_HTTP=true`; HTTPS should be used outside loopback. An optional
 `HEZUO_TOKEN` is sent as a bearer token for authenticated reverse proxies. When a token is set, an
-explicit `HEZUO_URL` or `OMB_PORT` is required so the credential is never sent while probing unrelated
+explicit `HEZUO_URL` or `HEZUO_PORT` is required so the credential is never sent while probing unrelated
 local ports. `HEZUO_MCP_TIMEOUT_MS` can set an HTTP timeout between 1,000 and 120,000 milliseconds.
 In packaged builds, `HEZUO_TOKEN` is required for mutating tools as
 described above; it is not a generic reverse-proxy secret.

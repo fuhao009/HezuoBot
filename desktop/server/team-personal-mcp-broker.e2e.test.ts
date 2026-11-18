@@ -10,10 +10,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { BOX_BROKER_PORT, type BoxBroker } from "./bot-box/box.ts";
-import { brokerRemoteMcp, forgetBrokeredMcp } from "./bot-box/broker-mcp.ts";
-import { openCredentialBroker, type CredentialBroker } from "./bot-box/broker.ts";
+import { BOX_BROKER_PORT, type BoxBroker } from "./execution-sandbox/box.ts";
+import { brokerRemoteMcp, forgetBrokeredMcp } from "./execution-sandbox/broker-mcp.ts";
+import { openCredentialBroker, type CredentialBroker } from "./execution-sandbox/broker.ts";
 import type { AppConfig } from "./config.ts";
+import * as composio from "./composio.ts";
 import type { McpServerSpec, RemoteMcpSpec } from "./contracts.ts";
 import { createTeamConnectionsHost } from "./host/team-connections-host.ts";
 import { RemoteMcpClient } from "./mcp-http.ts";
@@ -32,7 +33,7 @@ describe.skipIf(process.platform === "win32")("a member's own MCP server and the
   let mounted: Record<string, McpServerSpec> = {};
 
   beforeAll(async () => {
-    dir = mkdtempSync(join(tmpdir(), "omb-team-box-mcp-"));
+    dir = mkdtempSync(join(tmpdir(), "hezuo-team-box-mcp-"));
     own = await startFakeHttpMcp({ exactPath: true, tools: [{ name: "plan_seating" }], requireHeader: { name: "Authorization", value: ADA_KEY } });
     gateway = await startFakeHttpMcp({
       exactPath: true, tools: [{ name: "lookup_order" }],
@@ -53,8 +54,7 @@ describe.skipIf(process.platform === "win32")("a member's own MCP server and the
         return [name, { type: "http", url: server.url, headers: server.headers } as McpServerSpec];
       })),
       isOwnerLive: () => true,
-      brokerUrl: () => null,
-      composio: { configured: () => false, mcpIntegration: async () => null, connectedServices: async () => ({}), connectedServiceSlugs: async () => [], authorizeService: async () => { throw new Error("unused"); }, removeService: async () => {} } as never,
+      composio,
     });
     // Ada connects the wedding server with her own key; the gateway server stays the team's.
     host.scopes.set("mcp", "mi-boda-hq", "person");
@@ -90,7 +90,7 @@ describe.skipIf(process.platform === "win32")("a member's own MCP server and the
   it("gives the engine only the broker's address for each, with no header", () => {
     for (const name of ["mi-boda-hq", "orders"]) {
       const server = mounted[name] as RemoteMcpSpec;
-      expect(server.url, name).toMatch(new RegExp(`^http://127\\.0\\.0\\.1:${broker.port}/b/omb_t0_[a-f0-9]{48}/mcp-${name}$`));
+      expect(server.url, name).toMatch(new RegExp(`^http://127\\.0\\.0\\.1:${broker.port}/b/hezuo_t0_[a-f0-9]{48}/mcp-${name}$`));
       expect(server.headers, name).toEqual({});
     }
     const listed = JSON.stringify(mounted);

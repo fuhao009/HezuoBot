@@ -42,7 +42,6 @@ vi.mock("./ApprovalModeSelector", () => ({ ApprovalModeSelector: (_props: Compon
 
 const { ChatView } = await import("./ChatView");
 const { noteTurnEvent, resetTurnLive } = await import("@/state/turn-status");
-const { useActivityFocus } = await import("@/lib/activity-focus");
 
 const THREAD = "selected";
 const started = Date.UTC(2026, 9, 23, 12, 0, 0);
@@ -199,7 +198,7 @@ describe("what the bot is doing right now", () => {
   const toggle = () => host.querySelector<HTMLButtonElement>(".turn-presence button[aria-expanded]");
   const steps = () => [...host.querySelectorAll("[data-now-step]")].map((step) => `${step.getAttribute("data-now-step")}: ${step.querySelector("[dir=auto]")?.textContent}`);
 
-  it("names the step, says how it is doing, and unfolds the ask's steps with a way into the Activity panel at this run", () => {
+  it("unfolds the running steps inline without an Activity panel entry", () => {
     engine({ type: "turn.started" });
     engine({ type: "item.started", itemType: "tool", itemId: "b1", title: "Bash" } as Partial<RuntimeEvent>);
     engine({ type: "turn.progress", activity: "command", itemId: "b1", target: "scrape.py", detail: "python3 scrape.py --pages 40", quiet: { kind: "busy" } } as Partial<RuntimeEvent>);
@@ -211,13 +210,7 @@ describe("what the bot is doing right now", () => {
 
     act(() => toggle()!.click());
     expect(steps()).toEqual(["done: Searched the web for “Acme construction leads”", "now: Running scrape.py"]);
-    const seen: Array<ReturnType<typeof useActivityFocus>> = [];
-    const probe = createRoot(document.createElement("div"));
-    act(() => probe.render(createElement(() => { seen.push(useActivityFocus("bot")); return null; })));
-    act(() => [...host.querySelectorAll<HTMLButtonElement>("[data-now-card] button")].find((button) => button.textContent === "Open activity")!.click());
-    expect(dispatch).toHaveBeenCalledWith({ type: "toggleActivity", open: true });
-    expect(seen.at(-1)).toEqual({ botId: "bot", threadId: THREAD, turnId: "t1" });
-    act(() => probe.unmount());
+    expect(host.querySelector("[data-now-card] button")).toBeNull();
   });
 
   it("shows a running command's last lines of output in the card, and the time since they came on the line", () => {

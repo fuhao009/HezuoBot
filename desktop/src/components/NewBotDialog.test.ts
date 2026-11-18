@@ -83,7 +83,7 @@ describe("bot draft dialog", () => {
     fixture.admin = false;
     expect(render().html).not.toContain("Who can see it");
     fixture.admin = true;
-    vi.stubGlobal("window", { ogb: {} });
+    vi.stubGlobal("window", { hezuo: {} });
     expect(render().html).not.toContain("Who can see it");
   });
   it.each([false, true])("closes after a successful creation when its caller fails (async=%s)", async asyncFailure => {

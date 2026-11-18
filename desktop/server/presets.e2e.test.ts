@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, it } from "vitest";
 
-import { launchVerificationServer } from "../../scripts/control-omb.ts";
+import { launchVerificationServer } from "../../scripts/control-hezuo.ts";
 import { canonicalJson, parsePackageDocument } from "../../packages/shared/package-format.ts";
 import { NO_PRESETS_MESSAGE } from "./package-import.ts";
 import { ORG_PRESET_REMOVE_MESSAGE, PRESET_UNAVAILABLE_MESSAGE } from "./presets.ts";
@@ -118,7 +118,7 @@ it("shares New bot defaults as a preset, imports it, and creates bots from file 
 it("offers an organization library's presets in New bot until the publisher withdraws the release", async () => {
   const sha = (value: string) => createHash("sha256").update(value).digest("hex");
   const key = randomBytes(32).toString("hex");
-  const fixture = await launchVerificationServer({ ...process.env, OMB_TEST_ORG_LIBRARY_KEY: key });
+  const fixture = await launchVerificationServer({ ...process.env, HEZUO_TEST_ORG_LIBRARY_KEY: key });
   console.log(JSON.stringify({ fixture: fixture.info }));
   const call = async (method: string, path: string, body?: unknown, headers: Record<string, string> = {}) => {
     const response = await fetch(`${fixture.info.url}${path}`, {
@@ -136,7 +136,7 @@ it("offers an organization library's presets in New bot until the publisher with
     writeFileSync(join(blobs, `${digest}.json`), bytes, { mode: 0o600 });
     const packageId = "44444444-4444-4444-8444-444444444444";
     const catalog = (withdrawn: boolean) => JSON.stringify({
-      format: "openmaus.org-library", version: 1, libraryVersion: withdrawn ? 2 : 1, organization: { id: "11111111-1111-4111-8111-111111111111", name: "Customer Co" },
+      format: "hezuo.org-library", version: 1, libraryVersion: withdrawn ? 2 : 1, organization: { id: "11111111-1111-4111-8111-111111111111", name: "Customer Co" },
       packages: [{
         packageId, ref: "acme/sales-skills", name: "Sales skills", tagline: document.package.tagline, kind: "library",
         publisher: { organizationId: "33333333-3333-4333-8333-333333333333", name: "Acme Partners", self: false }, mode: "available", offAction: "keep",

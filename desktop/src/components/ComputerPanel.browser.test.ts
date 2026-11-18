@@ -2,6 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterAll, describe, expect, it, vi } from "vitest";
 import type { Bot } from "@/state/store";
+import type * as ComputerPanelViewModule from "@/lib/computer-panel-view";
 import { browserAvailable, type FeatureFlagConfig } from "@/lib/feature-flags";
 import { t } from "@/lib/i18n";
 
@@ -14,6 +15,12 @@ const fixture = vi.hoisted(() => {
 });
 // These cover the Advanced panel; ComputerPanel.simple.test.ts covers Simple.
 vi.mock("@/lib/interface-mode", () => ({ useAdvancedMode: () => true, setAdvancedMode: () => {} }));
+// Browser is opened explicitly: production deliberately does not restore it from localStorage.
+// These static renders cover the selected Browser panel, not the tab-selection interaction.
+vi.mock("@/lib/computer-panel-view", async (importOriginal) => ({
+  ...await importOriginal<typeof ComputerPanelViewModule>(),
+  readComputerPanelView: () => fixture.view.current,
+}));
 vi.mock("@/state/store", async (importOriginal) => ({
   ...await importOriginal<typeof import("@/state/store")>(),
   useStore: () => ({

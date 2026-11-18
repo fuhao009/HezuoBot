@@ -32,11 +32,11 @@ export function validateBaseUrl(url: string): string {
 }
 
 const configuredUrl = process.env.HEZUO_URL ||
-  (process.env.OMB_PORT ? `http://127.0.0.1:${process.env.OMB_PORT}` : undefined);
+  (process.env.HEZUO_PORT ? `http://127.0.0.1:${process.env.HEZUO_PORT}` : undefined);
 
-export const OMB_BASE_URL = validateBaseUrl(configuredUrl || "http://127.0.0.1:8799");
+export const HEZUO_BASE_URL = validateBaseUrl(configuredUrl || "http://127.0.0.1:8799");
 const DISCOVERY_URLS = configuredUrl
-  ? [OMB_BASE_URL]
+  ? [HEZUO_BASE_URL]
   : [8799, 18799, 28799].map((port) => `http://127.0.0.1:${port}`);
 let discoveredBaseUrl: string | undefined;
 
@@ -113,7 +113,7 @@ export async function probeBaseUrls(candidates: string[]): Promise<string> {
 export async function resolveBaseUrl(): Promise<string> {
   if (discoveredBaseUrl) return discoveredBaseUrl;
   if (process.env.HEZUO_TOKEN?.trim() && !configuredUrl) {
-    throw new Error("Set HEZUO_URL or OMB_PORT when using HEZUO_TOKEN so credentials are never sent during port discovery");
+    throw new Error("Set HEZUO_URL or HEZUO_PORT when using HEZUO_TOKEN so credentials are never sent during port discovery");
   }
   discoveredBaseUrl = await probeBaseUrls(DISCOVERY_URLS);
   return discoveredBaseUrl;
@@ -808,7 +808,7 @@ export async function handleToolCall(
       if (res?.app !== "hezuo") throw new Error("The configured endpoint is not an Hezuo server");
       return {
         status: "connected",
-        endpoint: discoveredBaseUrl ?? OMB_BASE_URL,
+        endpoint: discoveredBaseUrl ?? HEZUO_BASE_URL,
         app: "hezuo",
         packaged: Boolean(res.static),
       };

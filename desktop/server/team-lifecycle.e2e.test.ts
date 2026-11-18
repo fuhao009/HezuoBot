@@ -3,7 +3,7 @@ import { closeSync, existsSync, openSync, readFileSync, writeFileSync } from "no
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, it } from "vitest";
-import { launchVerificationServer, runControlOmb } from "../../scripts/control-omb.ts";
+import { launchVerificationServer, runControlHezuo } from "../../scripts/control-hezuo.ts";
 import { waitForExit } from "./testing/cleanup.ts";
 
 it("retains empty teams, moves existing bots, and keeps legacy imports additive through restart", async () => {
@@ -20,7 +20,7 @@ it("retains empty teams, moves existing bots, and keeps legacy imports additive 
     return result;
   };
   const control = async (...args: string[]) => {
-    const result = await runControlOmb([...args, "--url", url]);
+    const result = await runControlHezuo([...args, "--url", url]);
     evidence.push({ command: args, result });
     return result;
   };
@@ -38,6 +38,9 @@ it("retains empty teams, moves existing bots, and keeps legacy imports additive 
     const moved = await api("/api/sidebar-sections", "POST", { name: "Delivery", botIds: [a.id, b.id] });
     expect(moved.bots.map((bot: any) => bot.id)).toEqual([a.id, b.id]);
     expect(moved.bots.every((bot: any) => bot.section === "Delivery")).toBe(true);
+    expect(moved.sections).toContain("Untouched empty");
+    expect(moved.sections).not.toContain("Research");
+    expect(moved.sections).not.toContain("Engineering");
     expect(await messages()).toEqual(transcript);
     await api("/api/sidebar-sections?section=Delivery", "PATCH", { name: "Renamed" });
     const renamed = await api("/api/bots?messages=0");
@@ -51,8 +54,18 @@ it("retains empty teams, moves existing bots, and keeps legacy imports additive 
     await api("/api/sidebar-sections?section=Delivery", "PUT", { addBotIds: ["missing"], removeBotIds: [a.id] }, 404);
     await api("/api/sidebar-sections?section=Delivery", "PUT", { addBotIds: [b.id], removeBotIds: [] });
     expect(await messages()).toEqual(transcript);
-    await api("/api/sidebar-sections", "POST", { name: "", botIds: [a.id, b.id] });
-    expect((await api("/api/sidebar-sections")).sections).toContain("Delivery");
+    const ungrouped = await api("/api/sidebar-sections", "POST", { name: "", botIds: [a.id, b.id] });
+    expect(ungrouped.bots).toHaveLength(2);
+    expect(ungrouped.bots).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: a.id }), expect.objectContaining({ id: b.id }),
+    ]));
+    for (const bot of ungrouped.bots) expect(bot.section).toBeUndefined();
+    expect(ungrouped.sections).not.toContain("Delivery");
+    expect(ungrouped.sections).toContain("Untouched empty");
+    await api("/api/section-context?section=Delivery", "GET", undefined, 404);
+    // A vacated department is removed; create a fresh empty one for rename/import coverage.
+    await api("/api/sidebar-sections", "POST", { name: "Delivery" });
+    await api("/api/section-context?section=Delivery", "PUT", { text: "Finish research before engineering." });
     await api("/api/sidebar-sections?section=Delivery", "PATCH", { name: "Launch" });
     expect((await api("/api/section-context?section=Launch")).text).toBe("Finish research before engineering.");
     await api("/api/sidebar-sections?section=Launch", "PATCH", { name: "Untouched empty" }, 409);
@@ -80,12 +93,12 @@ it("retains empty teams, moves existing bots, and keeps legacy imports additive 
       if (process.env[key]) env[key] = process.env[key];
     }
     Object.assign(env, {
-      HOME: dataDir, USERPROFILE: dataDir, OMB_DATA_DIR: dataDir,
+      HOME: dataDir, USERPROFILE: dataDir, HEZUO_DATA_DIR: dataDir,
       APPDATA: join(dataDir, "AppData", "Roaming"), LOCALAPPDATA: join(dataDir, "AppData", "Local"),
       XDG_CONFIG_HOME: join(dataDir, ".config"), XDG_CACHE_HOME: join(dataDir, ".cache"),
       XDG_DATA_HOME: join(dataDir, ".local", "share"), HERMES_HOME: join(dataDir, ".hermes"),
       TEMP: join(dataDir, "tmp"), TMP: join(dataDir, "tmp"), TMPDIR: join(dataDir, "tmp"),
-      OMB_PORT: new URL(url).port, OMB_WEBHOOK_PORT: String(Number(new URL(url).port) + 1),
+      HEZUO_PORT: new URL(url).port, HEZUO_WEBHOOK_PORT: String(Number(new URL(url).port) + 1),
       PATH: dirname(process.execPath), FAKE_CLAUDE_MODE: "happy",
     });
     const restartFixture = async () => {
@@ -101,7 +114,9 @@ it("retains empty teams, moves existing bots, and keeps legacy imports additive 
     };
     await restartFixture();
     const state = await api("/api/bots?messages=0");
-    expect(state.sections).toEqual(expect.arrayContaining(["Research", "Engineering", "Launch", "Untouched empty"]));
+    expect(state.sections).toEqual(expect.arrayContaining(["Launch", "Untouched empty"]));
+    expect(state.sections).not.toContain("Research");
+    expect(state.sections).not.toContain("Engineering");
     expect(state.sections).not.toContain("Delivery");
     expect(state.sections).not.toContain("Launch 2");
     expect(state.bots.find((bot: any) => bot.id === a.id).section).toBeUndefined();

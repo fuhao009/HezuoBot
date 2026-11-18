@@ -23,7 +23,7 @@ type Step = "password" | "sign-up" | "confirm" | "reset-request" | "reset" | "co
  */
 export function ProductAccountGate() {
   const state = useProductAccount();
-  const bridge = typeof window === "undefined" ? undefined : window.ogb?.productAccount;
+  const bridge = typeof window === "undefined" ? undefined : window.hezuo?.productAccount;
   const [step, setStep] = useState<Step>("password");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

@@ -68,7 +68,7 @@ export function NewBotDialog({ defaultsMode = false, onClose, onCreated, readyBo
   const showThreads = useShowThreads();
   const advanced = useAdvancedMode();
   const sections = advanced && !parent.state.config?.productManaged ? SECTIONS : SECTIONS.filter((section) => section !== "Model");
-  const choosesVisibility = !defaultsMode && typeof window !== "undefined" && !window.ogb && ownerOrAdmin === true;
+  const choosesVisibility = !defaultsMode && typeof window !== "undefined" && !window.hezuo && ownerOrAdmin === true;
   const dialog = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
@@ -214,7 +214,7 @@ export function NewBotDialog({ defaultsMode = false, onClose, onCreated, readyBo
 }
 
 function SharedInTeam({ team }: { team: string }) {
-  const bridge = typeof window === "undefined" ? undefined : window.ogb?.workspaces;
+  const bridge = typeof window === "undefined" ? undefined : window.hezuo?.workspaces;
   return <div data-new-bot-shared className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-hairline/40 bg-raised/30 px-5 py-2.5 text-[13px] text-ink-secondary">
     <span>{t("newBot.sharedWith", { team })}</span>
     {bridge

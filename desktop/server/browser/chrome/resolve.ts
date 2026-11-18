@@ -102,8 +102,8 @@ export function agentBrowserChrome(host: ChromeHost): string | null {
 
 export function resolveChromePlan(host: ChromeHost, engine: ChromeEngine | null): ChromePlan {
   const { env, platform } = host;
-  if (env.OMB_BROWSER_LEGACY_SHELL?.trim() === "1") return { kind: "legacy", reason: "OMB_BROWSER_LEGACY_SHELL=1" };
-  const named = env.OMB_CHROME_PATH?.trim() || env.AGENT_BROWSER_EXECUTABLE_PATH?.trim();
+  if (env.HEZUO_BROWSER_LEGACY_SHELL?.trim() === "1") return { kind: "legacy", reason: "HEZUO_BROWSER_LEGACY_SHELL=1" };
+  const named = env.HEZUO_CHROME_PATH?.trim() || env.AGENT_BROWSER_EXECUTABLE_PATH?.trim();
   if (named) {
     if (isHeadlessShell(named)) return { kind: "legacy", reason: "the named browser is a headless shell" };
     if (!host.exists(named)) return { kind: "legacy", reason: `${named} does not exist` };
@@ -113,7 +113,7 @@ export function resolveChromePlan(host: ChromeHost, engine: ChromeEngine | null)
   const pin = platform === "darwin" || platform === "win32" ? chromeForTestingPin(platform, host.arch) : null;
   const installed = installedGoogleChrome(host);
   if (installed && !chromePolicyManaged(host)) return { kind: "chrome", chrome: { path: installed, source: "installed" }, fallback: pin };
-  if (platform === "linux" && env.OMB_RESOURCES_PATH) return { kind: "legacy", reason: installed ? "Google Chrome here is managed by an organization" : "Google Chrome is not installed" };
+  if (platform === "linux" && env.HEZUO_RESOURCES_PATH) return { kind: "legacy", reason: installed ? "Google Chrome here is managed by an organization" : "Google Chrome is not installed" };
   const own = agentBrowserChrome(host);
   if (own) return { kind: "chrome", chrome: { path: own, source: "agent-browser" }, fallback: null };
   if (pin) {

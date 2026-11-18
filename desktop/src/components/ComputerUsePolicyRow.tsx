@@ -6,7 +6,7 @@ import { Select } from "./Select";
 type Policy = "ask" | "allow" | "deny";
 
 export function ComputerUsePolicyRow() {
-  const bridge = typeof window === "undefined" ? undefined : window.ogb?.computerUsePolicy;
+  const bridge = typeof window === "undefined" ? undefined : window.hezuo?.computerUsePolicy;
   const [policy, setPolicy] = useState<Policy | null>(null);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);

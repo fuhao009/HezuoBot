@@ -15,6 +15,7 @@ import { fileURLToPath } from "node:url";
 import tls from "node:tls";
 
 import { workerProjectPaths, esbuild, miniflareRuntime, sqlSplitter } from "./runtime.mjs";
+import { directEgress } from "../../gateway/local/local-gateway/egress.mjs";
 
 const MAIL_FROM = "noreply@fixture.test";
 const SECRET = "fixture-better-auth-secret-with-at-least-32-chars";
@@ -119,6 +120,10 @@ async function startUpstream() {
       stream: body.stream === true,
       toolNames: Array.isArray(body.tools) ? body.tools.map(tool => tool?.function?.name).filter(Boolean) : [],
       hasToolResult: messages.some(message => message?.role === "tool"),
+      hasSignInToolResult: messages.some(message => message?.role === "tool" && message.tool_call_id === "fixture-sign-in"),
+      fixtureBrowserResults: messages.filter(message => message?.role === "tool"
+        && state.browserRun?.generated.some(generated => generated.id === message.tool_call_id))
+        .map(message => ({ id: message.tool_call_id, content: message.content })),
     };
     state.calls.push(call);
     const frame = value => `data: ${JSON.stringify(value)}\n\n`;
@@ -136,6 +141,43 @@ async function startUpstream() {
       return;
     }
     response.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
+    if (state.scenario === "browser-panel-absence") {
+      const run = state.browserRun;
+      if (!run) throw new Error("Browser fixture requires a fresh browserRun");
+      const results = call.fixtureBrowserResults;
+      const step = results.some(result => result.id === `${run.id}-open`) ? "title" : "open";
+      const name = step === "open" ? "browser_agent_browser_open" : "browser_agent_browser_get_title";
+      call.browserToolOffered = call.toolNames.includes(name);
+      if (results.some(result => result.id === `${run.id}-title`) || !call.browserToolOffered
+        || run.generated.some(generated => generated.id === `${run.id}-${step}`)) {
+        response.end(frame({ choices: [{ index: 0, delta: { content: !call.browserToolOffered
+          ? `Fixture blocked: ${name} was not offered by the product.`
+          : "Synthetic fixture browser sequence stopped; inspect correlated real tool results." } }] }) + terminal());
+        return;
+      }
+      const generated = { id: `${run.id}-${step}`, name, args: step === "open" ? { url: run.url } : {} };
+      // Only fixture-selected public example URL/empty arguments, never arbitrary model messages or user data.
+      call.fixtureBrowserGenerated = generated;
+      run.generated.push(generated);
+      response.end(frame({ choices: [{ index: 0, delta: { tool_calls: [{ index: 0, id: generated.id, type: "function",
+        function: { name: generated.name, arguments: JSON.stringify(generated.args) } }] } }] }) + terminal());
+      return;
+    }
+    if (state.scenario === "sign-in" && !call.hasSignInToolResult) {
+      const name = call.toolNames.find(candidate => /(?:^|_)request_sign_in$/.test(candidate));
+      call.requestSignInOffered = Boolean(name);
+      if (!name) {
+        response.end(frame({ choices: [{ index: 0, delta: { content: "Fixture blocked: request_sign_in was not offered." } }] }) + terminal());
+        return;
+      }
+      response.end(frame({ choices: [{ index: 0, delta: { tool_calls: [{ index: 0, id: "fixture-sign-in", type: "function",
+        function: { name, arguments: JSON.stringify({ site: state.signInUrl, reason: "Fixture UI cancellation observation" }) } }] } }] }) + terminal());
+      return;
+    }
+    if (state.scenario === "sign-in") {
+      response.end(frame({ choices: [{ index: 0, delta: { content: "Synthetic fixture continuation; not real-model acceptance." } }] }) + terminal());
+      return;
+    }
     if ((state.scenario === "tool" || state.scenario === "deny") && !call.hasToolResult) {
       const name = call.toolNames.find(candidate => /write/i.test(candidate)) ?? call.toolNames[0];
       if (!name) {
@@ -228,11 +270,9 @@ export async function startWorkerFixture({ root, log = () => {}, mail = true, wo
           return new Response(null, { status: 204 });
         }
         const url = `http://127.0.0.1:${upstream.port}${target.pathname}${target.search}`;
-        return fetch(url, {
-          method: request.method,
-          headers: request.headers,
-          body: request.method === "GET" || request.method === "HEAD" ? undefined : await request.arrayBuffer(),
-          redirect: "manual",
+        return directEgress(request, {
+          fetchImpl: (_url, options) => fetch(url, options),
+          log: message => appendFileSync(join(root, "egress-errors.jsonl"), `${message}\n`, { mode: 0o600 }),
         });
       },
       resourceTmpPath: join(root, "worker-tmp"),

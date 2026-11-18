@@ -2,25 +2,17 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** A bot can show a ChatKit-style widget in chat with `show_widget`, it renders on desktop, iOS and Android from one payload, and a press reaches the bot as the person's next message.
-
 **Architecture:** One canonical JSON tree, normalised once on the server by `packages/shared/widget.ts`, stored on a new `widget` message kind with a text fallback. One recursive renderer per platform. A press is posted on the existing send-message route as `widgetAction`, becomes an ordinary user message that replies to the widget, and settles the widget with a `message.patch`.
-
-**Tech Stack:** TypeScript (Node type-stripping server, React 19 + Tailwind v4 renderer, vitest); Swift 5.9 / SwiftUI / Swift Charts (iOS 16); Kotlin 2.2 / Jetpack Compose / kotlinx.serialization.
 
 **Spec:** `docs/superpowers/specs/2026-10-13-chat-widgets-design.md` (this repo). Design canvas: https://claude.ai/artifact/3jp8ZJ62qQCx8BXejVp8gv
 
 ## Global Constraints
 
-- Two repos, two branches named `feat/chat-widgets`: server, shared and desktop in `OpenGrokBot-widgets` (milind-soni/OpenMausBot); iOS and Android in `mausbot-mobile-widgets` (SupaMaus/mausbot-mobile). Never put phone code in the first or desktop code in the second. No push, no PR.
 - Ratchets (`scripts/testing/file-size-ratchet.test.ts`, `index-route-ratchet.test.ts`): `desktop/server/index.ts`, `desktop/src/state/store.tsx`, `desktop/server/store.ts`, `desktop/server/config.ts`, `ChatView.tsx`, `GroupView.tsx`, `scripts/mcp-server.ts`, `desktop/server/drivers/agents-call.ts` may not gain a line; `desktop/server/index.ts` may not gain a path guard; no new file over 1,000 lines. Move code out to make room and lower the pinned number.
 - Server code runs on type stripping: type-only imports must be `import type`, no enums, no parameter properties.
 - Tests are colocated `*.test.ts` (never `.tsx`); React tests start with `// @vitest-environment happy-dom` and use `createElement`.
-- Every desktop UI string goes through `t()` with a key in `desktop/src/locales/en.json`. iOS strings need `pt-BR`, `zh-Hans`, `zh-Hant` entries in `mobile/ios/App/Localizable.xcstrings`; Android strings need `values/`, `values-b+zh+Hans/`, `values-b+zh+Hant/`.
 - Colours come from tokens only: no hex literals in widget renderers on any platform.
-- On phones the type prefix is `ChatWidget`; `Widget` there means the home-screen extension.
 - Renderers read canonical trees only and must never crash on one: an unknown node type draws its children or nothing.
-- Checks before a task is done. Desktop: `pnpm typecheck`, `pnpm lint`, `pnpm exec vitest run <files>`, `pnpm i18n:check`, plus the two ratchet tests. iOS: `swift test --package-path ios`, `bash scripts/check-ios-view-shims.sh`, `node --test scripts/ios-strings.test.mjs`. Android: `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :core:test :app:testDebugUnitTest` from `mobile/android/`.
 
 ## Review Focus
 
@@ -28,7 +20,6 @@
 2. A press arrives twice (double tap, client retry with the same `sendId`): one user message, one settle. Pinned in Task 2.
 3. A press arrives for a settled widget, a wrong thread or another bot's message: refused with 409 or 404, nothing sent. Pinned in Task 2.
 4. A secret pasted into a widget string, and a password field: redacted before storage; rejected at parse. Pinned in Tasks 1 and 2.
-5. An older or offline client: the text fallback reads well on its own, and a cached phone thread shows values but no live actions. Pinned in Tasks 1, 4 and 5.
 
 ---
 
@@ -93,27 +84,6 @@ export function resolveWidgetAction(payload: WidgetPayload, ref: string, values:
 - [ ] Tests first: every sample in `WIDGET_SAMPLES` renders to markup without throwing; a list with `limit` shows "Show all"; a settled payload renders the tick line and no buttons; pressing `confirm` posts `{threadId, sendId, widgetAction}` with the form's current values; a required empty field blocks the post and marks the field; `open_url` opens the link and posts nothing; a server refusal shows its sentence in the card.
 - [ ] Implement to the canvas: surface, header, rows, dot status, actions under the card, settled line with Details, `size` widths, SVG chart from tokens.
 - [ ] Run tests, `pnpm typecheck`, `pnpm lint`, `pnpm i18n:check`, `pnpm check:contrast`, both ratchets. Commit.
-
-### Task 4: iOS
-
-**Files (in `mausbot-mobile-widgets`):**
-- Create: `mobile/ios/Sources/CompanionCore/ChatWidget.swift` (forgiving `JSONValue`, `ChatWidgetPayload`, `ChatWidgetNode` accessors, field and action helpers mirroring Task 1's scope rules), `mobile/ios/Tests/CompanionCoreTests/ChatWidgetTests.swift`, `mobile/ios/App/Cards/ChatWidgetView.swift`, `ChatWidgetNodes.swift`, `ChatWidgetControls.swift`, `ChatWidgetChart.swift`, `ChatWidgetIcons.swift`
-- Modify: `Models.swift` (`Kind.widget`, `widget` payload), `StateSnapshot.swift` and its guard tests, `ChatPreferences.swift` and `Walkie.swift` kind switches, `Client.swift` (`sendWidgetAction`), `Session.swift`, `TranscriptRows.swift` (`TranscriptActions.sendWidgetAction`), `ChatView.swift` (dispatch), `Localizable.xcstrings`
-- Fixture: `mobile/ios/Tests/CompanionCoreTests/Fixtures/widget-messages.json` (written by Task 1's samples; do not hand-edit)
-
-- [ ] Core tests first: the fixture decodes every message with `kind == .widget`; a malformed tree decodes to a message that falls back to text and never throws; field collection and required checks match the fixture's expectations; the snapshot round-trips the payload.
-- [ ] Implement core, then views. Offline uses the existing reconnect notice. Remote images use `AsyncImage` over https only.
-- [ ] Run the three iOS checks and `xcodegen generate` plus a simulator build if the toolchain is present. Commit.
-
-### Task 5: Android
-
-**Files (in `mausbot-mobile-widgets`):**
-- Create: `mobile/android/core/.../core/ChatWidget.kt`, `mobile/android/core/src/test/.../ChatWidgetTest.kt`, `mobile/android/app/.../ui/ChatWidgetView.kt`, `ChatWidgetNodes.kt`, `ChatWidgetControls.kt`, `ChatWidgetChart.kt`, `ChatWidgetIcons.kt`, app tests beside the existing ones
-- Modify: `Models.kt` (`Kind.WIDGET`, serializer, `widget` field last), `StateSnapshot.kt` and its test, `ChatPreferences.kt`, `ChatPolicy.kt` kind switches, `Client.kt`, `Session.kt` (`sendWidgetAction`), `MessageRow.kt` (dispatch), the three `strings.xml`
-
-- [ ] Core tests first, mirroring Task 4 on the shared fixture.
-- [ ] Implement core, then composables with `Hezuo.colors`, `Space`, `HezuoShapes`; charts on a Canvas; https images through a small bounded loader.
-- [ ] Run `:core:test :app:testDebugUnitTest` and `:app:assembleDebug`. Read the real counts from `build/test-results`. Commit.
 
 ### Task 6: End-to-end verification and review
 

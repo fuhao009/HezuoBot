@@ -11,7 +11,7 @@ const dirs: string[] = [];
 afterEach(() => { for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true }); });
 
 function fixture(language?: string) {
-  const dataDir = mkdtempSync(join(tmpdir(), "omb-secret-cards-"));
+  const dataDir = mkdtempSync(join(tmpdir(), "hezuo-secret-cards-"));
   dirs.push(dataDir);
   const lines: Message[] = [];
   let ids = 0;
@@ -31,7 +31,6 @@ function fixture(language?: string) {
   const bot = { id: "ledger", name: "Ledger" } as BotRecord;
   const cards = createSecretCards({
     store: store as never, cfg: {} as never, botLogins: { credentialConfig: (config) => ({ ...config, onePassword: { connected: false } }) },
-    phoneSecrets: { provide: async () => {}, open: () => {} } as never, phoneSecretSubmissions: {} as never,
     connectorThread: () => ({ bot, group: undefined }), answerCardNode: () => true, dataDir, providerKeysRefused: false,
     layerFolder: () => dataDir, turnVm: () => undefined, ...(language ? { threadLanguage: () => language } : {}),
   });

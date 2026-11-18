@@ -24,11 +24,11 @@ describe("host setup", () => {
     expect(diagnosis?.message).toMatch(/hezuo browser setup/);
     expect(await diagnoseLaunchFailure({ executable: "/opt/chrome", output: "something else", platform: "darwin" })).toBeNull();
     expect(sandboxDisabled({})).toBe(false);
-    expect(sandboxDisabled({ OMB_BROWSER_SANDBOX: "0" })).toBe(true);
+    expect(sandboxDisabled({ HEZUO_BROWSER_SANDBOX: "0" })).toBe(true);
   });
 
   it.skipIf(process.platform === "win32")("asks the browser's own loader which libraries are missing, in the environment the browser launched with", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "omb-host-setup-test-"));
+    const dir = mkdtempSync(join(tmpdir(), "hezuo-host-setup-test-"));
     folders.push(dir);
     const chrome = join(dir, "chrome");
     writeFileSync(chrome, `#!/bin/sh\nprintf '%s' "$HOME" > '${dir}/home'\necho "chrome: error while loading shared libraries: libnss3.so: cannot open shared object file" >&2\nexit 127\n`, { mode: 0o755 });

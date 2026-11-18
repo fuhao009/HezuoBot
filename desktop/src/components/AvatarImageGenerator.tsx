@@ -74,8 +74,8 @@ export function AvatarImageGenerator({
   };
 
   const saveCredential = async (key: string) => {
-    const status: ConfigStatus = window.ogb?.setCredential
-      ? await window.ogb.setCredential(providerInfo.credential, key)
+    const status: ConfigStatus = window.hezuo?.setCredential
+      ? await window.hezuo.setCredential(providerInfo.credential, key)
       : await api("/api/config", {
           method: "PUT",
           body: JSON.stringify(provider === "xai"

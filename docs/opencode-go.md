@@ -11,7 +11,7 @@ same runtime as the other ACP engines.
    [OpenCode installation guide](https://opencode.ai/docs/).
 2. Connect the providers you want in the OpenCode app, run
    `opencode auth login`, or save the provider's key in Hezuo under
-   Settings → API keys → **Keys for other OpenCode providers**. On an OMB
+   Settings → API keys → **Keys for other OpenCode providers**. On an HezuoBot
    Cloud, which has no terminal, save the key there.
 3. Restart Hezuo. It reuses OpenCode's existing connections and model
    configuration automatically.
@@ -36,7 +36,7 @@ saving one reloads the engines, so OpenCode lists that provider's models
 straight away. On a Cloud, a hosted team or an organization's desktop,
 OpenCode still never reads provider keys from the server's own environment;
 the keys saved here are the exception. Names Hezuo keeps for itself
-(`OPENCODE_*`, `OMB_*`, and the keys it saves for other engines, such as
+(`OPENCODE_*`, `HEZUO_*`, and the keys it saves for other engines, such as
 `XAI_API_KEY`) are refused, and up to 20 keys can be saved.
 
 Hezuo does not copy or rewrite `auth.json`. The OpenCode CLI remains the

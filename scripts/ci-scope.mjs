@@ -9,18 +9,18 @@ import { fileURLToPath } from "node:url";
 // vitest job's parts: "linux-tests", "host-tests" (Windows, and macOS where the
 // event runs it), and the subsets in VITEST_SUBSETS.
 export const SELECTABLE_JOBS = [
-  "vitest", "behavior-evals", "packaged-server", "windows-cua", "electron-smokes", "cloudflared-linux-arm64",
-  "foss", "control-plane", "ui-smoke", "browser-identity", "package-linux", "browser-driver",
+  "vitest", "packaged-server", "windows-cua", "electron-smokes",
+  "control-plane", "ui-smoke", "browser-identity", "package-linux", "browser-driver",
 ];
 
 // The server imports Electron and renderer modules, and the macOS smokes run
 // the packaged server inside Electron, so a server change and a desktop change
 // can affect the same checks.
 const SERVER_CHECKS = [
-  "build", "linux-tests", "host-tests", "behavior-evals", "packaged-server", "foss", "electron-smokes",
+  "build", "linux-tests", "host-tests", "packaged-server", "electron-smokes",
   "ui-smoke", "browser-identity", "browser-driver", "package-linux",
 ];
-const EVERY_CHECK = [...SERVER_CHECKS, "windows-cua", "cloudflared-linux-arm64", "control-plane"];
+const EVERY_CHECK = [...SERVER_CHECKS, "windows-cua", "control-plane"];
 
 /** What a pull request's change in each area can affect. */
 export const AREA_CHECKS = {
@@ -47,16 +47,18 @@ export const VITEST_SUBSETS = {
   "locale-tests": {
     part: "locale tests",
     files: ["desktop/src/", "scripts/generate-locale.test.mjs", "scripts/testing/key-readback.e2e.test.ts", "scripts/server-locale-plugin.test.ts",
-      "desktop/server/server-lines.test.ts", "desktop/server/host/devs-reports.test.ts", "desktop/server/automation-reports.test.ts", "desktop/server/incidents.test.ts",
+      "desktop/server/server-lines.test.ts", "desktop/server/automation-reports.test.ts", "desktop/server/incidents.test.ts",
       "desktop/server/routine-run-card.test.ts", "desktop/server/host/chief-notices-retry.test.ts", "desktop/server/connector-card-text.test.ts", "desktop/server/host/secret-cards.test.ts",
       "desktop/server/notify.test.ts", "desktop/server/room-lines.test.ts", "desktop/server/post-to-room.test.ts", "desktop/server/product-bot-selection.test.ts",
-      "desktop/server/teammate-lines.test.ts", "desktop/server/cloud-send-arrived.test.ts"],
+      "desktop/server/teammate-lines.test.ts", "desktop/server/cloud-send-arrived.test.ts",
+      "desktop/server/routes/setup-request.test.ts", "desktop/server/setup-request.test.ts",
+      "desktop/server/default-bot.test.ts", "desktop/server/initial-greeting.test.ts", "desktop/server/store.test.ts"],
     shards: 2,
     nodeTests: true,
   },
   "docs-tests": {
     part: "docs tests",
-    files: ["scripts/testing/analytics-docs.test.ts", "desktop/server/model-providers-docs.test.ts", "desktop/src/locales/vocabulary.test.ts"],
+    files: ["scripts/testing/analytics-docs.test.ts"],
     shards: 1,
     nodeTests: false,
   },
@@ -79,11 +81,11 @@ export const DOCS = /^(?:[^/]+\.md|docs\/.+\.md|\.github\/FUNDING\.yml)$/;
 // anything. English is the source every test reads, so en.json is web.
 const AREAS = [
   [DOCS, "docs"],
-  [/^(?:apps\/)?docs\//, "docs"],
+  [/^docs\//, "docs"],
   [/^(?:scripts|gateway\/(?:local|scripts))\/.+\.test\.[cm]?[jt]sx?$/, "script-tests"],
   [/^desktop\/src\/locales\/(?:(?!en\.json$)[^/]+\.json|[^/]+\.test\.ts)$/, "locales"],
   [/^desktop\/(?:src|public)\/|^desktop\/[^/]+-preview\.html$/, "web"],
-  [/^desktop\/(?:server|companion)\/|^(?:packages|enterprise|evals|skills|deploy|gateway\/composio-broker)\/|^(?:Dockerfile|\.dockerignore|compose\.yaml)$/, "server"],
+  [/^desktop\/(?:server|companion)\/|^(?:packages|skills)\//, "server"],
   [/^desktop\/electron\/(?:cua|cua-failure|cua-connection|capabilities|screen-status|shared-cua-connection|shared-computer-access|lent-screen-tools|lent-screen-failures|paced-typing)\.[cm]js$/, "windows-computer-control"],
   [/^desktop\/(?:electron|build)\/|^desktop\/(?:index|rail)\.html$|^electron-builder\.yml$/, "desktop"],
   [/^gateway\/control-plane\//, "control-plane"],
@@ -105,7 +107,7 @@ export const FULL_SCOPE = { areas: ["everything"], checks: [...EVERY_CHECK].sort
 export const MAIN_SCOPE = {
   areas: ["main"],
   checks: [
-    "behavior-evals", "browser-identity", "build", "control-plane", "electron-smokes", "foss", "host-tests", "linux-tests", "packaged-server",
+    "browser-identity", "build", "control-plane", "electron-smokes", "host-tests", "linux-tests", "packaged-server",
     "ui-smoke",
   ],
 };
@@ -250,7 +252,7 @@ export function ciOutputs({ checks }, oses) {
   };
 }
 
-/** The outputs for a static job that does the Linux work itself (on a Boat VM, `OMB_CI_LINUX_IN_STATIC`): the Linux
+/** The outputs for a static job that does the Linux work itself (on a Boat VM, `HEZUO_CI_LINUX_IN_STATIC`): the Linux
  * vitest entries, behavior evals and the Linux packaged server smoke become `linux_lanes`
  * (scripts/ci-linux-lanes.mjs), and the jobs left with nothing to run drop out of the selection. */
 export function moveLinuxIntoStatic(outputs) {
@@ -260,14 +262,13 @@ export function moveLinuxIntoStatic(outputs) {
   const packaged = outputs.jobs.includes("packaged-server");
   return {
     ...outputs,
-    jobs: outputs.jobs.filter((job) => job !== "behavior-evals" && !(job === "vitest" && others.length === 0)
+    jobs: outputs.jobs.filter((job) => !(job === "vitest" && others.length === 0)
       && !(job === "packaged-server" && packagedOs.length === 0)),
     // A job that drops out keeps its old matrix: GitHub refuses an empty one, even for a skipped job.
     vitest_matrix: others.length > 0 ? { include: others } : outputs.vitest_matrix,
     packaged_server_os: packaged && packagedOs.length > 0 ? packagedOs : outputs.packaged_server_os,
     linux_lanes: {
       vitest: vitest.filter((entry) => entry.os === "ubuntu-latest"),
-      evals: outputs.jobs.includes("behavior-evals"),
       packaged_server: packaged && outputs.packaged_server_os.includes("ubuntu-latest"),
     },
   };
@@ -386,12 +387,12 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       console.warn(`CI scope: using main's checks because the push diff or its CI is unavailable: ${error.message}`);
     }
   }
-  const linuxInStatic = process.env.OMB_CI_LINUX_IN_STATIC === "true";
+  const linuxInStatic = process.env.HEZUO_CI_LINUX_IN_STATIC === "true";
   const outputs = linuxInStatic ? moveLinuxIntoStatic(ciOutputs(scope, vitestOs)) : ciOutputs(scope, vitestOs);
   console.log(`CI scope: ${scope.areas.join(", ")} -> ${outputs.jobs.join(", ") || "static checks only"}`);
   if (linuxInStatic) {
-    const { vitest, evals, packaged_server: packaged } = outputs.linux_lanes;
-    console.log(`CI scope: this job runs ${vitest.length} Linux vitest lane(s)${evals ? ", behavior evals" : ""}${packaged ? ", the packaged server smoke" : ""}`);
+    const { vitest, packaged_server: packaged } = outputs.linux_lanes;
+    console.log(`CI scope: this job runs ${vitest.length} Linux vitest lane(s)${packaged ? ", the packaged server smoke" : ""}`);
   }
   appendFileSync(
     process.env.GITHUB_OUTPUT,

@@ -2,10 +2,10 @@
 // SECRETS. No secret is ever accepted on the command line or stored in the
 // config. The config holds 0600 file paths under <data-dir>/secrets/, and each
 // is opened O_NOFOLLOW with a private-mode and regular-file check. Sources are
-// the environment (OMB_LOCAL_UPSTREAM_KEY, OMB_LOCAL_SMTP_URL), a --*-file flag
+// the environment (HEZUO_LOCAL_UPSTREAM_KEY, HEZUO_LOCAL_SMTP_URL), a --*-file flag
 // naming an existing private file, or the OMP models.yml that already holds the
 // upstream key. The operator's own password is never stored at all: `whoami`
-// takes it from OMB_LOCAL_OPERATOR_PASSWORD for that one run, or falls back to
+// takes it from HEZUO_LOCAL_OPERATOR_PASSWORD for that one run, or falls back to
 // the existing OTP prompt.
 import { spawnSync } from "node:child_process";
 import { request as httpsRequest } from "node:https";
@@ -25,7 +25,7 @@ import {
   SERVICE_NODE_MAJOR, ServiceError, installService, nodeCandidates, serviceStatus, servicePaths, uninstallService,
 } from "./local-gateway/service.mjs";
 import { AccountLookupError, d1DatabaseFiles, findAccountByEmail } from "./local-gateway/operator-bootstrap.mjs";
-import { GATEWAY_D1_IDENTITY, assertLegacyGatewayRetired, migrateGatewayIdentity } from "./local-gateway/identity-migration.mjs";
+import { GATEWAY_D1_ID, assertCanonicalD1State } from "./local-gateway/d1-identity.mjs";
 import { createCompanionRelay, createDisconnectBridge, createGatewayFront } from "./local-gateway/companion-relay.mjs";
 import { directEgress } from "./local-gateway/egress.mjs";
 
@@ -35,8 +35,8 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 const WORKER_DIR = path.join(ROOT, "gateway", "control-plane");
 const MIGRATIONS_DIR = path.join(WORKER_DIR, "migrations");
 const MIGRATIONS_TABLE = "d1_migrations";
-/** The D1 binding's stable name; persistence is scoped to <data-dir>/state. */
-const D1_NAME = GATEWAY_D1_IDENTITY;
+/** D1 identity: offline cutover must map existing state before this runtime starts. */
+const D1_NAME = GATEWAY_D1_ID;
 
 const USAGE = `usage: node gateway/local/local-gateway.mjs <command> [options]
 
@@ -46,7 +46,6 @@ commands:
   status    print running state, origin, and readiness (never a secret)
   stop      ask this gateway to shut down cleanly
   migrate   apply pending D1 migrations while the gateway is stopped
-  identity-migrate  move stopped storage to --data-dir without changing D1, TLS or origin
   whoami    print the account id/email of an operator sign-in
   operator  allow one already-registered account email to administer AI
             (no account is created, no AI permission or points are granted)
@@ -64,7 +63,7 @@ operator options:
 
 init options:
   --config <file>              config path (default: <data-dir>/gateway.json)
-  --data-dir <dir>             persistent state root (default: .omb-scratch/local-gateway)
+  --data-dir <dir>             persistent state root (default: .hezuo-scratch/local-gateway for new state)
   --host <host>                bind host (default: 127.0.0.1)
   --port <port>                bind port (default: ${DEFAULT_PORT})
   --public-host <host>         origin host; required when --host is not loopback
@@ -84,17 +83,17 @@ init options:
   --operator-id <id>           account id allowed to use /v1/operator/ai/*
   --max-output-tokens <n>      hard per-request output ceiling (default: ${DEFAULT_MAX_OUTPUT_TOKENS})
 
-secret sources (never the command line): OMB_LOCAL_UPSTREAM_KEY,
-OMB_LOCAL_SMTP_URL; or the --*-file flags above. The operator password is
-never stored: \`whoami\` reads OMB_LOCAL_OPERATOR_PASSWORD for that run only, or
+secret sources (never the command line): HEZUO_LOCAL_UPSTREAM_KEY,
+HEZUO_LOCAL_SMTP_URL; or the --*-file flags above. The operator password is
+never stored: \`whoami\` reads HEZUO_LOCAL_OPERATOR_PASSWORD for that run only, or
 prompts for an emailed code.
 
-other environment: OMB_LOCAL_HOST, OMB_LOCAL_PORT, OMB_LOCAL_PUBLIC_HOST,
-OMB_LOCAL_DATA_DIR, OMB_LOCAL_CERT, OMB_LOCAL_KEY, OMB_LOCAL_EMAIL_FROM,
-OMB_LOCAL_EMAIL_VERIFICATION, OMB_LOCAL_OPEN_MODELS,
-OMB_LOCAL_OPEN_MODELS_PROVIDER, OMB_LOCAL_MODELS, OMB_LOCAL_RATES,
-OMB_LOCAL_RATE, OMB_LOCAL_DEFAULT_MODEL, OMB_LOCAL_OPERATOR_IDS,
-OMB_LOCAL_MAX_OUTPUT_TOKENS.
+other environment: HEZUO_LOCAL_HOST, HEZUO_LOCAL_PORT, HEZUO_LOCAL_PUBLIC_HOST,
+HEZUO_LOCAL_DATA_DIR, HEZUO_LOCAL_CERT, HEZUO_LOCAL_KEY, HEZUO_LOCAL_EMAIL_FROM,
+HEZUO_LOCAL_EMAIL_VERIFICATION, HEZUO_LOCAL_OPEN_MODELS,
+HEZUO_LOCAL_OPEN_MODELS_PROVIDER, HEZUO_LOCAL_MODELS, HEZUO_LOCAL_RATES,
+HEZUO_LOCAL_RATE, HEZUO_LOCAL_DEFAULT_MODEL, HEZUO_LOCAL_OPERATOR_IDS,
+HEZUO_LOCAL_MAX_OUTPUT_TOKENS.
 
 A model mirrored from models.yml is enabled only when it is the chosen
 --default-model and it has explicit rates. Every other mirrored model stays
@@ -247,7 +246,7 @@ function mailTransport(config) {
   const target = parseSmtpURL(url);
   // A private SMTP CA is trusted exactly like any other: as an extra root for
   // these connections, never by turning verification off.
-  const extraCA = envValue(process.env, "OMB_LOCAL_SMTP_CA");
+  const extraCA = envValue(process.env, "HEZUO_LOCAL_SMTP_CA");
   const targetWithCA = extraCA
     ? { ...target, ca: [...tls.getCACertificates("default"), readFileSync(path.resolve(extraCA), "utf8")] }
     : target;
@@ -432,7 +431,6 @@ function ownsRuntime(config, runtime) {
  */
 export async function startLocalGateway({ config, configPath = null, log = () => {} } = {}) {
   if (!config) fail("startLocalGateway needs a resolved config");
-  assertLegacyGatewayRetired();
   const effective = configPath ? { ...config, __configPath: path.resolve(configPath) } : config;
   mkdirSync(path.join(effective.dataDir, "state"), { recursive: true, mode: 0o700 });
   mkdirSync(path.join(effective.dataDir, "tmp"), { recursive: true, mode: 0o700 });
@@ -441,6 +439,7 @@ export async function startLocalGateway({ config, configPath = null, log = () =>
   const mail = mailTransport(effective);
   const bindings = bindingsFor(effective, origin);
   const runtime = await miniflareRuntime();
+  await assertCanonicalD1State(runtime, effective.dataDir);
 
   let db;
   let migrations;
@@ -584,7 +583,7 @@ export async function startLocalGateway({ config, configPath = null, log = () =>
 async function printWhoami({ config, origin, email, environment = process.env }) {
   const { createControlPlaneClient } = await import("../../desktop/electron/control-plane-client.mjs");
   trustGatewayCertificate(certificateFor(config).certPath);
-  const password = envValue(environment, "OMB_LOCAL_OPERATOR_PASSWORD");
+  const password = envValue(environment, "HEZUO_LOCAL_OPERATOR_PASSWORD");
   if (password) {
     const client = createControlPlaneClient({ baseURL: origin });
     const { user } = await client.signInWithPassword(email, password);
@@ -612,14 +611,10 @@ async function main() {
   // The default config path depends on the data directory, so a run that only
   // adjusts one setting still reads (and preserves) everything already there.
   const defaultDataDir = path.resolve(
-    options.dataDir ?? envValue(process.env, "OMB_LOCAL_DATA_DIR") ?? DEFAULT_DATA_DIR,
+    options.dataDir ?? envValue(process.env, "HEZUO_LOCAL_DATA_DIR") ?? DEFAULT_DATA_DIR,
   );
   const configPath = options.config ? path.resolve(options.config) : path.join(defaultDataDir, "gateway.json");
   const previous = existsSync(configPath) ? readGatewayConfig(configPath).config : null;
-  if (options.command === "identity-migrate") {
-    console.log(JSON.stringify(await migrateGatewayIdentity({ configPath, destination: options.dataDir }), null, 2));
-    return;
-  }
 
   if (options.command === "init") {
     const config = resolveGatewayConfig({ options, previous });
@@ -655,7 +650,7 @@ async function main() {
     });
     // Under launchd, stdout/stderr are one file launchd opened once; bounding
     // it here is the only place that can see when it has grown.
-    const logFile = envValue(process.env, "OMB_LOCAL_LOG_FILE");
+    const logFile = envValue(process.env, "HEZUO_LOCAL_LOG_FILE");
     if (logFile) {
       try {
         prepareLogFile(logFile);
@@ -755,6 +750,7 @@ async function main() {
     const origin = gatewayOrigin({ host: config.host, port: config.port, publicHost: config.publicHost });
     const script = await bundleWorker(path.join(config.dataDir, "worker", "index.js"));
     const runtime = await miniflareRuntime();
+    await assertCanonicalD1State(runtime, config.dataDir);
     const mf = new runtime.Miniflare(runtimeOptions({
       runtime, config, port: 0, script, mail: null, bindings: bindingsFor(config, origin),
     }));
@@ -773,7 +769,7 @@ async function main() {
     const { config } = readGatewayConfig(configPath);
     const runtime = readRuntime(config.dataDir);
     if (!ownsRuntime({ ...config, __configPath: configPath }, runtime)) fail("the gateway is not running; start it first");
-    const email = options.operatorEmail ?? envValue(process.env, "OMB_LOCAL_OPERATOR_EMAIL");
+    const email = options.operatorEmail ?? envValue(process.env, "HEZUO_LOCAL_OPERATOR_EMAIL");
     if (!email) fail("whoami needs --operator-email <address>");
     await printWhoami({ config, origin: runtime.origin, email: String(email).trim().toLowerCase() });
     return;
@@ -827,7 +823,7 @@ function runServiceCommand({ options, configPath, home }) {
     const log = prepareLogFile(paths.log);
     // Trim whatever a previous run left behind before the new job appends.
     const trimmed = trimLogFile(log);
-    const node = options.node ?? process.env.OMB_LOCAL_SERVICE_NODE;
+    const node = options.node ?? process.env.HEZUO_LOCAL_SERVICE_NODE;
     const candidates = node ? [node] : nodeCandidates({ requested: null });
     if (candidates.length === 0) {
       fail(`no node >= ${SERVICE_NODE_MAJOR} to stage; pass --node <path>`);
@@ -893,7 +889,7 @@ function runServiceCommand({ options, configPath, home }) {
 function runOperatorCommand({ options, configPath }) {
   if (!configPath) fail("operator needs --config <file>");
   const { config } = readGatewayConfig(configPath);
-  const email = options.operatorEmail ?? envValue(process.env, "OMB_LOCAL_OPERATOR_EMAIL");
+  const email = options.operatorEmail ?? envValue(process.env, "HEZUO_LOCAL_OPERATOR_EMAIL");
   if (!email) fail("operator needs --operator-email <address> (an existing, registered account)");
   const normalized = String(email).trim().toLowerCase();
   if (!EMAIL.test(normalized)) fail(`--operator-email ${JSON.stringify(email)} is not an email address`);

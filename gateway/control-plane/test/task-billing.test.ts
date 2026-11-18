@@ -229,7 +229,7 @@ describe("admission boundaries", () => {
       AI_OPERATOR_USER_IDS: "[]", AI_UPSTREAM_BASE_URL: "https://upstream.example.test/v1", AI_UPSTREAM_API_KEY: "test-key",
       AI_DEFAULT_MODEL: "luna", AI_MODELS: JSON.stringify(config().models) } as unknown as Env;
     let upstreamCalls = 0;
-    const worker = createWorker(undefined, undefined, undefined, (async () => {
+    const worker = createWorker(undefined, (async () => {
       upstreamCalls++;
       return Response.json({ id: "chat-estimate", object: "chat.completion", model: "gpt-6-luna",
         choices: [{ index: 0, message: { role: "assistant", content: "ok" }, finish_reason: "stop" }],

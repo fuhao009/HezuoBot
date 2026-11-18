@@ -1,22 +1,30 @@
 # Verifying Hezuo
 
-Hezuo has one development control surface: `pnpm control:omb`. It runs
+Hezuo has one development control surface: `pnpm control:hezuo`. It runs
 the published `hezuo` verbs (docs/headless-cli.md), which call the MCP
 tools in `scripts/mcp-server.ts`, so verification uses the same URL
 validation, task pinning, bounded transcripts, wait states, and redaction as
 external MCP clients and scripts.
 
 Historical screenshots and captured UI evidence under `docs/verification/` and
-`docs/pr-screenshots/` may show the upstream OpenMausBot or MausBot branding.
-They document the original capture, not the current Hezuo product appearance;
-asset paths and current verification instructions use Hezuo.
+`docs/pr-screenshots/` may show the original OpenMausBot or MausBot branding.
+They document the original capture, not the current Hezuo product appearance.
+Recorded evidence retains its historical original paths; those paths do not
+claim that a renamed artifact exists or that an old temporary fixture survives.
+Current verification instructions and newly generated evidence use Hezuo.
+
+Verification recipes, screenshots and recorded outcomes below are historical
+evidence or instructions, not proof of the current tree, packaged build or
+deployment. This documentation update ran no checks, builds or deployments and
+did not re-verify earlier reports. Current product documentation covers desktop
+and gateway use.
 
 ## Launch
 
 Start a fixture in one terminal:
 
 ```sh
-node --experimental-strip-types scripts/control-omb.ts launch
+node --experimental-strip-types scripts/control-hezuo.ts launch
 ```
 
 Run the foreground launcher directly rather than through `pnpm`; this ensures
@@ -29,16 +37,16 @@ that exact child. The parent shell and the user's Hezuo data are
 untouched. Only `FAKE_CLAUDE_*` variables cross from the launcher's
 environment into that child, so a recipe can script the fake engine's mode,
 replies and tool calls without writing a wrapper CLI. Live calls add one
-exception: `OMB_OPENAI_LIVE_URL` crosses when it is a loopback
+exception: `HEZUO_OPENAI_LIVE_URL` crosses when it is a loopback
 `http://127.0.0.1:PORT` (the fake GPT-Live that
 `node --experimental-strip-types desktop/server/testing/fake-openai-live.ts` prints),
-and `OMB_OPENAI_LIVE_KEY` crosses only with it, so that key can only ever
+and `HEZUO_OPENAI_LIVE_KEY` crosses only with it, so that key can only ever
 reach the fake.
 
 Pass the printed URL explicitly from a second terminal:
 
 ```sh
-pnpm control:omb doctor --url http://127.0.0.1:PORT
+pnpm control:hezuo doctor --url http://127.0.0.1:PORT
 ```
 
 Mutating commands refuse silent port discovery. This prevents a verification
@@ -103,7 +111,6 @@ Use only mapped, tested commands:
 - [Chat widgets](widgets.md)
 - [Reactions](reactions.md)
 - [Chat widgets: prompts to try with a real bot](widget-prompts.md)
-- [Phone web app installation and safe areas](phone-web-app.md)
 - [Welcome flow and guided tour](onboarding.md)
 - [Channels](channels.md)
 - [In-chat team coordination](room-coordination.md)
@@ -136,7 +143,7 @@ Use only mapped, tested commands:
 - [Spend cap and sell prices](spend-cap.md)
 - [Enterprise layer loading and license expiry](enterprise-license.md)
 
-`control-omb ui` ([Chat UI, driven headlessly](chat-ui.md)) drives the real
+`control-hezuo ui` ([Chat UI, driven headlessly](chat-ui.md)) drives the real
 renderer in a headless Chrome by accessible name, so composer sends, transcript
 rows, tool chips and server feature flags are provable from the command line.
 Other renderer-only behavior—Settings, sidebar drag-and-drop, the VM modal, the
@@ -202,7 +209,8 @@ It prints per-request receipts and the opening/closing wallet totals.
 Omit `--smoke` to inspect the actual `/admin` billing surface using the printed
 disposable credentials; interrupt the launcher after browser verification. This
 does not contact a personal upstream or prove production billing. See the
-[billing delivery evidence](../archive/gateway-v1-delivery.md#任务感知计费增量2026-11-13).
+[billing delivery evidence](../archive/gateway-v1-delivery.md), under
+“任务感知计费增量（2026-11-13）”.
 
 
 The [desktop server connection smoke](desktop-server-connection.md) mounts the
@@ -283,7 +291,7 @@ in a disposable workspace with synthetic data.
 
 The [people invitation fixture](people.md) checks hosted workspace sign-in,
 roles and device revocation through the real HTTP API with a stubbed email
-service. It does not drive the People settings UI through `control-omb`.
+service. It does not drive the People settings UI through `control-hezuo`.
 
 The [sidebar fixture](sidebar.md) checks archive and delete confirmations, their
 default focus, keyboard wrapping and focus return against two disposable bots;
@@ -308,9 +316,6 @@ The [GitHub Copilot engine checks](copilot-engine.md) cover its ACP catalog,
 model and effort selection, sign-in detection, and moving a bot or conversation
 between Claude, Copilot and a custom ACP agent with fake engines.
 
-The [mobile generated-image checks](mobile-generated-images.md) cover native image
-attachments and message-scoped download authorization using isolated fixtures.
-
 The [guarded external messages fixture](guarded-messages.md) checks atomic
 branch and approval preconditions, retry receipts, and refusal to queue or
 steer messages from external interfaces. It also verifies bounded request
@@ -319,9 +324,9 @@ interrupting a newer request.
 
 The [Live calls fixture](live-calls.md) checks the call id on spoken requests,
 the one "call" row a finished call leaves, its generated title and the desktop's
-record row, against the fake GPT-Live in a disposable workspace. `control-omb`
+record row, against the fake GPT-Live in a disposable workspace. `control-hezuo`
 cannot start a call, so the recipe also calls the harness's own routes. It
-proves no real audio, OpenAI key or phone.
+proves no real audio or OpenAI key.
 
 The [right-to-left fixture](bidi.md) checks per-block direction in bot replies
 and per-line direction in sent turns, with code pinned left-to-right.
@@ -383,9 +388,9 @@ and worker exports using synthetic data, with isolated backup workflow checks.
 The [Japanese desktop font recipe](japanese-desktop.md) checks real Firefox and
 XFCE glyph rendering in disposable managed desktops, including fresh recreation.
 
-The optional [Podman full-stack acceptance recipe](podman-self-hosting.md)
-checks the Compose deployment with a fresh home, fake engine, and two desktops.
-It includes workspace ownership, persistence, and proxy authentication checks.
+The [retired Podman full-stack acceptance recipe](podman-self-hosting.md)
+records the removed Compose deployment and its workspace ownership, persistence,
+and proxy authentication boundaries; it is not an active launch procedure.
 
 The [Podman Firefox sandbox recipe](podman-firefox.md) checks the capability set a
 managed desktop keeps so Firefox can start, with before/after acceptance evidence.
@@ -413,11 +418,11 @@ Gateway password discovery currently specifies 10–128 characters. Registration
 conflict recovery handles only `409 installation_exists`, once, by looking up
 and rotating that installation; other conflicts are not replayed.
 
-Run the focused isolated regressions from `desktop/`:
+Run the focused isolated regressions from the repository root:
 
 ```sh
-npx vitest run --root .. --config desktop/vite.config.ts desktop/electron/product-account.test.mjs desktop/electron/control-plane-client.test.mjs desktop/electron/product-gateway-host.test.mjs desktop/electron/gateway-companion-tunnel.test.mjs desktop/electron/product-runtime-drain.test.mjs
-node --test electron/product-account-ipc.node-test.mjs electron/product-preload.node-test.mjs
+pnpm exec vitest run --config desktop/vite.config.ts desktop/electron/product-account.test.mjs desktop/electron/control-plane-client.test.mjs desktop/electron/product-gateway-host.test.mjs desktop/electron/gateway-companion-tunnel.test.mjs desktop/electron/product-runtime-drain.test.mjs
+node --test desktop/electron/product-account-ipc.node-test.mjs desktop/electron/product-preload.node-test.mjs
 ```
 
 Unit regressions are not evidence of production settlement. Use only disposable

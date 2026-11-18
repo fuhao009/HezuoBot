@@ -32,7 +32,7 @@ export interface QuestionRoutingDeps {
   /** The open sign-in cards this work waits on were answered elsewhere: they settle, and the place goes back to its bot. */
   settleSignIns(node: HandoffView): void;
   /** The work runs in one person's private chat and its requester's chat is not that one: its questions stay theirs. */
-  keptPrivate(node: HandoffView, requester: HandoffView): boolean;
+  keptPrivate?(node: HandoffView, requester: HandoffView): boolean;
   /** Hands `text` to the turn running in `threadId`, read at its next step as a person's line sent mid-turn is; false when
    * its engine cannot take it now. */
   steer(threadId: string, text: string): Promise<boolean>;
@@ -58,7 +58,7 @@ export function createQuestionRouting(deps: QuestionRoutingDeps) {
     if (input.level !== "full" || personOnly(input.question)) return undefined;
     const node = deps.active().find((n) => n.threadId === input.threadId && n.botId === input.botId && n.status === "running" && n.parentId !== undefined);
     const requester = node?.parentId ? deps.node(node.parentId) : undefined;
-    if (!node || !requester || node.origin?.kind === "outside" || deps.keptPrivate(node, requester)) return undefined;
+    if (!node || !requester || node.origin?.kind === "outside" || deps.keptPrivate?.(node, requester)) return undefined;
     return `Not asked: at this level nobody is interrupted. Take the sensible default yourself, carry on, and say in one plain line what you chose. If you truly cannot choose, end your turn with NEEDS INPUT:, the question and Default: your pick, and @${store.bot(requester.botId)?.name ?? "your requester"} decides.`;
   }
 

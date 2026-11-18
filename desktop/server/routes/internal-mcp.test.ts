@@ -23,7 +23,6 @@ import { PASS, type RouteContext } from "./table.ts";
 const BOT = "kiwi";
 const THREAD = "thread-1";
 const MAC = { environmentId: "env-mac", label: "Ada's Mac" };
-const OWNER_ONLY = "MCP servers are managed by the owner.";
 const ASK_ADMIN = "Ask a workspace admin to add it.";
 
 const linear = { type: "http", url: "https://mcp.linear.app/mcp", headers: {}, enabled: true };
@@ -35,7 +34,6 @@ const userinfo = `https://ada:${USER_TOKEN}@mcp.example.com/mcp-server-productio
 
 interface Options {
   full?: boolean;
-  guest?: boolean;
   admin?: boolean;
   personal?: string[];
   mcpServers?: string[];
@@ -48,19 +46,18 @@ interface Options {
 }
 
 function fixture(options: Options = {}) {
-  const dataDir = mkdtempSync(join(tmpdir(), "omb-internal-mcp-"));
+  const dataDir = mkdtempSync(join(tmpdir(), "hezuo-internal-mcp-"));
   const cfg: Pick<AppConfig, "mcpServers" | "postiz"> = { mcpServers: structuredClone(options.servers ?? {}) };
   const mcpOAuth = new McpOAuthManager({ file: join(dataDir, "mcp-oauth.json") });
   let busy = false;
   const config = createMcpConfig({
     cfg, sessions: { isLive: () => true }, mcpOAuth,
     teamConnections: { personMcp: () => options.personal ?? [], people: {} as TeamConnectionsHost["people"] },
-    cloudHome: null, fallbackPublicUrl: null,
+    fallbackPublicUrl: null,
     mcpConfigBusy: { get: () => busy, set: (value) => { busy = value; } },
     mcpServerResponse: () => ({ servers: listMcpServers(cfg.mcpServers) }),
     mcpPolicyRefusal: (name) => options.refuse?.(name),
     persistMcpServers: (next) => { cfg.mcpServers = next; },
-    savedCustomDomain: () => null,
     changed: () => {},
   });
   let clock = Date.now();
@@ -91,7 +88,6 @@ function fixture(options: Options = {}) {
     readBody: async () => body as Record<string, unknown>,
     sender, threadId: THREAD,
     fullAccess: () => options.full ?? true,
-    guestDriven: () => options.guest ?? false,
     teamAdmin: () => options.admin ?? true,
     canUse: (name) => !options.leftOut?.includes(name),
     config, cfg: () => cfg as AppConfig,
@@ -155,7 +151,7 @@ async function createInternalMcpRoutesCall(deps: InternalMcpDeps, payload: Recor
   const res = Object.assign(new EventEmitter(), { writableEnded: false }) as unknown as ServerResponse;
   await createInternalMcpRoutes({ ...deps, readBody: async () => payload })({
     req: {} as IncomingMessage, res, path: "/api/internal/mcp-servers", method: "POST", url: new URL("http://fixture.invalid/api/internal/mcp-servers"),
-    auth: { kind: "loopback", scopes: ["admin", "client"] }, readBody: vi.fn(async () => payload), json,
+    readBody: vi.fn(async () => payload), json,
   });
   const [, status, body] = json.mock.calls[0]!;
   return { status, body };
@@ -350,12 +346,15 @@ describe("internal mcp_server route, Full access", () => {
     expect(probe).not.toHaveBeenCalled();
   });
 
-  it("every action, list included, is refused in a guest-driven thread with \"MCP servers are managed by the owner.\"", async () => {
-    const { call, post, cfg } = fixture({ guest: true, servers: { linear } });
-    expect(await call("GET")).toEqual({ status: 403, body: { error: OWNER_ONLY } });
-    for (const action of ["list", "add", "update", "enable", "disable", "test", "sign_in", "sign_out", "remove"]) {
-      expect(await post({ action, name: "linear" }), action).toEqual({ status: 403, body: { error: OWNER_ONLY } });
-    }
+  it("lets a non-admin list visible shared servers without gaining authority to change them", async () => {
+    const { call, post, cfg } = fixture({ admin: false, servers: { linear } });
+    const get = await call("GET");
+    const list = await post({ action: "list" });
+    expect(get.status).toBe(200);
+    expect(list.status).toBe(200);
+    expect(get.body.text).toContain("linear");
+    expect(list.body.text).toContain("linear");
+    expect(await post({ action: "disable", name: "linear" })).toEqual({ status: 403, body: { error: ASK_ADMIN } });
     expect(cfg.mcpServers).toEqual({ linear });
   });
 
@@ -695,7 +694,7 @@ describe("internal mcp_server route, below Full access", () => {
 
   it("a client-id-only update does not say the destination changed, and a url change still names it", async () => {
     probeWith({ ok: true, tools: [] });
-    const app = { ...linear, oauth: { clientId: "omb-app", clientSecret: "old-client-secret" } };
+    const app = { ...linear, oauth: { clientId: "hezuo-app", clientSecret: "old-client-secret" } };
     const idOnly = await fixture({ servers: { linear: app } }).post({ action: "update", name: "linear", oauth: { clientId: "other-app" } });
     expect(idOnly.body.dropped).toEqual(["oauth client secret"]);
     expect(idOnly.body.text).toContain("OAuth client id changed");
@@ -707,13 +706,13 @@ describe("internal mcp_server route, below Full access", () => {
 
   it("a new literal OAuth client secret shows as its own change line without its value", async () => {
     probeWith({ ok: true, tools: [] });
-    const signedApp = { ...linear, enabled: false, oauth: { clientId: "omb-app", clientSecret: "old-client-secret" } };
+    const signedApp = { ...linear, enabled: false, oauth: { clientId: "hezuo-app", clientSecret: "old-client-secret" } };
     const { post, respond, stored, card } = fixture({ full: false, servers: { linear: signedApp } });
     expect((await post({ action: "update", name: "linear", oauth: { clientSecret: "new-client-secret" } })).status).toBe(202);
     expect(card()?.subtitle).toBe("new OAuth client secret");
     expect(JSON.stringify(card())).not.toMatch(/new-client-secret|old-client-secret/);
     await respond("allow");
-    expect(stored("linear")).toMatchObject({ oauth: { clientId: "omb-app", clientSecret: "new-client-secret" } });
+    expect(stored("linear")).toMatchObject({ oauth: { clientId: "hezuo-app", clientSecret: "new-client-secret" } });
   });
 
   it("a Change card lists each field as old → new with no secret value, and allow merges onto the server as it is then", async () => {

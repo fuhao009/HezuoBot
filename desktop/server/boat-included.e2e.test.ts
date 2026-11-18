@@ -11,7 +11,7 @@ import { removeTempDir, waitForExit } from "./testing/cleanup.ts";
 import { freePortBlock } from "./testing/ports.ts";
 
 const SERVER_DIR = dirname(fileURLToPath(import.meta.url));
-const INCLUDED = `box_omb_${randomUUID()}`;
+const INCLUDED = `box_hezuo_${randomUUID()}`;
 const OWN = "box_own_person_key";
 const INCLUDED_BOX = "bx_23456789";
 let stub: Server;
@@ -64,13 +64,13 @@ beforeAll(async () => {
   await new Promise<void>((resolve) => stub.listen(0, "127.0.0.1", resolve));
   stubBase = `http://127.0.0.1:${(stub.address() as { port: number }).port}`;
 
-  home = mkdtempSync(join(tmpdir(), "omb-boat-included-"));
+  home = mkdtempSync(join(tmpdir(), "hezuo-boat-included-"));
   const dataDir = join(home, ".hezuo");
   mkdirSync(dataDir, { recursive: true });
   // One deliberately unknown engine: nothing probes an installed CLI.
   writeFileSync(join(dataDir, "config.json"), JSON.stringify({ instances: { fixture: { driver: "not-a-real-driver" } } }));
   // A computer this installation made on the included account.
-  accounts.relay = [{ id: INCLUDED_BOX, name: "ogb-included-fixture", state: "archived" }];
+  accounts.relay = [{ id: INCLUDED_BOX, name: "hezuo-included-fixture", state: "archived" }];
   journal = join(dataDir, "box-create-requests.json");
   writeFileSync(journal, JSON.stringify({ version: 1, requests: [{
     botId: "included-fixture-bot", requestBody: JSON.stringify({ fixture: true }), idempotencyKey: randomUUID(),
@@ -85,10 +85,10 @@ beforeAll(async () => {
       PATH: process.env.PATH,
       ...(process.env.PATHEXT ? { PATHEXT: process.env.PATHEXT } : {}),
       ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}),
-      HOME: home, USERPROFILE: home, OMB_DATA_DIR: dataDir, OMB_PORT: String(port), OMB_WEBHOOK_PORT: String(port + 1),
-      OMB_BOAT_API: `${stubBase}/boat/api/v1`,
-      OMB_CLOUD_BOAT_URL: `${stubBase}/relay/api/box/v1`,
-      OMB_CLOUD_BOAT_TOKEN: INCLUDED,
+      HOME: home, USERPROFILE: home, HEZUO_DATA_DIR: dataDir, HEZUO_PORT: String(port), HEZUO_WEBHOOK_PORT: String(port + 1),
+      HEZUO_BOAT_API: `${stubBase}/boat/api/v1`,
+      HEZUO_CLOUD_BOAT_URL: `${stubBase}/relay/api/box/v1`,
+      HEZUO_CLOUD_BOAT_TOKEN: INCLUDED,
     },
     stdio: ["ignore", "pipe", "pipe"],
   });

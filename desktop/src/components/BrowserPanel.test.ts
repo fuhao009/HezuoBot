@@ -108,7 +108,7 @@ describe("the browser panel's connection", () => {
   it("detaches the native view on close without closing the browser session", async () => {
     const surface = { surfaceId: "native-fixture", revision: 1, interactive: false, visible: true };
     const detach = vi.fn(async () => {});
-    vi.stubGlobal("ogb", { browserSurface: {
+    vi.stubGlobal("hezuo", { browserSurface: {
       attach: vi.fn(async () => surface), detach, layout: vi.fn(async () => {}),
       onState: () => () => {}, focus: vi.fn(async () => {}),
     } });
@@ -420,7 +420,7 @@ describe("what the person does in the panel", () => {
 });
 
 describe("a published page's Open", () => {
-  const PAGE = "https://abcdefghijklmnopqrstuvwxyz.mausbot.page/";
+  const PAGE = "https://abcdefghijklmnopqrstuvwxyz.hezuobot.page/";
   const show = (page: { url: string; nonce: number }) => act(async () => root.render(createElement(LiveBrowser, { bot, page })));
 
   it("opens the page in a new tab, once, taking the browser first, so the bot's own tab stays as it was", async () => {

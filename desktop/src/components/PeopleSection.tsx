@@ -1,10 +1,9 @@
 // Security: the invite link is convenience, not a second door; the one-time code still goes to the address itself.
 import { useCallback, useEffect, useState } from "react";
-import { Check, Copy, ExternalLink, Link2, Loader2, Plus, RefreshCw, X } from "lucide-react";
+import { ExternalLink, Loader2, Plus, RefreshCw } from "lucide-react";
 import { api } from "@/state/store";
 import { cn } from "@/lib/cn";
 import { t } from "@/lib/i18n";
-import { useCopyFeedback } from "@/lib/copy-text";
 import { formatUsd, hasFiniteCost } from "@/lib/usage";
 import { readMembership, type Membership } from "../lib/membership";
 import { readSessionState, type SessionState } from "../lib/session";
@@ -27,10 +26,6 @@ export interface Person {
   estimated?: boolean;
 }
 
-export function inviteLink(base: string, entry: string): string {
-  const origin = base.replace(/\/+$/, "");
-  return entry.startsWith("@") ? `${origin}/pair` : `${origin}/pair?email=${encodeURIComponent(entry)}`;
-}
 
 export function mergePeople(
   lists: SignInLists,
@@ -90,12 +85,11 @@ export function lastSeenLabel(lastSeenAt: number | null, now = Date.now()): stri
   return new Date(lastSeenAt).toISOString().slice(0, 10);
 }
 
-export function PeopleTable({ people, busy, onRole, onRemove, onLink, readOnly = false }: {
+export function PeopleTable({ people, busy, onRole, onRemove, readOnly = false }: {
   people: Person[];
   busy: boolean;
   onRole: (person: Person, role: Role) => void;
   onRemove: (person: Person) => void;
-  onLink: (person: Person) => void;
   readOnly?: boolean;
 }) {
   if (people.length === 0) return <p className="text-[13px] text-ink-secondary">{t(readOnly ? "people.portal.empty" : "people.empty")}</p>;
@@ -123,7 +117,6 @@ export function PeopleTable({ people, busy, onRole, onRemove, onLink, readOnly =
             {hasFiniteCost(person.costUsd) ? `${person.estimated ? "~" : ""}${formatUsd(person.costUsd)}` : "—"}
           </span>
           {readOnly ? <span /> : <span className="flex items-center justify-end gap-2 text-[12px]">
-            <button type="button" disabled={busy} onClick={() => onLink(person)} aria-label={t("people.link")} title={t("people.link")} className="rounded-md p-1 text-ink-secondary hover:bg-control hover:text-ink disabled:opacity-50"><Link2 size={13} /></button>
             <button type="button" disabled={busy} onClick={() => onRole(person, person.role === "admin" ? "member" : "admin")} className="text-ink-secondary hover:text-ink disabled:opacity-50">
               {person.role === "admin" ? t("people.makeMember") : t("people.makeAdmin")}
             </button>
@@ -135,22 +128,6 @@ export function PeopleTable({ people, busy, onRole, onRemove, onLink, readOnly =
   );
 }
 
-export function CopyLink({ link }: { link: string }) {
-  const { state, copy } = useCopyFeedback(link);
-  return (
-    <div className="mt-3 rounded-lg border border-hairline/40 bg-inset p-3 text-[13px]">
-      <div className="mb-1 text-ink-secondary">{t("people.link")}</div>
-      <div className="flex items-center gap-2">
-        <code className="min-w-0 flex-1 select-all break-all text-ink">{link}</code>
-        <button type="button" onClick={copy} className="flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[12px] text-ink-secondary hover:bg-control hover:text-ink">
-          {state === "copied" ? <Check size={13} className="text-success" /> : state === "failed" ? <X size={13} className="text-danger" /> : <Copy size={13} />}
-          {t(state === "copied" ? "people.copied" : state === "failed" ? "common.copyFailed" : "people.copy")}
-        </button>
-      </div>
-      <p className="mt-2 text-[12px] leading-relaxed text-ink-secondary">{t("people.linkHint")}</p>
-    </div>
-  );
-}
 
 export function PortalPeople({ peopleUrl, people }: { peopleUrl: string | null; people: Person[] }) {
   const noop = () => {};
@@ -170,7 +147,7 @@ export function PortalPeople({ peopleUrl, people }: { peopleUrl: string | null; 
         )}
       </div>
       <div className="mt-4">
-        <PeopleTable people={people} busy={false} readOnly onRole={noop} onRemove={noop} onLink={noop} />
+        <PeopleTable people={people} busy={false} readOnly onRole={noop} onRemove={noop} />
       </div>
       <p className="mt-3 text-[12px] leading-relaxed text-ink-secondary">{t("people.portal.note")}</p>
     </Card>
@@ -179,16 +156,12 @@ export function PortalPeople({ peopleUrl, people }: { peopleUrl: string | null; 
 
 export function PeopleSection({ simple = false, startOpen = false }: { simple?: boolean; startOpen?: boolean }) {
   const [open, setOpen] = useState(startOpen);
-  const [tried, setTried] = useState(false);
   const [session, setSession] = useState<SessionState | null>(null);
   const [membership, setMembership] = useState<Membership | null>(null);
   const [lists, setLists] = useState<SignInLists | null>(null);
   const [people, setPeople] = useState<Person[]>([]);
-  const [base, setBase] = useState<string>(typeof window !== "undefined" ? window.location.origin : "");
-  const [emailOffered, setEmailOffered] = useState<boolean | null>(null);
   const [draft, setDraft] = useState("");
   const [role, setRole] = useState<Role>("member");
-  const [link, setLink] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -197,12 +170,10 @@ export function PeopleSection({ simple = false, startOpen = false }: { simple?: 
     setLoading(true);
     setError(null);
     try {
-      const [config, sessions, usage, domain, environment] = await Promise.all([
+      const [config, sessions, usage] = await Promise.all([
         api("/api/config"),
         api("/api/auth/sessions").catch(() => ({ sessions: [] })),
         api("/api/usage?groupBy=user").catch(() => ({ groups: [] })),
-        api("/api/settings/custom-domain").catch(() => null),
-        fetch("/.well-known/hezuo/environment").then((res) => (res.ok ? res.json() : null)).catch(() => null),
       ]);
       const current: SignInLists = {
         admins: Array.isArray(config?.signIn?.admins) ? config.signIn.admins : [],
@@ -214,8 +185,6 @@ export function PeopleSection({ simple = false, startOpen = false }: { simple?: 
       const signedIn = Array.isArray(sessions?.sessions) ? sessions.sessions : [];
       const spent = Array.isArray(usage?.groups) ? usage.groups : [];
       setPeople(authority.authority === "portal" ? peopleFromSessions(signedIn, spent) : mergePeople(current, signedIn, spent));
-      if (typeof domain?.publicUrl === "string" && domain.publicUrl) setBase(domain.publicUrl);
-      setEmailOffered(environment?.capabilities?.emailSignIn === true ? true : environment ? false : null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
@@ -243,8 +212,7 @@ export function PeopleSection({ simple = false, startOpen = false }: { simple?: 
     }
   };
 
-  const invite = async () => {
-    setTried(true);
+  const addPerson = async () => {
     if (!lists || busy) return;
     const entry = normalizeAccessEntry(draft);
     if (!entry) {
@@ -253,15 +221,13 @@ export function PeopleSection({ simple = false, startOpen = false }: { simple?: 
     }
     await save(withEntry(lists, entry, role));
     setDraft("");
-    setLink(inviteLink(base, entry));
   };
 
   if (!canPairDevices(session)) return null;
   const portal = membership?.authority === "portal" ? <PortalPeople peopleUrl={membership.peopleUrl} people={people} /> : null;
   const content = (
     <>
-      {emailOffered === false && (!simple || tried) && <p className="mb-3 rounded-lg border border-warning/25 bg-warning/5 px-3 py-2 text-[13px] text-ink-secondary">{t(membership?.pairingCodes === false ? "people.portalSignIn" : "people.notHosted")}</p>}
-      <form className="flex flex-wrap items-center gap-2" onSubmit={(event) => { event.preventDefault(); void invite(); }}>
+      <form className="flex flex-wrap items-center gap-2" onSubmit={(event) => { event.preventDefault(); void addPerson(); }}>
         <input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
@@ -275,12 +241,10 @@ export function PeopleSection({ simple = false, startOpen = false }: { simple?: 
           <option value="admin">{t("people.roleAdmin")}</option>
         </Select>
         <button type="submit" disabled={busy || !draft.trim()} className="ui-button ui-button-primary">
-          {busy ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}{t("people.invite")}
+          {busy ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}{t("common.add")}
         </button>
         <button type="button" onClick={() => void load()} disabled={loading || busy} aria-label={t("people.refresh")} title={t("people.refresh")} className="rounded-md p-1.5 text-ink-secondary hover:bg-control hover:text-ink disabled:opacity-50"><RefreshCw size={13} className={cn(loading && "animate-spin")} /></button>
       </form>
-      <p className="mt-2 text-[12px] leading-relaxed text-ink-secondary">{t("people.inviteHint")}</p>
-      {link && <CopyLink link={link} />}
       {error && <p role="alert" className="mt-2 text-[12px] text-danger">{error}</p>}
       <div className="mt-4">
         <PeopleTable
@@ -288,7 +252,6 @@ export function PeopleSection({ simple = false, startOpen = false }: { simple?: 
           busy={busy}
           onRole={(person, next) => { if (lists) void save(withEntry(lists, person.entry, next)); }}
           onRemove={(person) => { if (lists) void save(withoutEntry(lists, person.entry)); }}
-          onLink={(person) => setLink(inviteLink(base, person.entry))}
         />
       </div>
       {!simple && <p className="mt-3 text-[12px] leading-relaxed text-ink-secondary">{t("people.note")}</p>}
@@ -299,7 +262,7 @@ export function PeopleSection({ simple = false, startOpen = false }: { simple?: 
       <div data-people-summary="">
         <SettingRow title={t("people.title")} subtitle={t("settings.simple.people")}>
           <button type="button" aria-expanded={open} className="ui-button" onClick={() => setOpen(!open)}>
-            {open ? t("common.done") : t("settings.simple.people.invite")}
+            {open ? t("common.done") : t("settings.simple.account.manage")}
           </button>
         </SettingRow>
         {open && <div className="px-3.5 pb-3.5 pt-1">{portal ?? content}</div>}

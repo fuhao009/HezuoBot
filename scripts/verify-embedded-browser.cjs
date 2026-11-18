@@ -26,8 +26,14 @@ app.whenReady().then(async () => {
   owner = new BrowserWindow({ show: true, width: 1100, height: 800, webPreferences: { sandbox: true, contextIsolation: true } });
   await owner.loadURL("data:text/html,<title>Embedded browser isolation verification</title><body>Owner UI must never be a browser target</body>");
   const nativeViews = [];
+  const takeoverWindows = [];
+  const handbacks = [];
   manager = createEmbeddedBrowserSurfaceManager({ owner, createNativeView: options => { const view = new WebContentsView(options); nativeViews.push(view); return view; },
-    createFallbackWindow: () => new BrowserWindow({ show: true, width: 1000, height: 700, webPreferences: { sandbox: true, contextIsolation: true } }), onFallbackClose: () => { void broker.close(); } });
+    createFallbackWindow: title => {
+      const window = new BrowserWindow({ title, show: false, width: 1000, height: 700, webPreferences: { sandbox: true, contextIsolation: true } });
+      takeoverWindows.push(window);
+      return window;
+    }, onFallbackClose: grant => { handbacks.push(grant); } });
   let primary;
   broker = createEmbeddedBrowserBroker({
     createView: async options => { const view = await manager.createView(options); primary ??= view; return view; },
@@ -96,6 +102,80 @@ app.whenReady().then(async () => {
     assert.ok(source && !source.thumbnail.isEmpty(), "OS composite capture of actual owner window is available");
     writeFileSync(join(output, "embedded-visible.png"), source.thumbnail.toPNG());
     return { visible: primary.getVisible(), bounds, capture: "desktopCapturer window composite" };
+  });
+  await step("independent native takeover focuses and reuses the authorized page", async () => {
+    manager.detach(binding);
+    await viewer.input({ type: "takeControl" });
+    const grant = { ...binding, interactive: true, hidden: false };
+    const contentsId = primary.webContents.id;
+    const pageUrl = primary.webContents.getURL();
+    assert.equal(manager.takeover(grant, "Fixture Bot’s browser"), true);
+    const window = takeoverWindows.at(-1);
+    assert.equal(window.isVisible(), true);
+    assert.equal(window.isFocused(), true);
+    assert.equal(window.getTitle(), "Fixture Bot’s browser");
+    assert.ok(window.contentView.children.includes(primary));
+    assert.equal(primary.webContents.id, contentsId);
+    assert.equal(primary.webContents.getURL(), pageUrl);
+    assert.equal(await primary.webContents.executeJavaScript("document.querySelector('h1').textContent"), "clicked-verified");
+    assert.equal(manager.takeover(grant, "Fixture Bot’s browser"), true);
+    assert.equal(takeoverWindows.length, 1);
+    await assert.rejects(service.agentRpc(target, "tools/call", { name: "agent_browser_snapshot", arguments: {} }), /paused while a person controls/);
+    return { contentsId, samePage: true, focused: window.isFocused(), windowCount: takeoverWindows.length };
+  });
+  await step("closing native window keeps the page and isolated login cookie", async () => {
+    const contents = primary.webContents;
+    const cookieUrl = "http://127.0.0.1/";
+    const cookieName = "fixture-login";
+    await contents.session.cookies.set({ url: cookieUrl, name: cookieName, value: nonce, httpOnly: true, sameSite: "lax" });
+    const beforeHandbacks = handbacks.length;
+    takeoverWindows.at(-1).close();
+    assert.equal(handbacks.length, beforeHandbacks + 1);
+    assert.equal(primary.getVisible(), false);
+    assert.equal(contents.isDestroyed(), false);
+    assert.equal(primary.webContents, contents);
+    assert.equal(await contents.executeJavaScript("document.querySelector('h1').textContent"), "clicked-verified");
+    assert.equal((await contents.session.cookies.get({ url: cookieUrl, name: cookieName }))[0]?.value, nonce);
+    await viewer.input({ type: "releaseControl" });
+    await call("agent_browser_snapshot", {});
+    assert.equal((await contents.session.cookies.get({ url: cookieUrl, name: cookieName }))[0]?.value, nonce);
+    return { contentsId: contents.id, cookiePreserved: true, pagePreserved: true, botResumed: true };
+  });
+  await step("two bots own separate native windows and revocation hides only its page", async () => {
+    const other = { session: "other-bot", key: "bot:other" };
+    const otherView = nativeViews.find(view => view !== primary && view.webContents.session === session.fromPartition(embeddedBrowserPartition("fixture", other.key)));
+    assert.ok(otherView);
+    const otherViewer = await service.attachViewer(other, { owner: "local-owner", canOperate: true, maxWidth: 1280, maxHeight: 800 }, event => { if (event.type === "frame") event.ack(); });
+    try {
+      await viewer.input({ type: "takeControl" });
+      await otherViewer.input({ type: "takeControl" });
+      const first = { ...binding, surfaceId: "fixture-independent", revision: 2, interactive: true, hidden: false };
+      const second = { ...first, surfaceId: "other-independent", profileKey: other.key };
+      assert.equal(manager.takeover(first, "Fixture Bot’s browser"), true);
+      assert.equal(manager.takeover(second, "Other Bot’s browser"), true);
+      const firstWindow = takeoverWindows.at(-2), secondWindow = takeoverWindows.at(-1);
+      assert.notEqual(firstWindow, secondWindow);
+      assert.ok(firstWindow.contentView.children.includes(primary));
+      assert.ok(secondWindow.contentView.children.includes(otherView));
+      assert.equal(firstWindow.isVisible(), true);
+      assert.equal(secondWindow.isVisible(), true);
+      assert.equal(firstWindow.getTitle(), "Fixture Bot’s browser");
+      assert.equal(secondWindow.getTitle(), "Other Bot’s browser");
+      assert.equal((await otherView.webContents.session.cookies.get({ url: "http://127.0.0.1/", name: "fixture-login" })).length, 0);
+      manager.updateTakeover({ ...second, hidden: true, interactive: false });
+      assert.equal(otherView.getVisible(), false);
+      assert.equal(otherView.webContents.isDestroyed(), false);
+      assert.equal(firstWindow.isVisible(), true);
+      assert.equal(primary.getVisible(), true);
+      const count = takeoverWindows.length;
+      assert.equal(manager.takeover({ ...second, hidden: true, interactive: false }, "Denied"), false);
+      assert.equal(takeoverWindows.length, count);
+      firstWindow.close();
+      await viewer.input({ type: "releaseControl" });
+      await otherViewer.input({ type: "releaseControl" });
+      await call("agent_browser_snapshot", {});
+      return { distinctWindows: true, distinctCookieJars: true, revokedPageRetained: true, unaffectedBotVisible: true };
+    } finally { await otherViewer.close(); }
   });
   await step("viewer close and browser restart", async () => { await viewer.close(); await call("restart_browser", {}); await call("agent_browser_snapshot", {}); });
 }).then(async () => {

@@ -83,7 +83,7 @@ export async function discoverAcpModels(
   args: string[],
   discovery: AcpDiscoveryOptions = {},
 ): Promise<ModelCatalog> {
-  const cwd = await mkdtemp(join(tmpdir(), "omb-acp-models-"));
+  const cwd = await mkdtemp(join(tmpdir(), "hezuo-acp-models-"));
   let child: ReturnType<typeof spawnCli> | undefined;
   let globalTimer: ReturnType<typeof setTimeout> | undefined;
   const pending = new Map<number, { resolve(value: unknown): void; reject(error: Error): void; timer: ReturnType<typeof setTimeout> }>();

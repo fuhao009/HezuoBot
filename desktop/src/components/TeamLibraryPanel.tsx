@@ -7,21 +7,18 @@ import { orgCardAction, orgPackagePreview, type OrgLibraryListing, type OrgLibra
 import type { PackageDocument } from "../../../packages/shared/package-format";
 import type { Routine } from "@/lib/routines";
 import { api, useStore, type Bot, type Group } from "@/state/store";
-import { ArrowLeft, Check, Compass, ExternalLink, FolderOpen, Github, Loader2, Search, Share2, UploadCloud, Users, X } from "lucide-react";
+import { ArrowLeft, Check, Compass, ExternalLink, FolderOpen, Github, Loader2, Share2, UploadCloud, Users, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { catalogCopy, catalogMatches, type TeamCatalog, type TeamCatalogEntry } from "@/lib/team-catalog";
 
 import { GrokFinishSetup, grokSetupLeft } from "./GrokFinishSetup";
 import { TEAM_GLYPHS, TeamImportDetails } from "./TeamImportDetails";
 import { GrokImportFlow } from "./GrokImportFlow";
-import { ReadyBotGallery } from "./ReadyBotGallery";
 import { ShareTeamDialog } from "./ShareTeamDialog";
 import { OrgLibraryTab } from "./TeamLibraryPanelOrg";
 import { MAX_TEAM_BACKUP_BYTES } from "../../../packages/shared/team-backup";
 import { takeImportName } from "../../../packages/shared/import-name";
 import { isGrokLink } from "../../../packages/shared/grok-import";
-const COMMUNITY_TEAMS_REPOSITORY = "https://github.com/milind-soni/openmausbot-teams";
 
 export { TeamImportDetails };
 
@@ -32,8 +29,8 @@ export interface TeamImportResult {
   connections?: number;
 }
 
-type ImportSource = "library" | "file" | "github" | "grok";
-type TeamTab = "org" | "explore" | "import" | "scout" | "share";
+type ImportSource = "file" | "github" | "grok";
+type TeamTab = "org" | "import" | "scout" | "share";
 
 interface ScoutResult {
   profile: { name: string; summary: string; stacks: string[] };
@@ -59,8 +56,8 @@ interface DirectoryCandidate {
 const DIRECTORY_COLORS = ["cyan", "red", "purple", "green", "orange"] as const;
 
 async function openExternal(url: string): Promise<void> {
-  if (window.ogb?.openExternal) {
-    await window.ogb.openExternal(url);
+  if (window.hezuo?.openExternal) {
+    await window.hezuo.openExternal(url);
     return;
   }
   const opened = window.open(url, "_blank", "noopener,noreferrer");
@@ -101,11 +98,7 @@ export function TeamLibraryPanel({
   const { state, dispatch } = useStore();
   const dialogRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [tab, setTab] = useState<TeamTab>("explore");
-  const [catalog, setCatalog] = useState<TeamCatalog | null>(null);
-  const [catalogLoading, setCatalogLoading] = useState(true);
-  const [catalogError, setCatalogError] = useState("");
-  const [busySlug, setBusySlug] = useState<string | null>(null);
+  const [tab, setTab] = useState<TeamTab>("import");
   const [pending, setPending] = useState<PendingTeamImport | null>(null);
   const [source, setSource] = useState<ImportSource>("file");
   const [githubUrl, setGithubUrl] = useState("");
@@ -114,7 +107,6 @@ export function TeamLibraryPanel({
   const [finishing, setFinishing] = useState<{ notes: NonNullable<PendingTeamImport["grokSetup"]>; bot: Bot; result: TeamImportResult } | null>(null);
   const [importing, setImporting] = useState(false);
   const [dragging, setDragging] = useState(false);
-  const [search, setSearch] = useState("");
   const [error, setError] = useState("");
   const [scoutFolder, setScoutFolder] = useState("");
   const [scouting, setScouting] = useState(false);
@@ -126,7 +118,6 @@ export function TeamLibraryPanel({
   const [roomName, setRoomName] = useState("");
   const [creating, setCreating] = useState(false);
   const [sharing, setSharing] = useState<string | null>(null);
-  const [nestedDialog, setNestedDialog] = useState(false);
   const [orgListing, setOrgListing] = useState<OrgLibraryListing | null>(null);
   const [orgBusy, setOrgBusy] = useState<string | null>(null);
   const [orgNotice, setOrgNotice] = useState("");
@@ -140,23 +131,6 @@ export function TeamLibraryPanel({
   const shareableTeams = shareableTeamList(state.sections ?? [], state.bots);
   const takenNames = new Set(state.bots.map((bot) => bot.name.trim().toLowerCase()));
   const importedNames = pending?.members.map((member) => takeImportName(member.name, takenNames)) ?? [];
-
-  const loadCatalog = useCallback(async () => {
-    setCatalogLoading(true);
-    setCatalogError("");
-    try {
-      // SAFETY: this endpoint is owned by the app and returns TeamCatalog.
-      setCatalog((await api("/api/team-library/catalog")) as TeamCatalog);
-    } catch (cause) {
-      setCatalogError(cause instanceof Error ? cause.message : String(cause));
-    } finally {
-      setCatalogLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadCatalog();
-  }, [loadCatalog]);
 
   const loadOrgLibrary = useCallback(async () => {
     try {
@@ -180,7 +154,7 @@ export function TeamLibraryPanel({
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (sharing !== null || nestedDialog) return;
+      if (sharing !== null) return;
       if (event.key === "Escape" && !importing) {
         event.preventDefault();
         event.stopPropagation();
@@ -210,7 +184,7 @@ export function TeamLibraryPanel({
     };
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [importing, onClose, pending, sharing, nestedDialog]);
+  }, [importing, onClose, pending, sharing]);
 
   const previewManifest = (preview: PendingTeamImport, nextSource: ImportSource) => {
     setPending(preview);
@@ -231,18 +205,6 @@ export function TeamLibraryPanel({
       }
     }
     previewManifest(teamImportPreview(manifest), "file");
-  };
-
-  const loadLibraryTeam = async (entry: TeamCatalogEntry) => {
-    setBusySlug(entry.slug);
-    setError("");
-    try {
-      previewManifest(teamImportPreview(await api(`/api/team-library/teams/${entry.slug}`)), "library");
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
-    } finally {
-      setBusySlug(null);
-    }
   };
 
   const loadGithubTeam = async () => {
@@ -391,7 +353,7 @@ export function TeamLibraryPanel({
   };
 
   const pickScoutFolder = async () => {
-    const chosen = await window.ogb?.pickFolder?.(scoutTarget || undefined);
+    const chosen = await window.hezuo?.pickFolder?.(scoutTarget || undefined);
     if (!chosen) return;
     setScoutFolder(chosen);
     await runScout(chosen);
@@ -443,9 +405,6 @@ export function TeamLibraryPanel({
     }
   };
 
-  const normalizedSearch = search.trim().toLowerCase();
-  const visibleTeams = (catalog?.teams ?? []).filter((entry) => !normalizedSearch || catalogMatches(entry, normalizedSearch));
-
   return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-[2px] sm:p-6"
@@ -495,17 +454,6 @@ export function TeamLibraryPanel({
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-1">
-            {!pending && (
-              <button
-                onClick={() => void openExternal(catalog?.repositoryUrl ?? COMMUNITY_TEAMS_REPOSITORY)}
-                className="flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-[13px] text-ink-secondary hover:bg-raised hover:text-ink"
-                title={t("templates.openRepository")}
-              >
-                <Github size={16} />
-                <span className="max-sm:hidden">{t("templates.communityRepo")}</span>
-                <ExternalLink size={12} />
-              </button>
-            )}
             <button
               onClick={onClose}
               disabled={importing}
@@ -586,21 +534,6 @@ export function TeamLibraryPanel({
                 )}
                 <button
                   role="tab"
-                  aria-selected={tab === "explore"}
-                  onClick={() => {
-                    tabChosen.current = true;
-                    setTab("explore");
-                    setError("");
-                  }}
-                  className={cn(
-                    "rounded-lg px-4 py-2 text-[14px] transition-colors",
-                    tab === "explore" ? "bg-card text-ink shadow-sm" : "text-ink-secondary hover:text-ink",
-                  )}
-                >
-                  {t("templates.explore")}
-                </button>
-                <button
-                  role="tab"
                   aria-selected={tab === "import"}
                   onClick={() => {
                     tabChosen.current = true;
@@ -645,18 +578,6 @@ export function TeamLibraryPanel({
                   {t("teamLibrary.shareTab")}
                 </button>
               </div>
-              {tab === "explore" && (
-                <label className="flex h-11 w-full items-center gap-2.5 rounded-xl bg-raised/70 px-3.5 sm:w-[320px]">
-                  <Search size={17} className="shrink-0 text-ink-secondary" />
-                  <input
-                    value={search}
-                    onChange={(event) => setSearch(event.target.value)}
-                    placeholder={t("templates.search")}
-                    aria-label={t("templates.search")}
-                    className="min-w-0 flex-1 bg-transparent text-[14px] text-ink placeholder:text-ink-secondary focus:outline-none"
-                  />
-                </label>
-              )}
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-7 pt-5 sm:px-8">
@@ -670,67 +591,12 @@ export function TeamLibraryPanel({
                   onDetails={(entry) => void loadOrgDetails(entry)}
                 />
               )}
-              {tab === "explore" && (
-                <div>
-                  <ReadyBotGallery search={search} onDialog={setNestedDialog} onAdded={onClose} />
-                  <div className="mb-3 text-[12px] font-medium text-ink-secondary">
-                    {search ? t("templates.searchResults") : t("templates.communityTemplates")}
-                  </div>
-                  {catalogLoading && (
-                    <div className="flex items-center justify-center gap-2 py-24 text-[13px] text-ink-secondary">
-                      <Loader2 size={16} className="animate-spin" /> {t("templates.loading")}
-                    </div>
-                  )}
-                  {!catalogLoading && catalogError && (
-                    <div className="rounded-xl bg-danger/10 p-4 text-[13px] text-danger">
-                      <p>{catalogError}</p>
-                      <button onClick={() => void loadCatalog()} className="mt-3 rounded-full bg-raised px-3.5 py-2 text-ink hover:bg-raised-hover">{t("common.tryAgain")}</button>
-                    </div>
-                  )}
-                  {!catalogLoading && catalog && (
-                    <div className="grid grid-cols-1 gap-x-10 md:grid-cols-2">
-                      {visibleTeams.map((entry, index) => {
-                        const copy = catalogCopy(entry);
-                        return (
-                        <article key={entry.slug} className="flex min-h-[104px] items-center gap-3 border-b border-hairline/35 px-1 py-4">
-                          <TeamGlyph index={index} />
-                          <div className="min-w-0 flex-1">
-                            <h3 className="truncate text-[14px] font-medium text-ink">{copy.name}</h3>
-                            <p className="mt-0.5 truncate text-[13px] text-ink-secondary">{copy.outcome ?? copy.summary}</p>
-                            <p className="mt-1 truncate text-[12px] text-ink-tertiary">
-                              {t("templates.botCount", { count: entry.members })} · {t("templates.playbookCount", { count: entry.skills.length })}
-                              {entry.requires.apps.length > 0 && ` · ${entry.requires.apps.join(", ")}`}
-                              {entry.setupMinutes && ` · ${t("templates.minutes", { count: entry.setupMinutes })}`}
-                            </p>
-                          </div>
-                          <button
-                            onClick={() => void loadLibraryTeam(entry)}
-                            disabled={busySlug !== null}
-                            className="flex min-w-[72px] items-center justify-center gap-1.5 rounded-full bg-raised px-3.5 py-2 text-[13px] text-ink hover:bg-raised-hover disabled:opacity-40"
-                          >
-                            {busySlug === entry.slug && <Loader2 size={13} className="animate-spin" />}
-                            {busySlug === entry.slug ? t("templates.loadingShort") : t("templates.load")}
-                          </button>
-                        </article>
-                        );
-                      })}
-                    </div>
-                  )}
-                  {!catalogLoading && catalog && visibleTeams.length === 0 && (
-                    <div className="flex min-h-56 flex-col items-center justify-center text-center">
-                      <div className="text-[14px] font-medium text-ink">{t("templates.noneFound")}</div>
-                      <div className="mt-1 text-[13px] text-ink-secondary">{t("templates.tryDifferentSearch")}</div>
-                    </div>
-                  )}
-                </div>
-              )}
-
               {tab === "import" && (
                 <div>
                   <input
                     ref={fileInputRef}
                     type="file"
-                    accept=".md,.json,.hezuobackup.json,.hezuoteam.json,text/markdown,application/json"
+                    accept=".md,.json,.hezuobackup.json,text/markdown,application/json"
                     className="hidden"
                     onChange={(event) => {
                       const file = event.currentTarget.files?.[0];
@@ -838,7 +704,7 @@ export function TeamLibraryPanel({
                       aria-label={t("templates.projectFolder")}
                       className="min-w-0 flex-1 rounded-xl bg-raised/80 px-3 py-2.5 text-[13px] text-ink placeholder:text-ink-secondary focus:outline-none"
                     />
-                    {Boolean(window.ogb?.pickFolder) && (
+                    {Boolean(window.hezuo?.pickFolder) && (
                       <button
                         onClick={() => void pickScoutFolder()}
                         disabled={scouting}

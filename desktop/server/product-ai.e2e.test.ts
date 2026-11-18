@@ -17,8 +17,8 @@ import {
 import { startFakeHttpMcp, type FakeHttpMcp } from "./testing/fake-http-mcp-server.ts";
 import { recordEvents } from "./testing/events.ts";
 
-const TOKEN = `omb_product_ai_${"a".repeat(22)}.${"b".repeat(43)}`;
-const NEXT_TOKEN = `omb_product_ai_${"c".repeat(22)}.${"d".repeat(43)}`;
+const TOKEN = `hezuo_product_ai_${"a".repeat(22)}.${"b".repeat(43)}`;
+const NEXT_TOKEN = `hezuo_product_ai_${"c".repeat(22)}.${"d".repeat(43)}`;
 const PERSONAL_KEY = "sk-personal-must-never-be-used";
 
 const usage = { prompt_tokens: 10, completion_tokens: 4, prompt_tokens_details: { cached_tokens: 0 } };

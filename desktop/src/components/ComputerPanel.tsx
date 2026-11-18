@@ -1,12 +1,11 @@
-import "@/lib/hezuo-preferences-migration";
 import { boatCapableEngine, cloudEngineOf } from "@/lib/remote-desktop";
 import { canWorkOnCloud } from "../../../packages/shared/cloud-computer";
 import { viewerTargetId } from "../../../packages/shared/desktop-viewer";
-import { Switch } from "./SettingsPrimitives";
+import { ComputerBrowserSwitchRow, ComputerRoutinesCard } from "./ComputerPanelCards";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { waitForLocalVmReady } from "@/lib/local-vm-readiness";
-import { CalendarClock, ChevronRight, Columns2, Box, Check, Cloud, Sparkles, Globe, Hand, Loader2, Maximize2, Monitor, Moon, Power, Settings, X } from "lucide-react";
+import { Columns2, Box, Check, Cloud, Sparkles, Globe, Hand, Loader2, Maximize2, Monitor, Moon, Power, Settings, X } from "lucide-react";
 import { api, ApiError, currentTaskBot, useStore, type Bot, type ConfigStatus } from "@/state/store";
 import { setAdvancedMode, useAdvancedMode } from "@/lib/interface-mode";
 import { ComputerFilesPane } from "./ComputerFilesPane";
@@ -22,11 +21,9 @@ import { isActiveTurnRefusal, isRemoteScreenshotContention } from "@/lib/remote-
 import { CloudBackendPicker } from "./CloudBackendPicker";
 import { useDesktopCapabilities } from "./DesktopCapabilities";
 import { RoutinesSection } from "./bot-settings/RoutinesSection";
-import { routineRunLabel, routineRunTone } from "@/lib/routine-display";
 import { AndroidDevicePanel, useAndroidUsbDevices } from "./AndroidDevicePanel";
 import { BrowserPanel } from "./BrowserPanel";
 import { usePanelPage, type PanelPage } from "@/lib/page-open";
-import { useBrowserTakeover } from "@/lib/browser-takeover";
 const DataPanel = lazy(() => import("./data/DataPanel").then((module) => ({ default: module.DataPanel })));
 const loadLiveDesktop = () => import("./LiveDesktop").then((module) => ({ default: module.LiveDesktop }));
 const LiveDesktop = lazy(loadLiveDesktop);
@@ -259,13 +256,7 @@ export function ComputerPanel({
   const errorText = panelErrorText(error);
   const advanced = useAdvancedMode();
   const [storedPanelView, setPanelView] = useState<ComputerPanelView>(() => readComputerPanelView(bot.id));
-  const [browserTakeover, setBrowserTakeover] = useState<{ target: string; nonce: number } | null>(null);
   const browserTarget = `${profileBot.id}:${profileBot.threadId}`;
-  useBrowserTakeover(profileBot.id, profileBot.threadId, (nonce) => {
-    explicitPanelView.current = true;
-    setBrowserTakeover({ target: browserTarget, nonce });
-    setPanelView("browser");
-  });
   const requestedDataResult = state.dataResultFocus?.botId === bot.id ? state.dataResultFocus : undefined;
   const [dataRequest, setDataRequest] = useState<{ id: string; requestId: number }>();
   const androidStatus = useAndroidUsbDevices();
@@ -325,7 +316,6 @@ export function ComputerPanel({
     if (previous === panelTargetKey) return;
     if (previous !== null) {
       explicitPanelView.current = false;
-      setBrowserTakeover(null);
       setSignInRequest(undefined);
       setPageRequest(undefined);
     }
@@ -359,7 +349,7 @@ export function ComputerPanel({
 
   useEffect(() => {
     let alive = true;
-    const dv = window.ogb?.desktopViewer;
+    const dv = window.hezuo?.desktopViewer;
     if (dv?.currentState) {
       void dv
         .currentState()
@@ -791,12 +781,12 @@ export function ComputerPanel({
   // 15+), so repeated empty frames mean denied.
   const [localMisses, setLocalMisses] = useState(0);
   useEffect(() => {
-    if (panelView !== "computer" || phase !== "local" || !computerStatusCurrent || !window.ogb || isLinux || !pageVisible) return;
+    if (panelView !== "computer" || phase !== "local" || !computerStatusCurrent || !window.hezuo || isLinux || !pageVisible) return;
     let alive = true;
     setLocalMisses(0);
     const shoot = async () => {
       try {
-        const url = await window.ogb!.screenFrame();
+        const url = await window.hezuo!.screenFrame();
         if (alive && url) setLocalFrame(url);
         else if (alive) setLocalMisses((n) => n + 1);
       } catch {
@@ -922,7 +912,7 @@ export function ComputerPanel({
 
   const handBack = async () => {
     setError(null);
-    void window.ogb?.desktopViewer?.close(bot.id);
+    void window.hezuo?.desktopViewer?.close(bot.id);
     await takeover.handBack().catch((cause) => setError(cause instanceof Error ? cause : String(cause)));
   };
 
@@ -1091,19 +1081,14 @@ export function ComputerPanel({
     dispatch({ type: "updateBot", botId: profileBot.id, patch: { browser: false } });
   };
   const browserSwitchRow = (
-    <div data-testid="browser-switch-row" className="mb-3 flex items-center gap-3 rounded-xl bg-card px-3 py-2.5">
-      <Globe size={15} className="shrink-0 text-ink-secondary" aria-hidden="true" />
-      <div className="min-w-0 flex-1">
-        <div className="text-[13px] font-medium text-ink">{t("computer.browserSwitch.title", { name: bot.name })}</div>
-        {!browserCanTurnOn && <div className="text-[12px] text-ink-secondary">{browserUnavailableReason(state.config)}</div>}
-      </div>
-      <Switch
-        checked={browserEnabled}
-        disabled={browserTurningOn || (!browserEnabled && !browserCanTurnOn)}
-        aria-label={t("computer.browserSwitch.title", { name: bot.name })}
-        onClick={() => (browserEnabled ? turnOffBrowser() : void turnOnBrowser())}
-      />
-    </div>
+    <ComputerBrowserSwitchRow
+      botName={bot.name}
+      canTurnOn={browserCanTurnOn}
+      unavailableReason={!browserCanTurnOn ? browserUnavailableReason(state.config) : undefined}
+      enabled={browserEnabled}
+      turningOn={browserTurningOn}
+      onToggle={() => (browserEnabled ? turnOffBrowser() : void turnOnBrowser())}
+    />
   );
 
   const managedPolicy = state.config?.managedPolicy;
@@ -1285,7 +1270,7 @@ export function ComputerPanel({
         <div {...tabPanelProps("browser")} className={cn("flex min-h-0 flex-1 flex-col px-4 pb-4", TAB_PANEL_FOCUS)}>
           {browserSwitchRow}
           {signInHelp?.place === "browser" && <div className="-mt-1 mb-3">{signInBanner()}</div>}
-          <BrowserPanel key={browserTarget} bot={bot} signIn={signInRequest} page={pageRequest} takeover={browserTakeover?.target === browserTarget ? browserTakeover.nonce : undefined} />
+          <BrowserPanel key={browserTarget} bot={bot} signIn={signInRequest} page={pageRequest} />
           {errorText && (
             <div role="alert" className="mt-2 rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-[12px] text-danger">
               {errorText}
@@ -1423,7 +1408,7 @@ export function ComputerPanel({
               {bot.computer === "cloud" && (phase === "unconfigured" || phase === "error") && cloudView.action?.id !== "add-boat-key" && placeActionButton(cloudView)}
               {phase === "local" && !isLinux && localMisses >= 3 && (
                 <button
-                  onClick={() => window.ogb?.permOpenSettings?.("screen")}
+                  onClick={() => window.hezuo?.permOpenSettings?.("screen")}
                   className="mt-1 rounded-lg bg-control px-3 py-1.5 text-[12px] text-ink hover:bg-raised-hover"
                 >
                   {t("computer.openSettings")}
@@ -1562,7 +1547,7 @@ export function ComputerPanel({
         {advanced &&
           phase === "vm" &&
           vmStatus?.mode === "per-bot" &&
-          window.ogb?.desktopWorkspace &&
+          window.hezuo?.desktopWorkspace &&
           onOpenVmWorkspace && (
             <button
               type="button"
@@ -1751,14 +1736,11 @@ export function ComputerPanel({
           )}
         </div>
 
-        <button type="button" onClick={() => selectPanelView("routines")} className="mt-4 flex w-full items-start gap-3 rounded-xl bg-card p-4 text-left hover:bg-raised">
-          <CalendarClock size={17} className="mt-0.5 shrink-0 text-accent" />
-          <span className="min-w-0 flex-1">
-            <span className="block text-[14px] font-medium text-ink">{t("computer.tab.routines")} <span className="ml-1 text-[11px] text-ink-secondary">{botRoutines.length}</span></span>
-            <span className={cn("mt-1 block truncate text-[12px]", activeRoutineRun ? routineRunTone(activeRoutineRun) : "text-ink-secondary")}>{activeRoutineRun ? `${activeRoutineRun.routineName} · ${routineRunLabel(activeRoutineRun)}` : t("computer.routines.openTitle")}</span>
-          </span>
-          <ChevronRight size={14} className="shrink-0 text-ink-secondary rtl:-scale-x-100" aria-hidden="true" />
-        </button>
+        <ComputerRoutinesCard
+          count={botRoutines.length}
+          activeRun={activeRoutineRun}
+          onOpen={() => selectPanelView("routines")}
+        />
         </> : (
           <div className="mt-4 rounded-xl bg-card p-4" data-testid="where-works">
             <div className="text-[15px] font-medium text-ink">{t("computer.simple.whereWorks", { name: bot.name })}</div>

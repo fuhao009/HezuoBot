@@ -4,7 +4,7 @@ A bot doing work another bot handed it asks the person with a card: a decision w
 engine's question tool, the bot's own choices as buttons, and any other question as the same card with a reply field in
 place of its `NEEDS INPUT:` line. On a Team Cloud the card's copy reaches the person's inbox with the same buttons, and
 an answer from either place, by tap or in the person's own words, reaches the bot. Contract:
-[`docs/runtime-contract.md`](../runtime-contract.md) §2 and §4; routing: [`docs/team-cloud.md`](../team-cloud.md).
+[`docs/runtime-contract.md`](../runtime-contract.md) §2 and §4; routing: the retired team-cloud guide (historical only) (retired guide; historical only).
 
 ## Server, end to end
 
@@ -99,8 +99,8 @@ pnpm exec vite --port 5287
 first-run cards that share the card's shell.
 
 The before-and-after screenshots were removed because they showed real example data. To see each screen, run the
-command above and open `desktop/question-cards-preview.html` in a 1338×870 window with these settings (for Phone, narrow the
-window to a phone's width):
+command above and open `desktop/question-cards-preview.html` in a 1338×870 window with these settings (for Narrow renderer,
+narrow the desktop browser window; this is not native-client evidence):
 
 | Screen | Settings |
 |---|---|
@@ -110,4 +110,4 @@ window to a phone's width):
 | Approval | `?state=approval&surface=chat&skin=daylight&mode=advanced` |
 | Open question, inbox | `?state=open&surface=inbox&skin=midnight&mode=simple` |
 | Answered | `?state=answered&surface=chat&skin=daylight&mode=simple` |
-| Phone | `?state=question&surface=chat&skin=midnight&mode=simple` |
+| Narrow renderer | `?state=question&surface=chat&skin=midnight&mode=simple` |

@@ -31,10 +31,10 @@ Only a run working in a conversation of its own is told that only its last
 reply leaves it (`NOTHING NEW`, `NEEDS INPUT:`). A "when my limit resets"
 continuation works in the person's own chat and is not.
 
-On a Cloud home, every run of a webhook or app-event automation reports into
+Historically, on a Cloud home, every webhook or app-event run reported into
 one "<name> · Results" chat of its own, and a routine someone other than the
-owner wrote keeps its own results chat, so no outside words reach the owner's
-other chats or a lent Mac.
+owner wrote kept its own results chat. That retired Cloud behavior is not a
+current verification recipe.
 
 ## The concurrency rule
 
@@ -53,7 +53,7 @@ waits on a teammate, is never taken for the run's result or failure.
 pnpm exec vitest run desktop/server/automation-reports.test.ts desktop/server/automation-reports.e2e.test.ts \
   desktop/server/routine-results.e2e.test.ts desktop/server/triggers.e2e.test.ts desktop/server/routines.test.ts \
   desktop/server/today.test.ts desktop/server/recent-work.test.ts desktop/src/components/ChatView.automation.test.ts desktop/src/lib/automations.test.ts
-pnpm exec vitest run desktop/server/cloud-routine-level.e2e.test.ts desktop/server/cloud-lending-memory.e2e.test.ts desktop/server/card-answerers.e2e.test.ts
+pnpm exec vitest run desktop/server/card-answerers.e2e.test.ts
 ```
 
 The end-to-end file runs the real server and Claude driver with the scripted

@@ -1,4 +1,3 @@
-import "./hezuo-preferences-migration";
 import { useSyncExternalStore } from "react";
 import type { LocaleKey } from "@/locales";
 import { t } from "./i18n";

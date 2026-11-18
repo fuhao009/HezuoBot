@@ -3,23 +3,21 @@ import { useEffect, useRef, useState } from "react";
 import { Check, Cloud, Laptop, Loader2, Trash2 } from "lucide-react";
 import { Card } from "./SettingsPrimitives";
 import { ComputerSharingSettings } from "./ComputerSharingSettings";
-import { CloudTile } from "./cloud-buy/parts";
-import { cloudColor } from "@/lib/cloud-look";
 import { useStore } from "@/state/store";
 import { sharedComputersEnabled } from "@/lib/feature-flags";
 import { productName } from "@/lib/brand";
 
-type SavedWorkspaces = Awaited<ReturnType<NonNullable<NonNullable<Window["ogb"]>["environments"]>["state"]>>;
+type SavedWorkspaces = Awaited<ReturnType<NonNullable<NonNullable<Window["hezuo"]>["environments"]>["state"]>>;
 type SavedEntry = SavedWorkspaces["environments"][number] | { id: string; name: string; origin: string; color: undefined };
 
 /** My Cloud, or another Cloud of the person's own: this computer is lent to it by itself, never through Computer access. */
 const ownCloud = (entry: SavedEntry) => ("home" in entry && entry.home === true) || ("cloud" in entry && Boolean(entry.cloud));
 
 export function ConnectedWorkspacesSettings() {
-  const bridge = window.ogb?.environments;
+  const bridge = window.hezuo?.environments;
   // Security: the desktop bridge alone is not enough; never offer access the server refuses.
   const { state } = useStore();
-  const sharingOffered = sharedComputersEnabled(state.config) && Boolean(window.ogb?.computerSharing);
+  const sharingOffered = sharedComputersEnabled(state.config) && Boolean(window.hezuo?.computerSharing);
   const [saved, setSaved] = useState<SavedWorkspaces | null>(null);
   const [address, setAddress] = useState("");
   const [name, setName] = useState("");
@@ -68,9 +66,9 @@ export function ConnectedWorkspacesSettings() {
     }
   };
   if (!bridge) return <p className="text-[13px] text-ink-secondary">Manage server connections in the desktop app.</p>;
-  const confirmAction = (message: string) => window.ogb?.confirm ? window.ogb.confirm(message) : window.confirm(message);
+  const confirmAction = (message: string) => window.hezuo?.confirm ? window.hezuo.confirm(message) : window.confirm(message);
   const connected = saved?.environments.find(entry => entry.id === computerId);
-  const computerWorkspace = connected?.origin && !connected.home ? { id: connected.id, name: connected.name, origin: connected.origin } : undefined;
+  const computerWorkspace = connected?.origin ? { id: connected.id, name: connected.name, origin: connected.origin } : undefined;
   const locals = saved?.environments.filter(entry => entry.kind === "local") ?? [];
   const forgetEntry = locals.find(entry => entry.id === envForget);
   return <>
@@ -150,7 +148,7 @@ export function ConnectedWorkspacesSettings() {
             const active = entry.id === saved.activeId;
             const Icon = entry.id === "local" ? Laptop : Cloud;
             return <li key={entry.id} className="flex items-center gap-3 py-3">
-              {cloudColor(entry.color) ? <CloudTile color={entry.color} size={20} /> : <Icon size={18} className="shrink-0 text-ink-secondary" />}
+              <Icon size={18} className="shrink-0 text-ink-secondary" />
               <div className="min-w-0 flex-1"><div className="truncate text-[13px] font-medium text-ink">{entry.name}</div>
                 <div className="break-all text-[12px] text-ink-secondary">{entry.origin || "Local bots and conversations"}</div></div>
               {active ? <span className="flex shrink-0 items-center gap-1 text-[12px] text-ink-secondary"><Check size={13} />Current</span> :

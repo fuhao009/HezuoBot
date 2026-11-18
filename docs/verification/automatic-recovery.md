@@ -16,7 +16,7 @@ Only its structured synthetic `authentication_failed` API-error frame followed
 by an error result with no new cost qualifies. The driver waits for its process
 tree to stop before reporting that refusal. Recovery skips
 other models on the same engine instance, since they share the failed sign-in.
-OMB tries the backup in the same thread with the canonical conversation.
+HezuoBot tries the backup in the same thread with the canonical conversation.
 The thread keeps the backup selection; bot defaults and sibling threads do not
 change. A visible activity line explains the switch.
 
@@ -74,7 +74,7 @@ to five). There is no switch; the card says when a backup is used.
 pnpm exec vitest run desktop/src/components/bot-panel/BackupAis.dom.test.ts desktop/src/components/BotSettingsDialog.simple.test.ts desktop/src/components/bot-settings/ModelSection.test.ts
 ```
 
-The pictures come from `control-omb ui launch --engine codex` (fake Claude and
+The pictures come from `control-hezuo ui launch --engine codex` (fake Claude and
 fake Codex in a disposable home): adding Codex in Simple saved
 `fallback: [{ instanceId: "codex", model: "gpt-fake-default" }]` on the bot and
 left `automaticRecovery` at `{ enabled: false }`.
@@ -85,7 +85,7 @@ left `automaticRecovery` at `{ enabled: false }`.
 
 | Adding | Changing | At 390px |
 | --- | --- | --- |
-| ![The Simple model menu for a new backup](evidence/simple-backup-models/after-add-menu.png) | ![The same menu with the backup checked](evidence/simple-backup-models/after-change-menu.png) | ![The card at phone width](evidence/simple-backup-models/after-phone-390.png) |
+| ![The Simple model menu for a new backup](evidence/simple-backup-models/after-add-menu.png) | ![The same menu with the backup checked](evidence/simple-backup-models/after-change-menu.png) | ![The desktop renderer card at 390px viewport width](evidence/simple-backup-models/after-phone-390.png) |
 
 Advanced shows the same list under Model, with words that no longer depend on
 the switch: ![Advanced Model section](evidence/simple-backup-models/after-advanced-model.png)

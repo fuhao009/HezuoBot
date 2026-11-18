@@ -119,7 +119,7 @@ describe("account lifecycle renewal and drain", () => {
 
 /** A throwaway certificate for the fixture service host, or null without openssl. */
 function certificate(altName = "DNS:operator.example", commonName = "operator.example") {
-  const directory = mkdtempSync(join(tmpdir(), "omb-account-ca-"));
+  const directory = mkdtempSync(join(tmpdir(), "hezuo-account-ca-"));
   try {
     const made = spawnSync("openssl", ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "2",
       "-keyout", join(directory, "key.pem"), "-out", join(directory, "cert.pem"),
@@ -159,7 +159,7 @@ const user = { id: "user-1", email: "ada@example.com" };
 
 const token = (suffix) => ({
   id: `22222222-2222-4222-8222-22222222222${suffix}`,
-  token: `omb_product_ai_${String(suffix).repeat(22).slice(0, 22)}.${"c".repeat(43)}`,
+  token: `hezuo_product_ai_${String(suffix).repeat(22).slice(0, 22)}.${"c".repeat(43)}`,
   expiresAt: 1_000_000,
 });
 

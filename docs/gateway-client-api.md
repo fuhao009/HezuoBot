@@ -1,11 +1,12 @@
 # 客户端接入网关 API：统一入口
 
-面向桌面端、Android、iOS 开发者。本文描述 `gateway/` 网关对客户端开放的协议，不是桌面本地 `desktop/server` 的完整业务 API。手机访问 bot、对话、工作区的 API 经中继到所属桌面，不能把网关当作云端对话数据库。
+面向桌面和网关开发者；手机端（iOS/Android 原生工程）已退役，不再作为活跃接入、发布或验收对象。通用 companion relay 和电脑配对继续保留。本文描述 `gateway/` 网关对客户端开放的协议，不是桌面本地 `desktop/server` 的完整业务 API。远程 companion 客户端访问 bot、对话、工作区的 API 经中继到所属桌面，不能把网关当作云端对话数据库。
 
 ## Git 与部署
 
-- 任务计费分支：`backend/task-aware-billing`，基于 `backend/gateway-v1-lan`；远端 `personal`（`github.com/fuhao009/OpenMausBot`）。
+- 任务计费分支：`backend/task-aware-billing`，基于 `backend/gateway-v1-lan`；推送前确认当前项目远端。
 - 实际部署提交、迁移与生产启用状态以 [部署记录](gateway-deployment-193.md) 为准；文档或隔离测试通过不代表生产已开启任务计费。
+- 本地 APNs 实现已删除，不再提供 APNs 兼容协议；本轮手机退役变更尚未部署到 `192.168.66.193`，本地源码和文档状态不能作为线上已删除手机/APNs 能力的证据。
 - 联调 base：`https://192.168.66.193:18487`；仅内网可达，不是公网地址。
 - 注册账号不自动获得 AI 权限、积分或管理员权限。真实上游未配置时，不能用健康接口 200 宣称模型可用。
 - 客户端只提交公开模型 ID，不持有渠道上游 key，不修改渠道配置。
@@ -22,8 +23,8 @@ git fetch personal backend/task-aware-billing
 | --- | --- |
 | 注册、密码登录、验证码、重置密码、退出、账号信息 | [认证 API](gateway-client-auth.md) |
 | 查询账号 AI 状态、模型令牌、Chat/Responses、积分流水 | 本文下方 |
-| 桌面注册、设备列表、凭据轮换、手机 HTTP/WebSocket 中继 | [设备与中继 API](gateway-client-devices.md) |
-| 可选 Cloudflare 托管端点、APNS 推送 | [设备与中继 API](gateway-client-devices.md) |
+| 桌面注册、设备列表、凭据轮换、远程 HTTP/WebSocket 中继 | [设备与中继 API](gateway-client-devices.md) |
+| 可选 Cloudflare 托管端点 | [设备与中继 API](gateway-client-devices.md) |
 | 可选 HighLevel OAuth | [认证 API](gateway-client-auth.md) |
 | 管理员身份、开通、充值、人工结算 | [管理 API](gateway-admin-api.md)，普通客户端不得调用 |
 | 渠道、上游密钥、模型定价管理 | [渠道 API](gateway-channels.md)，仅运营者 |
@@ -34,15 +35,15 @@ git fetch personal backend/task-aware-billing
 
 | 凭据 | 获取位置 | 用途 |
 | --- | --- | --- |
-| 账号会话 Bearer | 认证响应头 `set-auth-token`，签名后的原值 | `/v1/me`、账号 AI、安装管理、手机中继 |
+| 账号会话 Bearer | 认证响应头 `set-auth-token`，签名后的原值 | `/v1/me`、账号 AI、安装管理、companion 中继 |
 | 模型令牌 | `POST /v1/account/ai/tokens` 返回 `token` | `/v1/ai/models`、`/v1/ai/quote`、Chat/Responses；15 分钟 |
 | 安装凭据 | 创建/轮换桌面安装的响应 | `/v1/installations/self`、桌面中继隧道、端点与推送；90 天 |
 
-三者不可互换。上游 API key 不是任何客户端凭据。桌面安全进程和手机安全存储持有会话；不要把会话/model token 传入不可信 renderer、URL query、日志或 Git。客户端传 UUID `deviceId`，每台设备稳定保存，不要每次请求生成新设备身份。
+三者不可互换。上游 API key 不是任何客户端凭据。桌面安全进程和受信任客户端安全存储持有会话；不要把会话/model token 传入不可信 renderer、URL query、日志或 Git。客户端传 UUID `deviceId`，每台设备稳定保存，不要每次请求生成新设备身份。
 
 ### TLS
 
-证书位于服务器 `/var/lib/hezuo-gateway/tls/gateway-cert.pem`。通过可信 SSH 取得并核对，将其加入应用针对该 origin 的信任链；不能关闭 TLS 验证。手机的 `127.0.0.1` 是手机自己，不能填电脑回环地址。
+证书位于服务器 `/var/lib/hezuo-gateway/tls/gateway-cert.pem`。通过可信 SSH 取得并核对，将其加入应用针对该 origin 的信任链；不能关闭 TLS 验证。远程设备的 `127.0.0.1` 指设备自身，不能填桌面电脑的回环地址。
 
 以下 curl 示例假定调用者已通过安全方式设置环境变量，不包含真实凭据。`$CA` 为证书路径；公开 CA 证书部署可去掉 `--cacert`。不要用 `-k`。
 
@@ -52,7 +53,7 @@ export CA='/absolute/path/gateway-cert.pem'
 curl --cacert "$CA" "$BASE/healthz"
 ```
 
-期望 `200 {"ok":true,"service":"openmausbot-control-plane"}`，也可能有容量信息。该 service 值是已有协议标识，不能替换成产品显示名。单凭此响应无法证明账号、桌面在线或上游推理。
+期望 `200 {"ok":true,"service":"hezuobot-control-plane"}`，也可能有容量信息。单凭此响应无法证明账号、桌面在线或上游推理。
 
 ## 推荐调用顺序
 
@@ -283,7 +284,7 @@ curl --cacert "$CA" --get "$BASE/v1/account/ai/ledger" \
 - 区分未开通、停用、未配置、余额不足与可用，不把注册成功当 AI 开通。
 - 正确续签和撤销模型令牌；退出后旧令牌不可用。
 - 按公开模型协议选择端点，处理 JSON/SSE、错误与取消，凭据不进入日志。
-- 桌面注册/轮换，手机只查询所属安装并经中继访问；断线、离线和跨账号拒绝按设备文档处理。
+- 桌面注册/轮换，远程客户端只查询所属安装并经中继访问；断线、离线和跨账号拒绝按设备文档处理。
 - 提交问题时附客户端 SHA、后端部署 SHA、脱敏路径、HTTP/error code、时间和 request ID；不要附真实密码/token。
 
-本文档不是“所有功能已在生产打通”的声明：生产模型、任务计费策略、邮件/APNS/Cloudflare 托管端点按部署能力启用。通过隔离 fixture 验证的范围详见部署记录；未对生产账号注入测试积分或发起测试推理。
+本文档不是“所有功能已在生产打通”的声明：生产模型、任务计费策略、邮件/Cloudflare 托管端点按部署能力启用。本地 APNs 实现已删除，不再提供推送接入契约；193 尚未部署本轮退役变更，不表示线上已删除。通过隔离 fixture 验证的范围详见部署记录；未对生产账号注入测试积分或发起测试推理。

@@ -13,7 +13,6 @@ function questions(fullAccess: boolean): string {
     store: { bots: [chief, teammate], bot: () => teammate },
     isUnattended: () => false,
     startedOutside: () => false,
-    guestDriven: () => false,
     confined: () => false,
     fullAccess: () => fullAccess,
     readableFrom: () => () => true,

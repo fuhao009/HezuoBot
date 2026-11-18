@@ -275,31 +275,12 @@ describe("surfacePrompt", () => {
       .toBe(surfacePrompt({ computer: "vm", browser: false }, { canSelect: true }));
   });
 
-  const mounts: Array<{ computer: "cloud" | null; browser: boolean }> = [
-    { computer: "cloud", browser: false }, { computer: null, browser: true }, { computer: "cloud", browser: true }, { computer: null, browser: false },
-  ];
-  const shapes = mounts.flatMap((mounted) => ([{}, { canSelect: true }, { canSelect: true, pinned: "cloud" }] as Array<{ canSelect?: boolean; pinned?: "cloud" }>)
-    .map((opts) => ({ mounted, opts })));
 
-  it("tells a Cloud home's bots only about the places it has", () => {
-    for (const { mounted, opts } of shapes) {
-      const text = surfacePrompt(mounted, { ...opts, cloudHome: true });
-      expect(text, JSON.stringify({ mounted, opts })).not.toMatch(/Local VM|\bVM\b|host desktop|user's host|host window/);
-      if (mounted.computer || mounted.browser) {
-        expect(text).toContain("the cloud computer is remote, the built-in browser is a separate browser, and the user's own computer cannot be reached from here");
-        expect(text).toContain("never act on a different computer.");
-      }
-      if (opts.canSelect) expect(text).toContain("select an available cloud computer without asking");
-    }
-  });
-
-  it("leaves every other server's paragraph exactly as it was", () => {
-    for (const { mounted, opts } of shapes) {
-      expect(surfacePrompt(mounted, { ...opts, cloudHome: false })).toBe(surfacePrompt(mounted, opts));
-    }
+  it("distinguishes the host, Local VM and remote computer in surface guidance", () => {
     expect(surfacePrompt({ computer: "cloud", browser: true }, { canSelect: true }))
       .toContain("this computer is the user's host, Local VM is an isolated desktop, the cloud computer is remote");
   });
+
 });
 
 describe("surface parsing", () => {

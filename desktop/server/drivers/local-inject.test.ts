@@ -350,7 +350,7 @@ describe("codexLocalProviderArgs", () => {
 
 describe("ensureGrokInjectSlug", () => {
   it("writes a config block the first time and reuses it after", () => {
-    const home = mkdtempSync(join(tmpdir(), "omb-grok-inject-"));
+    const home = mkdtempSync(join(tmpdir(), "hezuo-grok-inject-"));
     scratchDirs.push(home);
     mkdirSync(join(home, ".grok"), { recursive: true });
     writeFileSync(join(home, ".grok", "config.toml"), "[cli]\nchannel = \"alpha\"\n");
@@ -363,7 +363,7 @@ describe("ensureGrokInjectSlug", () => {
   });
 
   it("writes the resolved Unsloth credential instead of a placeholder", () => {
-    const home = mkdtempSync(join(tmpdir(), "omb-grok-unsloth-"));
+    const home = mkdtempSync(join(tmpdir(), "hezuo-grok-unsloth-"));
     scratchDirs.push(home);
     mkdirSync(join(home, ".grok"), { recursive: true });
     ensureGrokInjectSlug("unsloth::local-model", {
@@ -375,7 +375,7 @@ describe("ensureGrokInjectSlug", () => {
   });
 
   it("puts the resolved oMLX slug after agent on the Grok child argv", async () => {
-    const home = mkdtempSync(join(tmpdir(), "omb-grok-argv-"));
+    const home = mkdtempSync(join(tmpdir(), "hezuo-grok-argv-"));
     scratchDirs.push(home);
     mkdirSync(join(home, ".grok"), { recursive: true });
     const dump = join(home, "dump.json");
@@ -418,7 +418,7 @@ describe("ensureGrokInjectSlug", () => {
 
 describe("ensureKimiInjectAlias", () => {
   it("writes an openai_legacy provider and model alias without touching hooks", () => {
-    const home = mkdtempSync(join(tmpdir(), "omb-kimi-inject-"));
+    const home = mkdtempSync(join(tmpdir(), "hezuo-kimi-inject-"));
     scratchDirs.push(home);
     const root = join(home, ".kimi-code");
     mkdirSync(root, { recursive: true });
@@ -437,7 +437,7 @@ describe("ensureKimiInjectAlias", () => {
   });
 
   it("amends an existing alias with protocol and context size and leaves user keys", () => {
-    const home = mkdtempSync(join(tmpdir(), "omb-kimi-patch-"));
+    const home = mkdtempSync(join(tmpdir(), "hezuo-kimi-patch-"));
     scratchDirs.push(home);
     const root = join(home, ".kimi-code");
     mkdirSync(root, { recursive: true });
@@ -471,7 +471,7 @@ describe("ensureKimiInjectAlias", () => {
   });
 
   it("does not overwrite a user's protocol or context size", () => {
-    const home = mkdtempSync(join(tmpdir(), "omb-kimi-keep-"));
+    const home = mkdtempSync(join(tmpdir(), "hezuo-kimi-keep-"));
     scratchDirs.push(home);
     const root = join(home, ".kimi-code");
     mkdirSync(root, { recursive: true });
@@ -495,7 +495,7 @@ describe("ensureKimiInjectAlias", () => {
   });
 
   it("treats a quoted protocol key as already set and does not duplicate it", () => {
-    const home = mkdtempSync(join(tmpdir(), "omb-kimi-quoted-"));
+    const home = mkdtempSync(join(tmpdir(), "hezuo-kimi-quoted-"));
     scratchDirs.push(home);
     const root = join(home, ".kimi-code");
     mkdirSync(root, { recursive: true });
@@ -516,7 +516,7 @@ describe("ensureKimiInjectAlias", () => {
   });
 
   it("finds a heading with a trailing comment and does not append a second table", () => {
-    const home = mkdtempSync(join(tmpdir(), "omb-kimi-heading-"));
+    const home = mkdtempSync(join(tmpdir(), "hezuo-kimi-heading-"));
     scratchDirs.push(home);
     const root = join(home, ".kimi-code");
     mkdirSync(root, { recursive: true });
@@ -532,7 +532,7 @@ describe("ensureKimiInjectAlias", () => {
   });
 
   it("does not hide a model table behind an apostrophe in a preceding comment", () => {
-    const home = mkdtempSync(join(tmpdir(), "omb-kimi-apos-"));
+    const home = mkdtempSync(join(tmpdir(), "hezuo-kimi-apos-"));
     scratchDirs.push(home);
     const root = join(home, ".kimi-code");
     mkdirSync(root, { recursive: true });
@@ -555,7 +555,7 @@ describe("ensureKimiInjectAlias", () => {
   });
 
   it("stops a model table before a following array-of-tables heading", () => {
-    const home = mkdtempSync(join(tmpdir(), "omb-kimi-aot-"));
+    const home = mkdtempSync(join(tmpdir(), "hezuo-kimi-aot-"));
     scratchDirs.push(home);
     const root = join(home, ".kimi-code");
     mkdirSync(root, { recursive: true });
@@ -579,7 +579,7 @@ describe("ensureKimiInjectAlias", () => {
   });
 
   it("treats a unicode-escaped model key as the same table as the literal alias", () => {
-    const home = mkdtempSync(join(tmpdir(), "omb-kimi-unicode-"));
+    const home = mkdtempSync(join(tmpdir(), "hezuo-kimi-unicode-"));
     scratchDirs.push(home);
     const root = join(home, ".kimi-code");
     mkdirSync(root, { recursive: true });
@@ -596,7 +596,7 @@ describe("ensureKimiInjectAlias", () => {
   });
 
   it("does not treat a malformed escape as a canonical alias", () => {
-    const home = mkdtempSync(join(tmpdir(), "omb-kimi-badesc-"));
+    const home = mkdtempSync(join(tmpdir(), "hezuo-kimi-badesc-"));
     scratchDirs.push(home);
     const root = join(home, ".kimi-code");
     mkdirSync(root, { recursive: true });
@@ -614,7 +614,7 @@ describe("ensureKimiInjectAlias", () => {
   });
 
   it("treats whitespace around dotted heading keys as the same table", () => {
-    const home = mkdtempSync(join(tmpdir(), "omb-kimi-dots-"));
+    const home = mkdtempSync(join(tmpdir(), "hezuo-kimi-dots-"));
     scratchDirs.push(home);
     const root = join(home, ".kimi-code");
     mkdirSync(root, { recursive: true });
@@ -630,7 +630,7 @@ describe("ensureKimiInjectAlias", () => {
   });
 
   it("does not treat a triple-quote inside a single-line string as multiline", () => {
-    const home = mkdtempSync(join(tmpdir(), "omb-kimi-squote-"));
+    const home = mkdtempSync(join(tmpdir(), "hezuo-kimi-squote-"));
     scratchDirs.push(home);
     const root = join(home, ".kimi-code");
     mkdirSync(root, { recursive: true });
@@ -652,7 +652,7 @@ describe("ensureKimiInjectAlias", () => {
   });
 
   it("does not treat a triple-quote inside a comment as multiline", () => {
-    const home = mkdtempSync(join(tmpdir(), "omb-kimi-hash-"));
+    const home = mkdtempSync(join(tmpdir(), "hezuo-kimi-hash-"));
     scratchDirs.push(home);
     const root = join(home, ".kimi-code");
     mkdirSync(root, { recursive: true });
@@ -674,7 +674,7 @@ describe("ensureKimiInjectAlias", () => {
   });
 
   it("does not treat a bracket line inside a multiline string as a table", () => {
-    const home = mkdtempSync(join(tmpdir(), "omb-kimi-ml-"));
+    const home = mkdtempSync(join(tmpdir(), "hezuo-kimi-ml-"));
     scratchDirs.push(home);
     const root = join(home, ".kimi-code");
     mkdirSync(root, { recursive: true });
@@ -704,7 +704,7 @@ describe("ensureKimiInjectAlias", () => {
   });
 
   it("treats USERPROFILE as the same home for credentials and config", async () => {
-    const home = mkdtempSync(join(tmpdir(), "omb-kimi-userprofile-"));
+    const home = mkdtempSync(join(tmpdir(), "hezuo-kimi-userprofile-"));
     scratchDirs.push(home);
     mkdirSync(join(home, ".kimi-code", "credentials"), { recursive: true });
     writeFileSync(join(home, ".kimi-code", "credentials", "kimi-code.json"), "{}");
@@ -756,7 +756,7 @@ describe("applyKimiLocalModelEnv", () => {
   });
 
   it("puts the overlay on the Kimi child only for a local inject pick", async () => {
-    const home = mkdtempSync(join(tmpdir(), "omb-kimi-overlay-"));
+    const home = mkdtempSync(join(tmpdir(), "hezuo-kimi-overlay-"));
     scratchDirs.push(home);
     mkdirSync(join(home, ".kimi-code"), { recursive: true });
     const dump = join(home, "dump.json");
@@ -799,7 +799,7 @@ describe("applyKimiLocalModelEnv", () => {
 
 describe("ensureDroidInjectModel", () => {
   it("upserts a generic-chat-completion BYOK row and reuses it", () => {
-    const home = mkdtempSync(join(tmpdir(), "omb-droid-inject-"));
+    const home = mkdtempSync(join(tmpdir(), "hezuo-droid-inject-"));
     scratchDirs.push(home);
     mkdirSync(join(home, ".factory"), { recursive: true });
     writeFileSync(join(home, ".factory", "settings.json"), JSON.stringify({ hooks: { Stop: [] } }));
@@ -822,7 +822,7 @@ describe("ensureDroidInjectModel", () => {
   });
 
   it("persists a generated id onto a matching customModels row that has none", () => {
-    const home = mkdtempSync(join(tmpdir(), "omb-droid-inject-noid-"));
+    const home = mkdtempSync(join(tmpdir(), "hezuo-droid-inject-noid-"));
     scratchDirs.push(home);
     mkdirSync(join(home, ".factory"), { recursive: true });
     writeFileSync(
@@ -861,7 +861,7 @@ describe("applyDroidLocalAuthEnv", () => {
   });
 
   it("does not invent a Factory key when a Droid auth file already exists", () => {
-    const home = mkdtempSync(join(tmpdir(), "omb-droid-authfile-"));
+    const home = mkdtempSync(join(tmpdir(), "hezuo-droid-authfile-"));
     scratchDirs.push(home);
     mkdirSync(join(home, ".factory"), { recursive: true });
     writeFileSync(join(home, ".factory", "auth.v2.file"), "signed-in");
@@ -871,7 +871,7 @@ describe("applyDroidLocalAuthEnv", () => {
   });
 
   it("puts the placeholder on the Droid child only for a local inject pick", async () => {
-    const home = mkdtempSync(join(tmpdir(), "omb-droid-overlay-"));
+    const home = mkdtempSync(join(tmpdir(), "hezuo-droid-overlay-"));
     scratchDirs.push(home);
     mkdirSync(join(home, ".factory"), { recursive: true });
     const dump = join(home, "dump.json");
@@ -909,7 +909,7 @@ describe("applyDroidLocalAuthEnv", () => {
 
 describe("ensureOpenCodeInjectModel", () => {
   it("merges a host provider into opencode.json without dropping existing models", () => {
-    const home = mkdtempSync(join(tmpdir(), "omb-opencode-inject-"));
+    const home = mkdtempSync(join(tmpdir(), "hezuo-opencode-inject-"));
     scratchDirs.push(home);
     const dir = join(home, ".config", "opencode");
     mkdirSync(dir, { recursive: true });
@@ -937,7 +937,7 @@ describe("ensureOpenCodeInjectModel", () => {
   });
 
   it("injects into a default object when opencode.json is malformed", () => {
-    const home = mkdtempSync(join(tmpdir(), "omb-opencode-bad-json-"));
+    const home = mkdtempSync(join(tmpdir(), "hezuo-opencode-bad-json-"));
     scratchDirs.push(home);
     const dir = join(home, ".config", "opencode");
     mkdirSync(dir, { recursive: true });
@@ -952,7 +952,7 @@ describe("ensureOpenCodeInjectModel", () => {
 
 describe("ensureHermesInjectProvider", () => {
   it("writes a named custom provider and returns the ACP model id", () => {
-    const home = mkdtempSync(join(tmpdir(), "omb-hermes-inject-"));
+    const home = mkdtempSync(join(tmpdir(), "hezuo-hermes-inject-"));
     scratchDirs.push(home);
     mkdirSync(join(home, ".hermes"), { recursive: true });
     writeFileSync(join(home, ".hermes", "config.yaml"), "model:\n  provider: auto\n  base_url: https://openrouter.ai/api/v1\n");
@@ -969,7 +969,7 @@ describe("ensureHermesInjectProvider", () => {
   });
 
   it("replaces a nested provider block without leaving orphan YAML lines", () => {
-    const home = mkdtempSync(join(tmpdir(), "omb-hermes-nested-"));
+    const home = mkdtempSync(join(tmpdir(), "hezuo-hermes-nested-"));
     scratchDirs.push(home);
     mkdirSync(join(home, ".hermes"), { recursive: true });
     writeFileSync(
@@ -998,7 +998,7 @@ describe("ensureHermesInjectProvider", () => {
 
 describe("ensureQwenInjectModel", () => {
   it("upserts an OpenAI-compatible provider without dropping existing rows", () => {
-    const home = mkdtempSync(join(tmpdir(), "omb-qwen-inject-"));
+    const home = mkdtempSync(join(tmpdir(), "hezuo-qwen-inject-"));
     scratchDirs.push(home);
     mkdirSync(join(home, ".qwen"), { recursive: true });
     writeFileSync(
@@ -1023,7 +1023,7 @@ describe("ensureQwenInjectModel", () => {
   });
 
   it("injects into a default object when settings.json is malformed", () => {
-    const home = mkdtempSync(join(tmpdir(), "omb-qwen-bad-json-"));
+    const home = mkdtempSync(join(tmpdir(), "hezuo-qwen-bad-json-"));
     scratchDirs.push(home);
     mkdirSync(join(home, ".qwen"), { recursive: true });
     writeFileSync(join(home, ".qwen", "settings.json"), "{not-json");
@@ -1044,7 +1044,7 @@ describe("live Custom lists on every local CLI harness", () => {
       }
       return new Response("nope", { status: 500 });
     }) as typeof fetch;
-    const home = mkdtempSync(join(tmpdir(), "omb-all-inject-"));
+    const home = mkdtempSync(join(tmpdir(), "hezuo-all-inject-"));
     scratchDirs.push(home);
     const environment = { HOME: home, HEZUO_PROBE_LOCAL_INJECT: "1" };
     const instances: Array<Awaited<ReturnType<typeof KimiAgentDriver.create>>> = [];

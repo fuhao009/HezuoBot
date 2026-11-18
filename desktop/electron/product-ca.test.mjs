@@ -25,7 +25,7 @@ afterEach(async () => {
 /** A throwaway self-signed leaf and a throwaway CA root, or null where no
  * openssl runs (the platform tests that need one skip). */
 async function certificates() {
-  const directory = await mkdtemp(path.join(tmpdir(), "omb-product-ca-"));
+  const directory = await mkdtemp(path.join(tmpdir(), "hezuo-product-ca-"));
   cleanups.push(() => rm(directory, { recursive: true, force: true }));
   const make = (name, args) => {
     const made = spawnSync("openssl", ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "2",
@@ -36,7 +36,7 @@ async function certificates() {
   const leaf = make("leaf", ["-subj", "/CN=127.0.0.1", "-addext", "subjectAltName=IP:127.0.0.1"]);
   const wrongLeaf = make("wrong", ["-subj", "/CN=127.0.0.1", "-addext", "subjectAltName=IP:127.0.0.1"]);
   const otherLeaf = make("other", ["-subj", "/CN=127.0.0.1", "-addext", "subjectAltName=IP:10.0.0.1"]);
-  const ca = make("root", ["-subj", "/CN=Hezuo fixture root", "-addext", "basicConstraints=critical,CA:TRUE",
+  const ca = make("root", ["-subj", "/CN=HezuoBot fixture root", "-addext", "basicConstraints=critical,CA:TRUE",
     "-addext", "keyUsage=critical,digitalSignature,keyCertSign", "-addext", "subjectAltName=DNS:gateway.example"]);
   const lanRoot = make("lan", ["-subj", "/CN=192.168.66.193", "-addext", "basicConstraints=critical,CA:TRUE",
     "-addext", "subjectAltName=IP:192.168.66.193"]);

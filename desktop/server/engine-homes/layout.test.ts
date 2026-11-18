@@ -42,8 +42,8 @@ linux("an audience's engine home", () => {
     const homed = homedSpawn({ HOME: serverHome, CLAUDE_CONFIG_DIR: "/data/.claude-work", CODEX_HOME: plan, XDG_CACHE_HOME: "/var/cache/x", GROK_HOME: "relative/grok" },
       { dataDir, serverHome, home: bob });
     expect(homed.env.CLAUDE_CONFIG_DIR).toBe(`${bob}/.claude-work`);
-    expect(homed.env.CODEX_HOME).toMatch(new RegExp(`^${bob}/\\.omb-folders/CODEX_HOME-[0-9a-f]{12}$`));
-    expect(homed.env.XDG_CACHE_HOME).toMatch(new RegExp(`^${bob}/\\.omb-folders/XDG_CACHE_HOME-[0-9a-f]{12}$`));
+    expect(homed.env.CODEX_HOME).toMatch(new RegExp(`^${bob}/\\.hezuo-folders/CODEX_HOME-[0-9a-f]{12}$`));
+    expect(homed.env.XDG_CACHE_HOME).toMatch(new RegExp(`^${bob}/\\.hezuo-folders/XDG_CACHE_HOME-[0-9a-f]{12}$`));
     expect(homed.env.GROK_HOME).toBe("relative/grok");
     expect(homed.folders).toEqual(expect.arrayContaining([`${bob}/.claude-work`, homed.env.CODEX_HOME, homed.env.XDG_CACHE_HOME]));
     expect(homed.shared).toContainEqual({ source: "/data/.claude-work/.credentials.json", target: `${bob}/.claude-work/.credentials.json` });
@@ -63,7 +63,7 @@ linux("an audience's engine home", () => {
 });
 
 describe("the audience homes made so far", () => {
-  const root = mkdtempSync(join(tmpdir(), "omb-engine-homes-"));
+  const root = mkdtempSync(join(tmpdir(), "hezuo-engine-homes-"));
   afterAll(() => rmSync(root, { recursive: true, force: true }));
   it("are the team's, the group chats' and the people's, never the held folder or anything else there", () => {
     for (const name of ["team", `member-${"a".repeat(16)}`, `room-${"b".repeat(16)}`, ".held", ".migrated-x", "member-xyz"]) mkdirSync(join(root, "engine-homes", name), { recursive: true });

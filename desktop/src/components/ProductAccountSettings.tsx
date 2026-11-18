@@ -25,13 +25,13 @@ export function ProductAccountSettings() {
             </p>
           )}
           <div className="flex flex-wrap items-center gap-2">
-            <button type="button" className="ui-button" disabled={!window.ogb?.productAccount}
-              onClick={() => { void window.ogb?.productAccount?.refresh().finally(ledger.reload); }}>
+            <button type="button" className="ui-button" disabled={!window.hezuo?.productAccount}
+              onClick={() => { void window.hezuo?.productAccount?.refresh().finally(ledger.reload); }}>
               <RefreshCw size={14} aria-hidden="true" className="mr-1.5 inline align-[-2px]" />
               {t(state.errorCode === "installation_replaced" ? "product.lifecycle.continueHere" : "product.refresh")}
             </button>
-            <button type="button" className="ui-button" disabled={!window.ogb?.productAccount}
-              onClick={() => { void window.ogb?.productAccount?.signOut(); }}>
+            <button type="button" className="ui-button" disabled={!window.hezuo?.productAccount}
+              onClick={() => { void window.hezuo?.productAccount?.signOut(); }}>
               {t("product.signOut")}
             </button>
           </div>
@@ -103,7 +103,7 @@ export function ProductAccountSettings() {
 }
 
 function CurrentAccountOperator({ email, onRefresh }: { email: string; onRefresh: () => void }) {
-  const bridge = window.ogb?.productAccount;
+  const bridge = window.hezuo?.productAccount;
   const [status, setStatus] = useState<ProductOperatorStatus>();
   const [confirming, setConfirming] = useState(false);
   const [pending, setPending] = useState(false);

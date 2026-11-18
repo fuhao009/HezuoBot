@@ -78,10 +78,23 @@ describe("vitest shard balance", () => {
     expect(shuffled.map((file) => forward[FILES.indexOf(file)])).toEqual(backward);
   });
 
+  it("rebalances the remaining files after a deletion instead of preserving shard membership", () => {
+    const files = ["a.test.ts", "b.test.ts", "c.test.ts", "d.test.ts", "e.test.ts", "f.test.ts"];
+    const weights = Object.fromEntries(files.map((file, index) => [file, 10 - index]));
+    const before = planShards(files, weights, 2);
+    const remaining = files.slice(1);
+    const after = planShards(remaining, weights, 2);
+    expect(files.filter((_, index) => before.shardOf[index] === 0)).toEqual(["a.test.ts", "d.test.ts", "e.test.ts"]);
+    expect(remaining.filter((_, index) => after.shardOf[index] === 0)).toEqual(["b.test.ts", "e.test.ts", "f.test.ts"]);
+    expect(before.loads).toEqual([23, 22]);
+    expect(after.loads).toEqual([20, 15]);
+    expect([0, 1].flatMap((shard) => remaining.filter((_, index) => after.shardOf[index] === shard)).sort()).toEqual(remaining);
+  });
+
   it("keys Windows and POSIX paths the same way", () => {
-    expect(weightKey("/repo", "/repo/server/a.e2e.test.ts", path.posix)).toBe("desktop/server/a.e2e.test.ts");
-    expect(weightKey("D:/a/repo", "D:/a/repo/server/a.e2e.test.ts", path.win32)).toBe("desktop/server/a.e2e.test.ts");
-    expect(weightKey("D:\\a\\repo", "d:/a/repo/server/drivers/b.test.ts", path.win32)).toBe("desktop/server/drivers/b.test.ts");
+    expect(weightKey("/repo", "/repo/desktop/server/a.e2e.test.ts", path.posix)).toBe("desktop/server/a.e2e.test.ts");
+    expect(weightKey("D:/a/repo", "D:/a/repo/desktop/server/a.e2e.test.ts", path.win32)).toBe("desktop/server/a.e2e.test.ts");
+    expect(weightKey("D:\\a\\repo", "d:/a/repo/desktop/server/drivers/b.test.ts", path.win32)).toBe("desktop/server/drivers/b.test.ts");
     expect(weightKey("D:/a/repo", "C:/elsewhere/c.test.ts", path.win32)).toBeNull();
     expect(weightKey("/repo", "/other/c.test.ts", path.posix)).toBeNull();
   });
@@ -107,19 +120,19 @@ describe("vitest shard balance", () => {
 
   it("logs its split, and annotates a CI run whose weights match no files", async () => {
     vi.stubEnv("GITHUB_ACTIONS", "true");
-    // The Windows and macOS CI shards run this file with OMB_VITEST_E2E=host.
-    vi.stubEnv("OMB_VITEST_E2E", "");
+    // The Windows and macOS CI shards run this file with HEZUO_VITEST_E2E=host.
+    vi.stubEnv("HEZUO_VITEST_E2E", "");
     const lines: string[] = [];
     await new DurationSequencer(context(2, 4, (line) => lines.push(line))).shard(specs(FILES));
     expect(lines).toEqual([expect.stringMatching(new RegExp(`^duration-sequencer: shard 2/4 runs \\d+ of ${FILES.length} files, ~\\d+s recorded; ${Object.keys(WEIGHTS).length} of ${Object.keys(WEIGHTS).length} weighted files found$`))]);
 
     lines.length = 0;
-    vi.stubEnv("OMB_VITEST_E2E", "host");
+    vi.stubEnv("HEZUO_VITEST_E2E", "host");
     const hostFiles = FILES.filter((file) => !isPortableE2e(file));
     const hostWeighted = Object.keys(WEIGHTS).filter((file) => !isPortableE2e(file)).length;
     await new DurationSequencer(context(1, 4, (line) => lines.push(line))).shard(specs(hostFiles));
     expect(lines).toEqual([expect.stringMatching(new RegExp(`; ${hostWeighted} of ${hostWeighted} weighted files found$`))]);
-    vi.stubEnv("OMB_VITEST_E2E", "");
+    vi.stubEnv("HEZUO_VITEST_E2E", "");
 
     lines.length = 0;
     const elsewhere = FILES.map((file) => ({ moduleId: path.join(ROOT, "..", "elsewhere", file) }) as TestSpecification);
@@ -127,7 +140,7 @@ describe("vitest shard balance", () => {
     expect(lines[1]).toMatch(/^::warning title=duration-sequencer::Only 0 of \d+ weighted test files were found/);
 
     lines.length = 0;
-    vi.stubEnv("OMB_VITEST_SUBSET", "desktop/src/ scripts/generate-locale.test.mjs");
+    vi.stubEnv("HEZUO_VITEST_SUBSET", "desktop/src/ scripts/generate-locale.test.mjs");
     await new DurationSequencer(context(1, 2, (line) => lines.push(line))).shard(specs(FILES.filter((file) => file.startsWith("desktop/src/"))));
     expect(lines).toEqual([expect.stringMatching(/^duration-sequencer: shard 1\/2 runs \d+ of \d+ files/)]);
   });

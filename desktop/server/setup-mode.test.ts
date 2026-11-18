@@ -136,15 +136,28 @@ describe("setupSystemPrompt for a Chief of Staff", () => {
 describe("connectedAppsForSetup", () => {
   const facts = { mounted: true, engine: true, configured: true, enabled: true, grants: undefined, host: "server" as const };
 
-  it("is available when the turn mounted the tools and the bot has any connected-app tools", () => {
+  it("is available when the turn mounted connection management and Connected apps is on", () => {
     expect(connectedAppsForSetup(facts)).toEqual({ state: "available" });
     expect(connectedAppsForSetup({ ...facts, grants: { gmail: { tools: "*" } } })).toEqual({ state: "available" });
   });
 
-  it("is off when this bot's switch is off or it was given no tools, even with the tools mounted", () => {
-    expect(connectedAppsForSetup({ ...facts, mounted: false, enabled: false })).toEqual({ state: "off", noTools: false });
-    expect(connectedAppsForSetup({ ...facts, grants: {} })).toEqual({ state: "off", noTools: true });
-    expect(connectedAppsForSetup({ ...facts, mounted: false, enabled: false, grants: {} })).toEqual({ state: "off", noTools: true });
+  it("offers connection management for a new bot without granting business tools or activating /setup", () => {
+    const grants = {};
+    const connectedApps = connectedAppsForSetup({ ...facts, grants });
+    expect(connectedApps).toEqual({ state: "available" });
+    expect(setupSystemPrompt(true, { connectedApps })).toContain("COMPOSIO_MANAGE_CONNECTIONS");
+    expect(setupSystemPrompt(false, { connectedApps })).toBe("");
+    expect(grants).toEqual({});
+  });
+
+  it("is off when this bot's switch is off, even with connection management mounted", () => {
+    for (const mounted of [false, true]) {
+      for (const grants of [undefined, {}, { gmail: { tools: "*" } }]) {
+        const connectedApps = connectedAppsForSetup({ ...facts, mounted, enabled: false, grants });
+        expect(connectedApps).toEqual({ state: "off", noTools: grants !== undefined && Object.keys(grants).length === 0 });
+        expect(setupSystemPrompt(true, { connectedApps })).not.toContain("COMPOSIO_");
+      }
+    }
   });
 
   it("is not configured when there is no connection service, saying where the bot runs", () => {
@@ -153,6 +166,7 @@ describe("connectedAppsForSetup", () => {
         .toEqual({ state: "not-configured", host });
     }
     expect(connectedAppsForSetup({ ...facts, mounted: false, host: "desktop" })).toEqual({ state: "not-configured", host: "desktop" });
+    expect(connectedAppsForSetup({ ...facts, mounted: false, grants: {} })).toEqual({ state: "not-configured", host: "server" });
   });
 
   it("is unsupported when the bot's model cannot mount connected apps at all", () => {

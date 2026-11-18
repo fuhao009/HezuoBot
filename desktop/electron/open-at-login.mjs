@@ -4,16 +4,16 @@
 import fs from "node:fs";
 import path from "node:path";
 
-export const HIDDEN_ARG = "--omb-hidden";
-const MARK = "X-Hezuo-Lending=true";
+export const HIDDEN_ARG = "--hezuo-hidden";
+const MARK = "X-HezuoBot-Lending=true";
 /** Windows keeps one Run entry per name, so the person's own entry has a name apart from lending's (the app's). */
-const CHOSEN_NAME = "Hezuo at login";
+const CHOSEN_NAME = "HezuoBot at login";
 
 /** Desktop Entry Exec quoting: the path in double quotes, with ", `, $ and \ escaped. */
 const quoted = (value) => `"${value.replace(/["`$\\]/g, (match) => `\\${match}`)}"`;
 
 export function autostartEntry(exec, { lending = true } = {}) {
-  return ["[Desktop Entry]", "Type=Application", "Name=Hezuo", `Exec=${quoted(exec)}${lending ? ` ${HIDDEN_ARG}` : ""}`, "NoDisplay=true",
+  return ["[Desktop Entry]", "Type=Application", "Name=HezuoBot", `Exec=${quoted(exec)}${lending ? ` ${HIDDEN_ARG}` : ""}`, "NoDisplay=true",
     "X-GNOME-Autostart-enabled=true", ...(lending ? [MARK] : []), ""].join("\n");
 }
 
@@ -26,33 +26,12 @@ export function autostartEntry(exec, { lending = true } = {}) {
  */
 export function createOpenAtLogin({ app, file, platform = process.platform, env = process.env, home, argv = process.argv, execPath = process.execPath }) {
   const autostart = path.join(env.XDG_CONFIG_HOME || path.join(home, ".config"), "autostart", "hezuo.desktop");
-  // Retire only registrations made by the predecessor; user-authored launchers remain untouched.
-  if (app.isPackaged && platform === "linux") {
-    const legacy = path.join(path.dirname(autostart), "openmausbot.desktop");
-    try {
-      const text = fs.readFileSync(legacy, "utf8");
-      if (text.includes("X-OpenMausBot-Lending=true")) {
-        if (!fs.existsSync(autostart)) fs.writeFileSync(autostart, autostartEntry(env.APPIMAGE || execPath), { flag: "wx" });
-        fs.unlinkSync(legacy);
-      }
-    } catch (error) { if (error.code !== "ENOENT") throw error; }
-  }
-  if (app.isPackaged && platform === "win32") {
-    for (const name of ["OpenMausBot at login", "electron.app.OpenMausBot"]) {
-      const settings = app.getLoginItemSettings({ name });
-      const item = settings.launchItems?.find(item => item.name === name);
-      if (!item) continue;
-      const args = item.args ?? [];
-      app.setLoginItemSettings({ openAtLogin: item.enabled !== false, args, ...(name === "OpenMausBot at login" ? { name: CHOSEN_NAME } : {}) });
-      app.setLoginItemSettings({ openAtLogin: false, args, name });
-    }
-  }
   const saved = () => { try { return JSON.parse(fs.readFileSync(file, "utf8")) ?? {}; } catch { return {}; } };
   const store = (fields) => { try { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, JSON.stringify({ ...saved(), ...fields })); } catch {} };
   const added = () => saved().added === true;
   const remember = (value) => store({ added: value });
   /** Electron 43.7 on Windows: `openAtLogin` compares the Run entry's arguments with the `args` asked about (none by
-   * default), so lending's `--omb-hidden` entry reads as off; `launchItems` lists the entries that start this executable,
+   * default), so lending's `--hezuo-hidden` entry reads as off; `launchItems` lists the entries that start this executable,
    * each with its name, arguments and whether Task Manager has it enabled. */
   const windowsStartsApp = () => (app.getLoginItemSettings().launchItems ?? []).filter(item => item.enabled !== false);
   const ours = () => { try { return fs.readFileSync(autostart, "utf8").includes(MARK); } catch { return false; } };

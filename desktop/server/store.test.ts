@@ -5,6 +5,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import "./server-line-packs.ts";
+
 import { soulFile, soulHash } from "./bot-folder.ts";
 import { flushProfileHistory, readHistory, recordProfileChange } from "./profile-versions.ts";
 import { DATA_DIR } from "./config.ts";
@@ -235,13 +237,14 @@ describe("Store", () => {
   it("rejects rename conflicts and active work without changing teams", () => {
     const store = new Store(selection);
     const bot = store.createBot({ section: "Delivery" });
-    store.setBotsSection([], "Existing");
+    const existing = store.createBot({ section: "Existing" });
     expect(store.renameSection("Delivery", "Existing")).toContain("already exists");
     expect(store.renameSection("Delivery", "bad\nname")).toContain("control characters");
     bot.busy = true;
     expect(store.renameSection("Delivery", "Launch")).toContain("active work");
     expect(bot.section).toBe("Delivery");
     expect(store.sections).not.toContain("Launch");
+    expect(existing.section).toBe("Existing");
   });
 
   it("restores membership files when a rename cannot save the group registry", () => {
@@ -601,8 +604,8 @@ describe("Store", () => {
     const greeting = (name: string) => store.messagesFor(store.createBot({ name }).threadId)[0]?.text;
 
     expect(greeting("Ivy")).toBe("Hi, I'm Ivy. What would you like me to do?");
-    person = "Milind Soni";
-    expect(greeting("Scout")).toBe("Hi Milind, I'm Scout. What would you like me to do?");
+    person = "Alex Soni";
+    expect(greeting("Scout")).toBe("Hi Alex, I'm Scout. What would you like me to do?");
   });
 
   it("clears provider-owned voice ids as one durable mutation", () => {
@@ -1291,7 +1294,7 @@ describe("Store", () => {
     const store = new Store(selection);
     const chief = store.createBot({ name: "Chief", section: "Ops" });
     store.patchBot(chief.id, { chiefOfStaff: true });
-    const folder = mkdtempSync(join(tmpdir(), "omb-store-cwd-"));
+    const folder = mkdtempSync(join(tmpdir(), "hezuo-store-cwd-"));
     store.applyTeamSetup({ version: 1, requestId: "setup-cwd", botId: chief.id, threadId: chief.threadId,
       reason: "Requested", createdAt: 1, requesterRevision: "fixture", newTeams: [], operations: [
         { action: "create", botId: "cwd-bot", threadId: "cwd-thread", fields: { name: "Foldered", section: "Ops", modelSelection: selection(), cwd: folder } },
@@ -1388,33 +1391,34 @@ describe("Store", () => {
     else expect(store.deleteBot(bot.id)).toBe(true);
     const restored = new Store(selection);
     expect(restored.sections).not.toContain("Source");
-    expect(restored.sections).not.toContain("Keep empty");
+    expect(restored.sections).toContain("Keep empty");
     expect(restored.bot(manager.id)?.managedSections ?? []).not.toContain("Source");
     expect(changes.some(change => change.type === "sections")).toBe(true);
   });
 
-  it("retains archived bot membership but removes a department containing only group chats", () => {
+  it("retains archived bot membership and a department containing only group chats", () => {
     const store = new Store(selection);
     const bot = store.createBot({ section: "Source" });
     const archived = store.createBot({ section: "Source" });
     store.patchBot(archived.id, { hidden: true });
     store.patchBot(bot.id, { section: undefined });
     expect(store.sections).toContain("Source");
-    store.createGroup("Room", [bot.id], false, "Source");
+    const room = store.createGroup("Room", [bot.id], false, "Source");
     store.deleteBot(archived.id);
-    expect(new Store(selection).sections).not.toContain("Source");
+    expect(new Store(selection).sections).toContain("Source");
+    expect(new Store(selection).groups.find(group => group.id === room.id)?.section).toBe("Source");
   });
 
-  it("cleans legacy pinned membership and empty departments without deleting bots or chats", () => {
+  it("preserves legacy pinned membership and group departments when reading sections", () => {
     const store = new Store(selection);
     const bot = store.createBot({ section: "Legacy" });
     const room = store.createGroup("Room", [bot.id], false, "Legacy");
     store.patchBot(bot.id, { pinned: true });
-    expect(store.sections).not.toContain("Legacy");
+    expect(store.sections).toContain("Legacy");
     const restored = new Store(selection);
     expect(restored.bot(bot.id)?.pinned).toBe(true);
-    expect(restored.bot(bot.id)?.section).toBeUndefined();
-    expect(restored.groups.find(group => group.id === room.id)?.section).toBeUndefined();
+    expect(restored.bot(bot.id)?.section).toBe("Legacy");
+    expect(restored.groups.find(group => group.id === room.id)?.section).toBe("Legacy");
   });
 
   it("adds and removes members together without replacing unrelated concurrent additions", () => {
@@ -1490,6 +1494,28 @@ describe("Store", () => {
     expect(reloaded.bot(teammate.id)?.section).toBe("Launch");
     expect(reloaded.bots.filter((bot) => bot.section === "Launch" && bot.chiefOfStaff).map((bot) => bot.id))
       .toEqual([incumbent.id]);
+  });
+
+  it("reads empty teams without deleting them, revoking grants, saving, or emitting changes", () => {
+    const store = new Store(selection);
+    const chief = store.createBot({ section: "Office" });
+    store.setChiefOfStaff(chief.id);
+    store.setBotsSection([], "Delivery");
+    store.patchBot(chief.id, { managedSections: ["Delivery"] });
+    const savedSections = readFileSync(SECTION_CONTEXTS_FILE, "utf8");
+    const changes: StoreChange[] = [];
+    store.onChange(change => { changes.push(change); });
+    const persistence = store as unknown as { saveBots: () => void; saveGroups: () => void };
+    persistence.saveBots = persistence.saveGroups = () => { throw new Error("unexpected save"); };
+
+    expect(store.sections).toEqual(expect.arrayContaining(["Office", "Delivery"]));
+    expect(store.sections).toEqual(expect.arrayContaining(["Office", "Delivery"]));
+    expect(chief.managedSections).toEqual(["Delivery"]);
+    expect(changes).toEqual([]);
+    expect(readFileSync(SECTION_CONTEXTS_FILE, "utf8")).toBe(savedSections);
+    const reloaded = new Store(selection);
+    expect(reloaded.sections).toContain("Delivery");
+    expect(hasTeamAuthority(reloaded.bot(chief.id)!, "Delivery")).toBe(true);
   });
 
   it.each([null, "Renamed"])("revokes exact old team grants before changing the empty team to %s", (nextName) => {
@@ -1653,7 +1679,7 @@ describe("Store", () => {
   });
 
   it("seedIfEmpty makes the new install's Chief its Hezuo in chrome, introduced, and no bot after it takes chrome or silver in turn", () => {
-    const store = new Store(selection);
+    const store = new Store(selection, undefined, undefined, "en");
     store.seedIfEmpty();
     const chief = store.bots[0]!;
     expect(chief).toMatchObject({ name: "Hezuo", color: "chrome", chiefOfStaff: true, defaultBot: {} });
@@ -2701,20 +2727,13 @@ describe("soul", () => {
     for (const field of ["composio", "connectorTools", "connectorScopes", "mcpServers"]) expect(mine).not.toHaveProperty(field);
   });
 
-  it("on a Team Cloud, gives a member's Chief's apps only to the bot it makes for that member", () => {
+  it("gives a local Chief's app grants to the unowned bot it creates", () => {
     const store = new Store(selection);
-    const ada = "ada@acme.test";
-    const chief = store.createBot({ name: "Ada's Hezuo", section: "Sales", createdBy: ada, visibility: { people: [ada] } });
-    store.patchBot(chief.id, { chiefOfStaff: true, connectorTools: { gmail: { tools: "*" }, slack: { tools: ["SLACK_SEND_MESSAGE"] } },
-      connectorScopes: { apps: { gmail: "write", slack: "read" } } });
-    const helper = createdBy(store, chief, "ada-helper");
-    expect(helper).toMatchObject({ createdBy: ada, visibility: { people: [ada] } });
-    expect(grantsOf(helper)).toEqual(grantsOf(chief));
-    const shared = store.createBot({ name: "Team Chief", section: "Ops" });
-    store.patchBot(shared.id, { chiefOfStaff: true, connectorScopes: { apps: { slack: "write" } } });
-    const teamHelper = createdBy(store, shared, "team-helper");
-    expect(teamHelper.createdBy, "a bot nobody owns makes bots nobody owns").toBeUndefined();
-    expect(grantsOf(teamHelper)).toEqual({ connectorScopes: { apps: { slack: "write" } } });
+    const chief = store.createBot({ name: "Team Chief", section: "Ops" });
+    store.patchBot(chief.id, { chiefOfStaff: true, connectorScopes: { apps: { slack: "write" } } });
+    const helper = createdBy(store, chief, "team-helper");
+    expect(helper.createdBy, "a bot nobody owns makes bots nobody owns").toBeUndefined();
+    expect(grantsOf(helper)).toEqual({ connectorScopes: { apps: { slack: "write" } } });
   });
 
   it("deleteBot removes the bot folder with the workspace", () => {

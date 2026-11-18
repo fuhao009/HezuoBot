@@ -1,41 +1,35 @@
-import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { launchVerificationServer, type VerificationServer } from "../../scripts/control-omb.ts";
+import { launchVerificationServer, type VerificationServer } from "../../scripts/control-hezuo.ts";
 import { removeTempDir } from "./testing/cleanup.ts";
 
-const ENTRY = join(import.meta.dirname, "hezuo.ts");
+import { runHeadless } from "./headless/main.ts";
 
-interface Ran { code: number | null; stdout: string; stderr: string }
+interface Ran { code: number; stdout: string; stderr: string }
 
 let session: VerificationServer;
 let dir: string;
 
-function cli(args: string[], env: NodeJS.ProcessEnv = {}): Promise<Ran> {
-  return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, ["--experimental-strip-types", ENTRY, ...args], {
-      env: { ...process.env, HEZUO_TOKEN: "", OMB_PORT: "", HEZUO_URL: session.info.url, ...env },
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-    let stdout = "";
-    let stderr = "";
-    child.stdout.on("data", (chunk) => { stdout += chunk; });
-    child.stderr.on("data", (chunk) => { stderr += chunk; });
-    const timer = setTimeout(() => { child.kill("SIGKILL"); reject(new Error(`hezuo ${args.join(" ")} did not finish: ${stderr}`)); }, 90_000);
-    child.on("error", reject);
-    child.on("close", (code) => { clearTimeout(timer); resolve({ code, stdout, stderr }); });
+async function cli(args: string[], env: NodeJS.ProcessEnv = {}): Promise<Ran> {
+  let stdout = "";
+  let stderr = "";
+  const code = await runHeadless(args, {
+    env: { ...process.env, HEZUO_TOKEN: "", HEZUO_PORT: "", HEZUO_URL: session.info.url, ...env },
+    io: { out: (text) => { stdout += `${text}\n`; }, err: (text) => { stderr += `${text}\n`; }, readStdin: async () => "" },
+    signal: AbortSignal.timeout(90_000),
   });
+  return { code, stdout, stderr };
 }
 const json = (ran: Ran) => JSON.parse(ran.stdout);
 const botsNow = async () => json(await cli(["bots", "--json"])).bots as any[];
 
 beforeAll(async () => {
   // A port range of its own (19975-19999), and a scripted fake engine.
-  session = await launchVerificationServer({ ...process.env, OMB_TEST_PORTS: "19975-19999" }, undefined, undefined, undefined, undefined, { scripted: true });
-  dir = mkdtempSync(join(tmpdir(), "omb-headless-cli-"));
+  session = await launchVerificationServer({ ...process.env, HEZUO_TEST_PORTS: "19975-19999" }, undefined, undefined, undefined, undefined, { scripted: true });
+  dir = mkdtempSync(join(tmpdir(), "hezuo-headless-cli-"));
 }, 60_000);
 
 afterAll(async () => {

@@ -1,29 +1,15 @@
 # Plan: Remote Workspace
 
-Run the Hezuo server anywhere; connect from the desktop app, any
-browser, or the phone — with real authentication instead of the loopback
-trust model.
-
 ## Why
-
-Three independent demand signals in one week: community members already
-self-hosting on VPSes and asking how to connect from their Mac; users
-wanting "the chat window from any PC or mobile" because a Linux server
-outruns their laptop; and the standing product promise that routines keep
-working with the laptop closed. The workload benefits are real: server
-hardware is faster, always on, and every engine CLI runs happily headless.
 
 ## What exists today
 
-- `docs/self-hosting.md`: the Docker tenant stack (`deploy/`) puts Caddy in
+- the retired self-hosting guide (historical only): the Docker tenant stack (`deploy/`) puts Caddy in
   the server's network namespace with a basic-auth login; the server still
   binds loopback and its Host/Origin gates are satisfied by two header
-  rules. This is the hosted path **now**, and it stays valid: Remote
-  Workspace replaces the shared password with per-device sessions, not the
-  stack.
-- The iOS companion already pairs by QR: a short-lived pairing token, a
-  durable per-device bearer stored hashed at rest, Tailscale-aware
-  advertising. Remote Workspace generalizes exactly this to every client.
+  rules. This was the hosted path at the time of this proposal. Remote
+  Workspace proposed replacing the shared password with per-device sessions;
+  the retired stack is not current deployment guidance.
 - The server serves its own web UI, so "any PC" needs no new app.
 
 ## Design in one paragraph
@@ -42,7 +28,7 @@ We studied a shipped design that solves this same problem for a
 desktop-first agent app and adopt these points as requirements:
 
 1. **Stable server identity.** The server generates `environmentId` once
-   (`OMB_DATA_DIR/environment-id`) and serves a descriptor at
+   (`HEZUO_DATA_DIR/environment-id`) and serves a descriptor at
    `/.well-known/hezuo/environment` — id, label, platform, version,
    capabilities. Clients verify the id on every connect and refuse a
    mismatch loudly (a re-used URL now pointing at a different server).
@@ -154,7 +140,7 @@ by that step.
 
 ## Sequencing
 
-1. `docs/self-hosting.md` + Docker stack — shipped.
+1. the retired self-hosting guide (historical only) + Docker stack — shipped.
 2. Server: environment id + descriptor, pairing + sessions + stream ticket
    + scope table + lockout (~1 week, all under tests).
 3. Clients: environments list, pairing screen (paste URL or scan), session

@@ -67,7 +67,7 @@ describe("the tab icon", () => {
 });
 
 // The title shows before /api/brand answers, and stays if that request fails.
-it.each(["index.html", "rail.html"])("%s starts with the product's name as its title", (page) => {
+it.each(["index.html", "product-account.html"])("%s starts with the product's name as its title", (page) => {
   const html = readFileSync(new URL(`../../${page}`, import.meta.url), "utf8");
   expect(html).toContain(`<title>${PRODUCT_NAME}</title>`);
 });

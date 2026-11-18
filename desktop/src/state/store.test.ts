@@ -7,7 +7,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   api,
   ApiError,
-  CLOUD_LINK_SETTINGS,
   configStatusFromFrame,
   currentTaskBot,
   desktopApprovalBridge,
@@ -116,16 +115,16 @@ describe("composer thread approval persistence", () => {
       const now = desktopCapabilitiesNow();
       cacheDesktopCapabilities({ ...now, host: { ...now.host, packaged: value } });
     };
-    window.ogb = { approvals } as unknown as NonNullable<Window["ogb"]>;
+    window.hezuo = { approvals } as unknown as NonNullable<Window["hezuo"]>;
     try {
       packaged(false);
       expect(desktopApprovalBridge()).toBeUndefined();
       packaged(true);
       expect(desktopApprovalBridge()).toBe(approvals);
-      delete window.ogb;
+      delete window.hezuo;
       expect(desktopApprovalBridge()).toBeUndefined();
     } finally {
-      delete window.ogb;
+      delete window.hezuo;
       packaged(false);
     }
   });
@@ -362,31 +361,12 @@ describe("keyboard shortcuts dialog state", () => {
   });
 });
 
-describe("Settings opened by the Cloud link", () => {
-  it("marks only the link's own opening, counts each link, and clears on any other Settings navigation", () => {
-    expect(initialState.appSettingsCloudLink).toBe(0);
-    const link = CLOUD_LINK_SETTINGS;
-    const opened = reducer(initialState, link);
-    expect(opened).toMatchObject({ appSettingsOpen: true, appSettingsSection: "cloudAccount", appSettingsCloudLink: 1 });
-    expect(reducer(opened, link).appSettingsCloudLink).toBe(2);
-    expect(reducer(opened, { type: "toggleAppSettings", open: true, section: "cloudAccount" }).appSettingsCloudLink).toBe(0);
-    expect(reducer(opened, { type: "toggleAppSettings", open: true, section: "general" }).appSettingsCloudLink).toBe(0);
-    expect(reducer(opened, { type: "toggleAppSettings", open: false })).toMatchObject({ appSettingsOpen: false, appSettingsCloudLink: 0 });
-    expect(reducer(opened, { type: "toggleAppSettings" }).appSettingsCloudLink).toBe(0);
-    expect(reducer(initialState, { ...link, open: false }).appSettingsCloudLink).toBe(0);
-  });
-});
 
-describe("Settings opened on the phone pairing", () => {
-  it("counts each request, and clears on any other Settings navigation", () => {
-    expect(initialState.appSettingsPhonePairing).toBe(0);
-    const phone = { type: "toggleAppSettings", open: true, section: "companion", phonePairing: true } as const;
-    const opened = reducer(initialState, phone);
-    expect(opened).toMatchObject({ appSettingsOpen: true, appSettingsSection: "companion", appSettingsPhonePairing: 1 });
-    expect(reducer(opened, phone).appSettingsPhonePairing).toBe(2);
-    expect(reducer(opened, { type: "toggleAppSettings", open: true, section: "companion" }).appSettingsPhonePairing).toBe(0);
-    expect(reducer(opened, { type: "toggleAppSettings", open: false }).appSettingsPhonePairing).toBe(0);
-    expect(reducer(initialState, { ...phone, open: false }).appSettingsPhonePairing).toBe(0);
+describe("Settings remote-access navigation", () => {
+  it("opens the remote-access section and closes settings", () => {
+    const opened = reducer(initialState, { type: "toggleAppSettings", open: true, section: "companion" });
+    expect(opened).toMatchObject({ appSettingsOpen: true, appSettingsSection: "companion" });
+    expect(reducer(opened, { type: "toggleAppSettings", open: false }).appSettingsOpen).toBe(false);
   });
 });
 
@@ -1668,24 +1648,25 @@ describe("browser profile announcements", () => {
   });
 });
 
-describe("phone grant announcements", () => {
-  const granted: Bot = {
-    id: "phone-bot", threadId: "phone-thread", name: "Pepper", title: "", description: "",
+describe("computer selection announcements", () => {
+  const selected: Bot = {
+    id: "computer-bot", threadId: "computer-thread", name: "Pepper", title: "", description: "",
     notifications: true, color: "green", unread: false,
-    modelSelection: { instanceId: "codex", model: "default" }, phoneApps: { location: "read" },
+    modelSelection: { instanceId: "codex", model: "default" }, computer: "cloud",
     messages: [{ id: "message", role: "user", kind: "text", at: 1, text: "Keep this conversation" }],
   };
-  const { messages, phoneApps: _old, ...announcement } = granted;
+  const { messages, computer: _old, ...announcement } = selected;
 
-  it("clears a stale grant when a complete frame omits it", () => {
-    const next = reducer({ ...initialState, bots: [granted] }, { type: "botPatched", bot: announcement });
-    expect(next.bots[0]?.phoneApps).toBeUndefined();
+  it("clears a stale selection when a complete frame omits it", () => {
+    const next = reducer({ ...initialState, bots: [selected] }, { type: "botPatched", bot: announcement });
+    expect(next.bots[0]?.computer).toBeUndefined();
     expect(next.bots[0]?.messages).toBe(messages);
   });
 
   it("clears it on the thread-snapshot path too", () => {
-    const next = reducer({ ...initialState, bots: [{ ...granted, awaitingThreadSnapshot: true }] }, { type: "botPatched", bot: { ...announcement, messages } });
-    expect(next.bots[0]?.phoneApps).toBeUndefined();
+    const next = reducer({ ...initialState, bots: [{ ...selected, awaitingThreadSnapshot: true }] }, { type: "botPatched", bot: { ...announcement, messages } });
+    expect(next.bots[0]?.computer).toBeUndefined();
+    expect(next.bots[0]?.messages).toEqual(messages);
   });
 });
 
@@ -2547,14 +2528,6 @@ describe("activity panel", () => {
     expect(reducer(open, { type: "showTeamMap" }).activityOpen).toBe(false);
   });
 
-  it("opens Files as its own page, carrying the folders it should offer to share only when asked", () => {
-    const open = { ...initialState, activityOpen: true, appSettingsOpen: true, settingsOpen: true };
-    const suggested = reducer(open, { type: "showFiles", suggest: ["/Users/ada/site"] });
-    expect(suggested).toMatchObject({ activeView: "files", filesSuggest: ["/Users/ada/site"], activityOpen: false, appSettingsOpen: false, settingsOpen: false });
-    expect(reducer(suggested, { type: "showFiles" })).toMatchObject({ activeView: "files", filesSuggest: null });
-    expect(reducer(suggested, { type: "showFiles", suggest: [] }).filesSuggest).toBeNull();
-    expect(reducer(suggested, { type: "showTeamMap" })).toMatchObject({ activeView: "team-map", filesSuggest: null });
-  });
 
   it("a pinned web panel replaces the main view like the team map, and chat comes back", () => {
     const open = { ...initialState, activityOpen: true, computerOpen: true, settingsOpen: true };
@@ -2592,20 +2565,18 @@ describe("live config frames", () => {
     expect(configStatusFromFrame(baseFrame)).not.toHaveProperty("cloudHome");
   });
 
-  it("preserves edition, budgets and billing through configStatusFromFrame", () => {
+  it("preserves budgets and billing through configStatusFromFrame", () => {
     const frame: ConfigStatusFrame = {
       ...baseFrame,
-      edition: { edition: "enterprise", features: ["budgets", "billing"] },
       budgets: { monthlyUsd: 10, warnAtPercent: 80 },
       billing: { currency: "USD", prices: { default: { inputPerMillion: 1, outputPerMillion: 2 } } },
     };
     const status = configStatusFromFrame(frame);
-    expect(status.edition).toEqual(frame.edition);
     expect(status.budgets).toEqual(frame.budgets);
     expect(status.billing).toEqual(frame.billing);
   });
 
-  it("keeps saved provider keys and the fleet flag after a config SSE frame lands after a save's own response", () => {
+  it("keeps saved provider keys after a config SSE frame lands after a save's own response", () => {
     const saved = reducer(initialState, {
       type: "configStatus",
       config: configStatusFromFrame({ ...baseFrame, openaiCompat: { configured: true, url: "http://127.0.0.1:1/v1" } }),
@@ -2617,7 +2588,6 @@ describe("live config frames", () => {
       groq: { configured: true },
       meta: { configured: true },
       openaiCompat: { configured: true, url: "http://127.0.0.1:1/v1" },
-      fleet: { available: true },
     };
     const state = reducer(saved, { type: "configStatus", config: configStatusFromFrame(frame) });
     expect(state.config).toMatchObject({
@@ -2626,7 +2596,6 @@ describe("live config frames", () => {
       groq: { configured: true },
       meta: { configured: true },
       openaiCompat: { configured: true, url: "http://127.0.0.1:1/v1" },
-      fleet: { available: true },
     });
   });
 
@@ -2637,16 +2606,14 @@ describe("live config frames", () => {
     expect(configStatusFromFrame({ ...baseFrame, managedPolicy: null }).managedPolicy).toBeNull();
   });
 
-  it("keeps edition, budgets and billing in state.config after a config SSE frame lands", () => {
+  it("keeps budgets and billing in state.config after a config SSE frame lands", () => {
     const frame: ConfigStatusFrame = {
       ...baseFrame,
-      edition: { edition: "enterprise", features: ["budgets", "billing"] },
       budgets: { monthlyUsd: 10, warnAtPercent: 80 },
       billing: { currency: "USD" },
     };
     const state = reducer(initialState, { type: "configStatus", config: configStatusFromFrame(frame) });
     expect(state.config).toMatchObject({
-      edition: { edition: "enterprise", features: ["budgets", "billing"] },
       budgets: { monthlyUsd: 10, warnAtPercent: 80 },
       billing: { currency: "USD" },
     });
@@ -3179,5 +3146,22 @@ describe("fleet order from the server", () => {
   it("ignores ids it does not know and leaves an unchanged order alone", () => {
     expect(ids(reducer(hydrated, { type: "botsOrdered", botIds: ["ghost", "b", "a"] }))).toEqual(["b", "a", "c", "d"]);
     expect(reducer(hydrated, { type: "botsOrdered", botIds: ["a", "b", "c", "d"] })).toBe(hydrated);
+  });
+});
+
+describe("reviewed bot creation", () => {
+  it("opens a draft without creating a bot and cancellation preserves the chat", () => {
+    const before = { ...initialState, selectedId: "existing", settingsOpen: true };
+    const action = { type: "newBot" as const, section: "Design" };
+    const opened = reducer(before, action);
+    expect(opened.pendingNewBot).toBe(action);
+    expect(opened.bots).toBe(before.bots);
+    expect(opened.selectedId).toBe("existing");
+    expect(opened.settingsOpen).toBe(false);
+    expect(reducer(opened, { type: "newBot" })).toBe(opened);
+    const closed = reducer(opened, { type: "closeNewBot" });
+    expect(closed.pendingNewBot).toBeNull();
+    expect(closed.bots).toBe(before.bots);
+    expect(closed.selectedId).toBe("existing");
   });
 });

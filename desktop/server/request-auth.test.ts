@@ -1,5 +1,6 @@
 import type { IncomingMessage } from "node:http";
-import { mkdtempSync, rmSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -68,9 +69,9 @@ describe("origin and cookies", () => {
     expect(isSameOrigin(request({ host: "a.example", origin: "https://evil.example" }))).toBe(false);
   });
   it("parses cookies and names the session cookie per port and environment", () => {
-    expect(parseCookies("a=1; omb_session_8799_abc=tok; b = 2")).toEqual(new Map([["a", "1"], ["omb_session_8799_abc", "tok"], ["b", "2"]]));
+    expect(parseCookies("a=1; hezuo_session_8799_abc=tok; b = 2")).toEqual(new Map([["a", "1"], ["hezuo_session_8799_abc", "tok"], ["b", "2"]]));
     expect(parseCookies(undefined).size).toBe(0);
-    expect(sessionCookieName(8799, "3f2a-uuid-like-id")).toBe("omb_session_8799_3f2auuidlike");
+    expect(sessionCookieName(8799, "3f2a-uuid-like-id")).toBe("hezuo_session_8799_3f2auuidlike");
     expect(serializeSessionCookie("c", "t", { secure: true, maxAgeSeconds: 60 })).toBe("c=t; Path=/; HttpOnly; SameSite=Lax; Max-Age=60; Secure");
     expect(serializeSessionCookie("c", "t", { secure: false, maxAgeSeconds: 60 })).not.toContain("Secure");
     expect(clearSessionCookie("c")).toContain("Max-Age=0");
@@ -237,12 +238,12 @@ describe("scopes", () => {
 describe("resolveRequestAuth", () => {
   let dir: string;
   let sessions: SessionRegistry;
-  const cookieName = "omb_session_8799_env";
+  const cookieName = "hezuo_session_8799_env";
   const resolve = (headers: Record<string, string>, path = "/api/bots", method = "GET") =>
     resolveRequestAuth(request(headers, method), { sessions, cookieName, streamPath: "/api/events", url: new URL(path, "http://x") });
 
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), "omb-auth-"));
+    dir = mkdtempSync(join(tmpdir(), "hezuo-auth-"));
     sessions = new SessionRegistry({ file: join(dir, "sessions.json") });
   });
   afterEach(() => rmSync(dir, { recursive: true, force: true }));
@@ -446,9 +447,9 @@ describe("resolveRequestAuth", () => {
     const signedIn = sessions.exchange({ code: credential, label: "Chrome on Mac", source: "1.2.3.4", browser: true });
     if (!signedIn.ok) throw new Error(signedIn.error);
     const cookie = `${cookieName}=${signedIn.token}`;
-    const cloud = { host: "omb-u-0123456789ab.fly.dev", "x-forwarded-proto": "https", cookie };
+    const cloud = { host: "hezuo-u-0123456789ab.fly.dev", "x-forwarded-proto": "https", cookie };
     expect(resolve(cloud).auth?.kind).toBe("session");
-    expect(resolve({ ...cloud, origin: "https://omb-u-0123456789ab.fly.dev" }, "/api/bots", "POST").auth?.kind).toBe("session");
+    expect(resolve({ ...cloud, origin: "https://hezuo-u-0123456789ab.fly.dev" }, "/api/bots", "POST").auth?.kind).toBe("session");
     expect(resolve({ ...cloud, "sec-fetch-site": "same-origin" }, "/api/bots", "DELETE").auth?.kind).toBe("session");
     for (const [headers, method] of [[{}, "POST"], [{}, "PUT"], [{}, "PATCH"], [{}, "DELETE"], [{ "sec-fetch-site": "none" }, "POST"], [{ "sec-fetch-site": "cross-site" }, "POST"],
       [{ "sec-fetch-site": "same-site" }, "POST"], [{ origin: "https://evil.example", "sec-fetch-site": "same-origin" }, "POST"]] as const) {
@@ -465,7 +466,7 @@ describe("resolveRequestAuth", () => {
     expect(resolve({ ...cloud, "sec-fetch-site": "same-origin" }, connectorRefresh, "GET").auth?.kind).toBe("session");
     expect(resolve({ ...cloud, "sec-fetch-site": "same-site" }, "/api/bots", "GET").auth?.kind).toBe("session");
     const paired = pairedToken();
-    expect(resolve({ host: "omb-u-0123456789ab.fly.dev", "x-forwarded-proto": "https", cookie: `${cookieName}=${paired}` }, "/api/bots", "POST").auth?.kind).toBe("session");
+    expect(resolve({ host: "hezuo-u-0123456789ab.fly.dev", "x-forwarded-proto": "https", cookie: `${cookieName}=${paired}` }, "/api/bots", "POST").auth?.kind).toBe("session");
     expect(provesSameOrigin(request({ host: "a.example", origin: "http://a.example" }))).toBe(true);
     expect(provesSameOrigin(request({ host: "a.example" }))).toBe(false);
     expect(provesSameOrigin(request({ host: "a.example", origin: "https://evil.example", "sec-fetch-site": "same-origin" }))).toBe(false);
@@ -498,9 +499,6 @@ describe("resolveRequestAuth", () => {
   });
 
   it.each([
-    ["GET", "/api/settings/custom-domain"],
-    ["POST", "/api/settings/custom-domain"],
-    ["DELETE", "/api/settings/custom-domain"],
     ["GET", "/api/instances/codex/auth/status?flowId=private-device-flow"],
     ["POST", "/api/instances/codex/auth/start"],
     ["POST", "/api/instances/codex/auth/cancel"],
@@ -509,10 +507,6 @@ describe("resolveRequestAuth", () => {
     ["GET", "/api/usage?from=2026-09-01&to=2026-09-30"],
     ["GET", "/api/usage.csv?from=2026-09-01&to=2026-09-30"],
     ["POST", "/api/keys/test"],
-    ["GET", "/api/fleet"],
-    ["POST", "/api/fleet/workspaces"],
-    ["DELETE", "/api/fleet/workspaces/acme"],
-    ["POST", "/api/fleet/upgrade"],
     ["POST", "/api/instances/antigravity/auth/complete"],
     ["GET", "/api/computers/usage"],
   ])("requires admin for server Settings: %s %s", (method, path) => {
@@ -531,6 +525,44 @@ describe("resolveRequestAuth", () => {
     expect(resolve(headers, path, method).auth).toBeNull();
   });
 
+  it("rejects persisted legacy credentials without falling back to loopback owner", () => {
+    const token = pairedToken(["client"]);
+    const legacy = token.replace(/^hezuo_sess_/, "omb_sess_");
+    expect(legacy).not.toBe(token);
+    const tokenHash = createHash("sha256").update(token).digest("hex");
+    const legacyHash = createHash("sha256").update(legacy).digest("hex");
+    const file = join(dir, "sessions.json");
+    sessions.close();
+    writeFileSync(file, readFileSync(file, "utf8").replace(tokenHash, legacyHash));
+    sessions = new SessionRegistry({ file });
+    const host = "127.0.0.1:8799";
+    expect(resolve({ host, authorization: `Bearer ${legacy}` })).toMatchObject({ auth: null, status: 401 });
+    expect(resolve({ host, cookie: `${cookieName}=${legacy}` })).toMatchObject({ auth: null, status: 401 });
+    const current = pairedToken(["client"]);
+    expect(resolve({ host, authorization: `Bearer ${current}` }).auth).toMatchObject({
+      kind: "session", via: "bearer", scopes: ["client"],
+    });
+    expect(resolve({ host, cookie: `${cookieName}=${current}` }).auth).toMatchObject({
+      kind: "session", via: "cookie", scopes: ["client"],
+    });
+    expect(resolve({ host, authorization: `Bearer ${legacy}`, cookie: `${cookieName}=${current}` })).toMatchObject({
+      auth: null, status: 401,
+    });
+  });
+
+  it.each(["Bearer omb_sess_unknown", "Bearer unknown", "Bearer", "bEaReR invalid token"])(
+    "never falls back to loopback owner for %s",
+    (authorization) => {
+      const host = "127.0.0.1:8799";
+      expect(resolve({ host }).auth?.kind).toBe("loopback");
+      expect(resolve({ host, authorization })).toMatchObject({ auth: null, status: 401 });
+      expect(resolve({ host, authorization, cookie: `${cookieName}=${pairedToken()}` })).toMatchObject({
+        auth: null,
+        status: 401,
+      });
+    },
+  );
+
   it("explains a dead credential instead of silently falling back, even on loopback", () => {
     const token = pairedToken();
     const session = sessions.authenticate(token);
@@ -543,7 +575,7 @@ describe("resolveRequestAuth", () => {
   });
 });
 
-describe("an IPC listener (hezuo serve --tunnel) is remote by construction", () => {
+describe("connections without a peer address are treated as remote", () => {
   // SAFETY: only headers, method and the socket peer are read; a unix-socket peer has no address
   const overSocket = (headers: Record<string, string>) => ({ headers, method: "GET", socket: {} }) as unknown as IncomingMessage;
 
@@ -560,10 +592,10 @@ describe("an IPC listener (hezuo serve --tunnel) is remote by construction", () 
   });
 
   it("never grants loopback trust over the socket, even with a loopback Host and no forwarded headers; a session works", () => {
-    const dir = mkdtempSync(join(tmpdir(), "omb-auth-ipc-"));
+    const dir = mkdtempSync(join(tmpdir(), "hezuo-auth-ipc-"));
     try {
       const sessions = new SessionRegistry({ file: join(dir, "sessions.json") });
-      const gate = { sessions, cookieName: "omb_session_test", streamPath: "/api/events", url: new URL("/api/bots", "http://x") };
+      const gate = { sessions, cookieName: "hezuo_session_test", streamPath: "/api/events", url: new URL("/api/bots", "http://x") };
       const denied = resolveRequestAuth(overSocket({ host: "127.0.0.1:8799" }), gate);
       expect(denied.auth).toBeNull();
       expect(denied.status).toBe(403);
@@ -571,7 +603,7 @@ describe("an IPC listener (hezuo serve --tunnel) is remote by construction", () 
       const { code } = sessions.openPairing({ scopes: ["admin", "client"] });
       const paired = sessions.exchange({ code, label: "phone", source: "203.0.113.9" });
       if (!paired.ok) throw new Error(paired.error);
-      const admitted = resolveRequestAuth(overSocket({ host: "c-1.openmausbot.com", authorization: `Bearer ${paired.token}` }), gate);
+      const admitted = resolveRequestAuth(overSocket({ host: "example.test", authorization: `Bearer ${paired.token}` }), gate);
       expect(admitted.auth?.kind).toBe("session");
     } finally {
       rmSync(dir, { recursive: true, force: true });
@@ -582,7 +614,7 @@ describe("an IPC listener (hezuo serve --tunnel) is remote by construction", () 
 describe("loopback trust: owner on one person's machine, service on a shared workspace", () => {
   let dir: string;
   let sessions: SessionRegistry;
-  const cookieName = "omb_session_8799_env";
+  const cookieName = "hezuo_session_8799_env";
   const local = { host: "127.0.0.1:8799" };
   const check = (method: string, path: string, options: { trust?: "owner" | "service"; headers?: Record<string, string>; desktopToken?: string } = {}) =>
     resolveRequestAuth(request({ ...local, ...options.headers }, method), {
@@ -592,7 +624,7 @@ describe("loopback trust: owner on one person's machine, service on a shared wor
     });
 
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), "omb-auth-trust-"));
+    dir = mkdtempSync(join(tmpdir(), "hezuo-auth-trust-"));
     sessions = new SessionRegistry({ file: join(dir, "sessions.json") });
   });
   afterEach(() => rmSync(dir, { recursive: true, force: true }));
@@ -623,7 +655,7 @@ describe("loopback trust: owner on one person's machine, service on a shared wor
     ["POST", "/api/bots"], ["PATCH", "/api/bots/bot-1"], ["DELETE", "/api/bots/bot-1"],
     ["POST", "/api/instances"], ["GET", "/api/instances"], ["POST", "/api/mcp-servers"],
     ["POST", "/api/keys/test"], ["GET", "/api/usage"], ["GET", "/api/decisions"], ["GET", "/api/decisions.csv"],
-    ["POST", "/api/fleet/workspaces"], ["POST", "/api/settings/custom-domain"], ["POST", "/api/workspace-backup/export"],
+    ["POST", "/api/workspace-backup/export"],
     ["POST", "/api/bots/bot-1/messages"], ["POST", "/api/bots/bot-1/respond"], ["POST", "/api/bots/bot-1/always-allow"],
     ["POST", "/api/threads/thread-1/undo"], ["POST", "/api/groups/room-1/messages"], ["POST", "/api/routines"], ["GET", "/api/events"],
   ];
@@ -669,29 +701,21 @@ describe("loopback trust: owner on one person's machine, service on a shared wor
       resolveLoopbackTrust({ env, desktopManaged: false, hostedWorkspace: false, ...flags });
     expect(pick({})).toEqual({ trust: "owner", reason: "self-hosted default", localBrowsers: false });
     expect(pick({}, { hostedWorkspace: true })).toEqual({ trust: "service", reason: "hosted workspace", localBrowsers: false });
-    expect(pick({ OMB_LOOPBACK_TRUST: "service" })).toEqual({ trust: "service", reason: "OMB_LOOPBACK_TRUST", localBrowsers: false });
-    expect(pick({ OMB_LOOPBACK_TRUST: " Service " }).trust).toBe("service");
-    const forced = pick({ OMB_LOOPBACK_TRUST: "owner" }, { hostedWorkspace: true });
+    expect(pick({ HEZUO_LOOPBACK_TRUST: "service" })).toEqual({ trust: "service", reason: "HEZUO_LOOPBACK_TRUST", localBrowsers: false });
+    expect(pick({ HEZUO_LOOPBACK_TRUST: " Service " }).trust).toBe("service");
+    const forced = pick({ HEZUO_LOOPBACK_TRUST: "owner" }, { hostedWorkspace: true });
     expect(forced.trust).toBe("owner");
     expect(forced.warning).toMatch(/shared workspace/);
-    const typo = pick({ OMB_LOOPBACK_TRUST: "own3r\n" });
+    const typo = pick({ HEZUO_LOOPBACK_TRUST: "own3r\n" });
     expect(typo.trust).toBe("service");
     expect(typo.warning).toMatch(/not owner or service/);
     expect(typo.warning).not.toContain("\n");
-    expect(pick({ OMB_LOOPBACK_TRUST: "" }).trust).toBe("owner");
-    const desktop = pick({ OMB_LOOPBACK_TRUST: "service" }, { desktopManaged: true, hostedWorkspace: true });
+    expect(pick({ HEZUO_LOOPBACK_TRUST: "" }).trust).toBe("owner");
+    const desktop = pick({ HEZUO_LOOPBACK_TRUST: "service" }, { desktopManaged: true, hostedWorkspace: true });
     expect(desktop.trust).toBe("owner");
     expect(desktop.warning).toMatch(/ignored in the desktop app/);
   });
 
-  it("is always service on an OMB Cloud home, where a local request is only ever a process on the machine", () => {
-    const pick = (env: NodeJS.ProcessEnv) => resolveLoopbackTrust({ env, desktopManaged: false, hostedWorkspace: false, cloudHome: true });
-    expect(pick({})).toEqual({ trust: "service", reason: "Hezuo Cloud home", localBrowsers: false });
-    expect(pick({ OMB_LOOPBACK_TRUST: "service" })).toEqual({ trust: "service", reason: "Hezuo Cloud home", localBrowsers: false });
-    const forced = pick({ OMB_LOOPBACK_TRUST: "owner" });
-    expect(forced.trust).toBe("service");
-    expect(forced.warning).toMatch(/ignored on a Hezuo Cloud home/);
-  });
 
   it("lets only the CLI that started the server, holding its secret, mint a pairing code under service trust", () => {
     const secret = "c".repeat(43);
@@ -714,7 +738,7 @@ describe("loopback trust: owner on one person's machine, service on a shared wor
 describe("a browser on this machine is not the owner", () => {
   let dir: string;
   let sessions: SessionRegistry;
-  const cookieName = "omb_session_8799_env";
+  const cookieName = "hezuo_session_8799_env";
   // What Chrome sends: Sec-Fetch-* on every request to a loopback address, Origin on every WebSocket handshake.
   const page = { host: "127.0.0.1:8799", "sec-fetch-site": "cross-site", "sec-fetch-mode": "no-cors", "sec-fetch-dest": "empty" };
   const navigation = { host: "127.0.0.1:8799", "sec-fetch-site": "none", "sec-fetch-mode": "navigate", "sec-fetch-dest": "document", "sec-fetch-user": "?1" };
@@ -729,7 +753,7 @@ describe("a browser on this machine is not the owner", () => {
     });
 
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), "omb-auth-browser-"));
+    dir = mkdtempSync(join(tmpdir(), "hezuo-auth-browser-"));
     sessions = new SessionRegistry({ file: join(dir, "sessions.json") });
   });
   afterEach(() => rmSync(dir, { recursive: true, force: true }));
@@ -812,13 +836,12 @@ describe("a browser on this machine is not the owner", () => {
     expect(check(page, "/api/bots/bot-1", "PATCH", { localBrowsers: true, desktopToken: "owner-token-123" }).status).toBe(403);
     const pick = (env: NodeJS.ProcessEnv, flags: { fromSource?: boolean; desktopManaged?: boolean; hostedWorkspace?: boolean } = {}) =>
       resolveLoopbackTrust({ env, desktopManaged: false, hostedWorkspace: false, ...flags });
-    const dev = { OMB_DEV_TRUST_LOCAL_BROWSER: "1" };
+    const dev = { HEZUO_DEV_TRUST_LOCAL_BROWSER: "1" };
     expect(pick(dev, { fromSource: true })).toMatchObject({ trust: "owner", localBrowsers: true, warning: expect.stringMatching(/development only/) });
     expect(pick(dev, { fromSource: false })).toMatchObject({ localBrowsers: false, warning: expect.stringMatching(/ignored/) });
     expect(pick(dev, { fromSource: true, desktopManaged: true })).toMatchObject({ localBrowsers: false, warning: expect.stringMatching(/ignored/) });
     expect(pick(dev, { fromSource: true, hostedWorkspace: true })).toMatchObject({ trust: "service", localBrowsers: false });
-    expect(pick({ ...dev, OMB_LOOPBACK_TRUST: "service" }, { fromSource: true }).localBrowsers).toBe(false);
-    expect(pick({ OMB_DEV_TRUST_LOCAL_BROWSER: "true" }, { fromSource: true })).toEqual({ trust: "owner", reason: "self-hosted default", localBrowsers: false });
-    expect(resolveLoopbackTrust({ env: dev, desktopManaged: false, hostedWorkspace: false, cloudHome: true, fromSource: true }).localBrowsers).toBe(false);
+    expect(pick({ ...dev, HEZUO_LOOPBACK_TRUST: "service" }, { fromSource: true }).localBrowsers).toBe(false);
+    expect(pick({ HEZUO_DEV_TRUST_LOCAL_BROWSER: "true" }, { fromSource: true })).toEqual({ trust: "owner", reason: "self-hosted default", localBrowsers: false });
   });
 });

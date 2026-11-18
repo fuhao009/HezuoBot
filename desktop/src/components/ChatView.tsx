@@ -4,7 +4,7 @@ import { useAdvancedMode } from "@/lib/interface-mode";
 import { PHONE_LAYOUT, useMediaQuery } from "@/lib/use-media-query";
 import { ThreadLinkContext } from "@/components/ThreadLinkMenu";
 import { useShowThreads } from "@/lib/thread-preferences";
-import { ChevronLeft, ChevronRight, Copy, ListChecks, Monitor, Reply, Square, Webhook } from "lucide-react";
+import { ChevronLeft, ChevronRight, Copy, Reply, Square, Webhook } from "lucide-react";
 import { WorkingDots } from "@/components/WorkingIndicator";
 import { ACTION_ICON, ChatBusyContext, CopyButton, MESSAGE_ROW, MessageActions, messageActionClass, ReplyAction, type MessageMenuItem } from "@/components/MessageActions";
 import { copyText } from "@/lib/copy-text";
@@ -13,8 +13,6 @@ import { useBotMessageMenu, userMessageMenu } from "@/components/message-menu";
 import { useSpeech } from "@/lib/tts/useSpeech";
 import { localSystemVoiceActive } from "@/lib/local-voice";
 import { computerStartLine, useScreensWhile } from "@/lib/computer-start";
-import { rememberComputerPanelOpen } from "@/lib/computer-panel-focus";
-import { requestBrowserTakeover } from "@/lib/browser-takeover";
 import { useCaptionChrome, useDesktopCapabilities } from "@/components/DesktopCapabilities";
 import {
   api,
@@ -99,7 +97,7 @@ import { SpeakButton } from "./SpeakButton";
 import { CallOverlay } from "./CallView";
 import { LiveCallBar } from "./LiveCallBar";
 import { LiveCallChip } from "./LiveCallPill";
-import { browserInUse, effectivePlace, toolPlace, type EffectivePlace } from "@/lib/place";
+import { effectivePlace, toolPlace, type EffectivePlace } from "@/lib/place";
 import { cn } from "@/lib/cn";
 import { activeLocale, t } from "@/lib/i18n";
 import { COMPACT_BUBBLE } from "@/lib/compact-chip";
@@ -185,7 +183,7 @@ function PlaceFailedRow({ place, botId, threadId, onRetry }: {
   const bot = state.bots.find((candidate) => candidate.id === botId);
   const view = placeRowViewFor(place, seat, worksOnSimpleLabel(bot?.computer, capabilities.host.platform));
   const id = view.action?.id;
-  const onClick = !id ? undefined
+  const onClick = !id || id === "watch" || id === "open-computer-panel" ? undefined
     : id === "try-again" ? onRetry
     : () => { openPlaceAction(id, { botId, threadId }, dispatch); };
   return <ErrorRow message={view.line} action={view.action && onClick ? { label: view.action.label, onClick } : null} />;
@@ -275,7 +273,7 @@ const Bubble = memo(function Bubble({
   onReply: (message: Message) => void;
 }) {
   const { botId, threadId, botName, voiceId, tts, localVoice, bots, mentionPeers, mentionPerson, focus, dispatch, onBranch, bubbleStyle, conversational, simple, canReact, openedAt, speakerViewer } = useChatRows(), busy = onRegenerate || versions ? use(ChatBusyContext) : false;
-  const remoteClient = window.ogb?.remoteClient?.active === true;
+  const remoteClient = window.hezuo?.remoteClient?.active === true;
   const peer = peerLine(message) ?? peerRequest(message, botId);
   const user = message.role === "user" && !peer;
   const speaker = user ? otherSpeaker(message, speakerViewer ?? null) : null;
@@ -749,7 +747,7 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
   const bot = useMemo(() => currentTaskBot(profile), [profile]);
   const { state, dispatch } = useStore();
   const showThreads = useShowThreads();
-  const remoteClient = window.ogb?.remoteClient?.active === true;
+  const remoteClient = window.hezuo?.remoteClient?.active === true;
   // A managed product account: no engine or key is offered anywhere in this chat, its model is the account's, and the
   // header carries the work panel's two real entries. The bridge covers the window before the server's config arrives.
   const product = isProductWorkspace(state.config?.productManaged);
@@ -763,16 +761,8 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
   const phoneMenu = phone && !remoteClient;
   const simpleHead = !advanced && !remoteClient;
   const unifiedPanel = useUnifiedBotPanel();
-  const botPanelOpen = state.settingsOpen || state.computerOpen || state.activityOpen;
-  const toggleBotPanel = () => {
-    if (!botPanelOpen) {
-      dispatch({ type: "toggleSettings", open: true });
-      return;
-    }
-    dispatch({ type: "toggleSettings", open: false });
-    dispatch({ type: "toggleComputer", open: false });
-    dispatch({ type: "toggleActivity", open: false });
-  };
+  const botPanelOpen = state.settingsOpen;
+  const toggleBotPanel = () => dispatch({ type: "toggleSettings", open: !state.settingsOpen });
   const canWrite = useCanWriteIn(bot.threadId, bot.yourAccess);
 
   const computerStarting = computerStartLine(state.computerStarts[bot.id], bot.name); useScreensWhile(Boolean(computerStarting));
@@ -996,7 +986,7 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
               <RenameTitle
                 value={bot.name}
                 onCommit={(name) => {
-                  if (window.ogb?.remoteClient?.active) {
+                  if (window.hezuo?.remoteClient?.active) {
                     void api(`/api/bots/${bot.id}/profile`, { method: "PATCH", body: JSON.stringify({ name }) })
                       .then(({ bot: updated }) => dispatch({ type: "botPatched", bot: updated }))
                       .catch((cause) => dispatch({ type: "error", message: cause instanceof Error ? cause.message : String(cause) }));
@@ -1061,40 +1051,7 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
           <ThreadContextWarning bot={bot} messages={messages} />
           {!product && <EngineLimitNotice engine={bot.modelSelection?.instanceId} />}
           {!phone && !product && <ModelPicker key={bot.threadId} bot={bot} threadId={bot.threadId} />}
-          {product && !unifiedPanel && <button
-            type="button"
-            data-product-work-entry="tasks"
-            aria-pressed={state.activityOpen}
-            onClick={() => dispatch({ type: "toggleActivity" })}
-            className={cn(
-              "relative flex size-8 items-center justify-center rounded-full transition-colors hover:bg-ink/[0.06]",
-              state.activityOpen ? "text-accent" : "text-ink-secondary hover:text-ink",
-            )}
-            title={t("product.workPanel.tasks")} aria-label={t("product.workPanel.tasks")}
-          >
-            <ListChecks size={18} aria-hidden="true" />
-          </button>}
           <LiveCallChip currentBotId={bot.id} onOpen={(botId, threadId) => openThread(dispatch, { botId, threadId }, state, showThreads)} />
-          {!remoteClient && bot.browser !== false && <button
-            type="button"
-            data-browser-takeover
-            onClick={() => { requestBrowserTakeover(bot.id, bot.threadId); dispatch({ type: "toggleComputer", open: true }); }}
-            className="shrink-0 rounded-full border border-hairline/40 px-3 py-1.5 text-[12px] text-ink-secondary hover:bg-raised hover:text-ink"
-          >{t("chat.takeBrowser")}</button>}
-          {!phoneMenu && !unifiedPanel && <button
-            data-tour="computer"
-            data-product-work-entry="computer"
-            aria-pressed={product ? state.computerOpen : undefined}
-            onClick={(event) => { if (!state.computerOpen) rememberComputerPanelOpen({ botId: bot.id, opener: event.currentTarget, tabs: event.detail === 0 }); dispatch({ type: "toggleComputer" }); }}
-            className={cn(
-              "relative",
-              "flex size-8 items-center justify-center rounded-full transition-colors hover:bg-ink/[0.06]",
-              state.computerOpen ? "text-accent" : "text-ink-secondary hover:text-ink",
-            )}
-            title={t("chat.computer")} aria-label={browserInUse(bot) ? `${t("chat.computer")}, ${t("place.live")}` : t("chat.computer")}
-          >
-            <Monitor size={18} />{browserInUse(bot) && <span aria-hidden="true" className="absolute right-1 top-1 size-1.5 animate-pulse rounded-full bg-success" data-testid="computer-button-live" />}
-          </button>}
           {phoneMenu ? <ChatMoreMenu bot={bot} phoneHeader /> : (advanced || remoteClient) && <ChatHeaderMenu key={`menu:${bot.threadId}`} bot={bot} />}
         </div>
         </div>

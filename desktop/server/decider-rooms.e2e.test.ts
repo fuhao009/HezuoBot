@@ -84,7 +84,7 @@ beforeAll(async () => {
   await new Promise<void>((resolve) => jev.listen(0, "127.0.0.1", resolve));
   const jevUrl = `http://127.0.0.1:${(jev.address() as AddressInfo).port}`;
 
-  home = mkdtempSync(join(tmpdir(), "omb-decider-rooms-"));
+  home = mkdtempSync(join(tmpdir(), "hezuo-decider-rooms-"));
   data = join(home, ".hezuo");
   const staticDir = join(home, "static");
   mkdirSync(data, { recursive: true });
@@ -120,10 +120,10 @@ beforeAll(async () => {
       ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}),
       HOME: home,
       USERPROFILE: home,
-      OMB_PORT: String(port),
-      OMB_WEBHOOK_PORT: String(port + 1),
-      OMB_STATIC_DIR: staticDir,
-      OMB_JEV_API_KEY: KEY,
+      HEZUO_PORT: String(port),
+      HEZUO_WEBHOOK_PORT: String(port + 1),
+      HEZUO_STATIC_DIR: staticDir,
+      HEZUO_JEV_API_KEY: KEY,
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -280,7 +280,7 @@ describe("Auto rooms ask the decision model who answers", { timeout: 90_000 }, (
   it("engines never see the key; the decision log holds no text and no key", async () => {
     expect(existsSync(engineDump)).toBe(true);
     const dump = readFileSync(engineDump, "utf8");
-    expect(JSON.parse(dump).env).not.toHaveProperty("OMB_JEV_API_KEY");
+    expect(JSON.parse(dump).env).not.toHaveProperty("HEZUO_JEV_API_KEY");
     expect(dump).not.toContain(KEY);
     const dir = join(data, "decider-log");
     const log = readdirSync(dir).map((name) => readFileSync(join(dir, name), "utf8")).join("");
@@ -458,7 +458,7 @@ describe("Auto rooms ask the decision model who answers", { timeout: 90_000 }, (
 
     it("engines never see the OpenRouter decision key", () => {
       const dump = readFileSync(engineDump, "utf8");
-      expect(JSON.parse(dump).env).not.toHaveProperty("OMB_OPENROUTER_DECIDER_KEY");
+      expect(JSON.parse(dump).env).not.toHaveProperty("HEZUO_OPENROUTER_DECIDER_KEY");
       expect(dump).not.toContain(OR_KEY);
     });
   });

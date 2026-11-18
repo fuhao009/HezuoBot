@@ -316,7 +316,7 @@ describe("team export", () => {
     state.skills["bot-a"] = { common: { text: skill("first"), enabled: true } };
     state.skills["bot-b"] = { common: { text: skill("second"), enabled: true } };
     state.skills["bot-c"] = { common: { text: skill("third"), enabled: true } };
-    const dir = mkdtempSync(join(tmpdir(), "omb-team-export-"));
+    const dir = mkdtempSync(join(tmpdir(), "hezuo-team-export-"));
     try {
       const out = join(dir, "team.yaml");
       const ctx = { verb: "team export", flags: { out }, positionals: [], env: {}, io: { out: () => undefined, err: () => undefined, readStdin: async () => "" },
@@ -339,7 +339,7 @@ describe("team export", () => {
     state.bots.find((bot) => bot.name === "Room Lead")!.soul = `Lead the rehearsal. Pay with ${KEY}.`;
     state.briefs["Launch Room"] = `We rehearse a launch. The staging key is ${KEY}.`;
     state.skills["bot-1"]!["launch-report"]!.text = `---\nname: launch-report\ndescription: Write it.\n---\nUpload with ${KEY}\n`;
-    const dir = mkdtempSync(join(tmpdir(), "omb-team-export-"));
+    const dir = mkdtempSync(join(tmpdir(), "hezuo-team-export-"));
     try {
       const out = join(dir, "team.yaml");
       const ctx = { verb: "team export", flags: { out }, positionals: [], env: {}, io: { out: () => undefined, err: () => undefined, readStdin: async () => "" },

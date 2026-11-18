@@ -23,7 +23,7 @@ export function departmentNames(state: Pick<AppState, "sections" | "bots" | "gro
  * workspace, so it asks for the move in one request. */
 export function moveBotsToSection(dispatch: Dispatch<Action>, botIds: string[], section: string): void {
   if (!botIds.length) return;
-  if (typeof window === "undefined" || window.ogb?.remoteClient?.active !== true) {
+  if (typeof window === "undefined" || window.hezuo?.remoteClient?.active !== true) {
     for (const botId of botIds) dispatch({ type: "updateBot", botId, patch: { section } });
     return;
   }
@@ -35,7 +35,7 @@ export function moveBotsToSection(dispatch: Dispatch<Action>, botIds: string[], 
 /** A pinned bot leaves the tiles for `section` (`""`: no department). A remote client may unpin but not file a bot
  * with a profile patch, so it files it by the same request as any other move. */
 export function unpinIntoSection(dispatch: Dispatch<Action>, botId: string, section: string): void {
-  if (typeof window !== "undefined" && window.ogb?.remoteClient?.active === true) {
+  if (typeof window !== "undefined" && window.hezuo?.remoteClient?.active === true) {
     dispatch({ type: "updateBot", botId, patch: { pinned: false } });
     moveBotsToSection(dispatch, [botId], section);
     return;

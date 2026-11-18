@@ -81,7 +81,7 @@ async function upstream(reply: Reply) {
 }
 
 function toolIntegrations(): SendTurnInput["integrations"] {
-  const dir = mkdtempSync(join(tmpdir(), "omb-managed-driver-"));
+  const dir = mkdtempSync(join(tmpdir(), "hezuo-managed-driver-"));
   const script = join(dir, "mcp.mjs");
   writeFileSync(script, MCP_SCRIPT);
   cleanups.push(() => rmSync(dir, { recursive: true, force: true }));
@@ -210,7 +210,7 @@ describe("gateway response metadata", () => {
   });
 
   it("measures the actual request sent to the isolated gateway", async () => {
-    vi.stubEnv("OMB_REQUEST_TOKEN_DIAGNOSTICS", "1");
+    vi.stubEnv("HEZUO_REQUEST_TOKEN_DIAGNOSTICS", "1");
     const log = vi.spyOn(console, "info").mockImplementation(() => {});
     try {
       const f = await upstream(chatText("hello"));

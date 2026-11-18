@@ -15,7 +15,7 @@ export const HEADLESS_USAGE = `Drive a running workspace (scripts, CI, other age
   hezuo connect URL --code CODE --out FILE              get a token for a workspace elsewhere
   hezuo new-bot | new-channel | set-model | edit | mcp
 
-  Server: --url URL (or HEZUO_URL), --port N (or OMB_PORT), else this computer's.
+  Server: --url URL (or HEZUO_URL), --port N (or HEZUO_PORT), else this computer's.
   Token: HEZUO_TOKEN or --token-file FILE. --json prints one JSON document;
   progress goes to stderr (--quiet drops it). hezuo help VERB for the details.`;
 
@@ -26,7 +26,7 @@ export const USAGE = `hezuo — your team of AI bots, ready in a few steps
   hezuo start [the same options as serve]
   hezuo serve [--port 8799] [--data-dir DIR] [--label NAME]
                     [--public-url https://host] [--tailscale | --tunnel | --domain HOST] [--no-pair]
-  hezuo pair  [--label NAME] [--client] [--phone ios|android]
+  hezuo pair  [--label NAME] [--client]
                     [--public-url https://host]
   hezuo sessions [revoke ID]
   hezuo status
@@ -43,7 +43,7 @@ export const USAGE = `hezuo — your team of AI bots, ready in a few steps
                   | delete NAME --yes [--keep-data] | upgrade   (all take --dry-run)
                   | agent [--socket PATH] [--group USER]   (root; installed by init --operator)
 
-setup   choose AI access and optional phone access; keep existing bots and chats
+setup   choose AI access; keep existing bots and chats
 start   same as hezuo: use your saved settings and open the workspace
 serve   starts the server without prompts and prints a pairing link + QR code
 pair    mints a pairing code against a running server (--client: chat only)
@@ -85,7 +85,7 @@ fleet   many client workspaces on one Linux server, each its own account,
              open ports 80 and 443.
 
 --no-open   do not open a browser window
---no-pair   skip phone setup and do not print a pairing code
+--no-pair   do not print a pairing code
 --local     start locally this time, ignoring saved remote-access settings
 
 ${HEADLESS_USAGE}

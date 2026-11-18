@@ -214,13 +214,13 @@ describe("scoped remote MCP subprocess", () => {
 
   it("runs the shipped helpers without a TypeScript source tree", async () => {
     fixture = await remoteFixture("http");
-    scratch = mkdtempSync(join(tmpdir(), "omb-remote-bundle-"));
+    scratch = mkdtempSync(join(tmpdir(), "hezuo-remote-bundle-"));
     await build({ entryPoints: ["mcp-gate.ts", "mcp-remote-proxy.ts"].map((name) => join(SERVER_ROOT, name)), outdir: scratch, bundle: true, platform: "node", format: "esm", logLevel: "silent" });
     const gated = gateServer({ name: "notes", server: fixture.spec, budget: 0, threadId: "fixture", toolScope: { allow: ["mcp:notes:read"] } })!;
     gated.args = [join(scratch, "mcp-gate.js")];
-    const upstream = JSON.parse(gated.env.OMB_GATE_UPSTREAM);
+    const upstream = JSON.parse(gated.env.HEZUO_GATE_UPSTREAM);
     upstream.args = [join(scratch, "mcp-remote-proxy.js")];
-    gated.env.OMB_GATE_UPSTREAM = JSON.stringify(upstream);
+    gated.env.HEZUO_GATE_UPSTREAM = JSON.stringify(upstream);
     start(gated);
     await initialize();
     send({ id: 2, method: "tools/call", params: { name: "read", arguments: { large: true } } });
@@ -462,7 +462,7 @@ describe("remote MCP tool directory", () => {
     fake = await startFakeHttpMcp({ tools: padded, callResult: () => ({ content: [{ type: "text", text: "r".repeat(5_000) }] }) });
     const gated = gateServer({ name: "whop", server: spec(fake.url), threadId: "directory-fixture", budget: 600,
       toolScope: { allow: selected.map((name) => `mcp:whop:${name}`) }, directory: true });
-    expect(gated!.env.OMB_GATE_DIRECTORY).toBe("1");
+    expect(gated!.env.HEZUO_GATE_DIRECTORY).toBe("1");
     start(gated!);
     await initialize();
     const listed = (await request("tools/list")).result.tools;
@@ -498,13 +498,13 @@ describe("remote MCP tool directory", () => {
 
   it("reads its settings from a private record when mounts share one environment", async () => {
     fake = await startFakeHttpMcp({ tools: catalog });
-    const record = `OMB_REMOTE_MCP_CONFIG_${"a".repeat(64)}`;
+    const record = `HEZUO_REMOTE_MCP_CONFIG_${"a".repeat(64)}`;
     const descriptor = mcpStdioServer(spec(fake.url), { directory: { name: "whop" }, configEnvName: record })!;
     expect(descriptor.args!.slice(1)).toEqual(["--config-env", record]);
-    expect(Object.keys(descriptor.env!).filter((name) => name.startsWith("OMB_REMOTE_MCP_"))).toEqual([record]);
+    expect(Object.keys(descriptor.env!).filter((name) => name.startsWith("HEZUO_REMOTE_MCP_"))).toEqual([record]);
     const settings = JSON.parse(descriptor.env![record]!);
-    expect(JSON.parse(settings.OMB_REMOTE_MCP_SERVER)).toMatchObject({ url: fake.url, headers: spec(fake.url).headers });
-    expect(JSON.parse(settings.OMB_REMOTE_MCP_DIRECTORY)).toEqual({ name: "whop" });
+    expect(JSON.parse(settings.HEZUO_REMOTE_MCP_SERVER)).toMatchObject({ url: fake.url, headers: spec(fake.url).headers });
+    expect(JSON.parse(settings.HEZUO_REMOTE_MCP_DIRECTORY)).toEqual({ name: "whop" });
     expect(descriptor.args!.join(" ")).not.toContain("directory-fixture-token");
     start(descriptor);
     await initialize();
@@ -514,7 +514,7 @@ describe("remote MCP tool directory", () => {
   const withoutProxies = () => Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^(https?_proxy|no_proxy|node_use_env_proxy)$/i.test(name)));
 
   // A throwaway certificate for an https:// fake, trusted by the proxy child via NODE_EXTRA_CA_CERTS; undefined without openssl.
-  const tlsDir = mkdtempSync(join(tmpdir(), "omb-remote-proxy-tls-"));
+  const tlsDir = mkdtempSync(join(tmpdir(), "hezuo-remote-proxy-tls-"));
   const tls = makeTestTls(tlsDir);
   afterAll(() => removeTempDir(tlsDir));
 
@@ -636,7 +636,7 @@ describe("remote MCP tool directory", () => {
 
   it("runs from the shipped bundle, schema checks included", async () => {
     fake = await startFakeHttpMcp({ tools: catalog });
-    const scratch = mkdtempSync(join(tmpdir(), "omb-directory-bundle-"));
+    const scratch = mkdtempSync(join(tmpdir(), "hezuo-directory-bundle-"));
     try {
       await build({ entryPoints: [join(SERVER_ROOT, "mcp-remote-proxy.ts")], outdir: scratch, bundle: true, platform: "node", format: "esm", logLevel: "silent" });
       const descriptor = mcpStdioServer(spec(fake.url), { directory: { name: "whop" } })!;
@@ -654,7 +654,7 @@ describe("remote MCP tool directory", () => {
   it("refuses to start on tool directory settings it cannot read", async () => {
     fake = await startFakeHttpMcp({ tools: catalog });
     const descriptor = mcpStdioServer(spec(fake.url))!;
-    start({ ...descriptor, env: { ...descriptor.env, OMB_REMOTE_MCP_DIRECTORY: JSON.stringify({ name: "whop", toolScope: { allow: null } }) } });
+    start({ ...descriptor, env: { ...descriptor.env, HEZUO_REMOTE_MCP_DIRECTORY: JSON.stringify({ name: "whop", toolScope: { allow: null } }) } });
     const [code] = await once(child!, "close");
     expect(code).toBe(1);
     expect(fake.seenHeaders).toEqual([]);

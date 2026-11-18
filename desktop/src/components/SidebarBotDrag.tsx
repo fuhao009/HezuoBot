@@ -81,7 +81,7 @@ export function useSidebarBotDrag({ dispatch, announce, onNamed, onRenamed, onEr
     const { lists, bots } = latest.current;
     const from = botListOf(lists, botId);
     if (move.section === PINNED_LIST && from !== PINNED_LIST) {
-      if (typeof window !== "undefined" && window.ogb?.remoteClient?.active === true) {
+      if (typeof window !== "undefined" && window.hezuo?.remoteClient?.active === true) {
         moveBotsToSection(actions.current.dispatch, [botId], "");
         actions.current.dispatch({ type: "updateBot", botId, patch: { pinned: true } });
       } else actions.current.dispatch({ type: "updateBot", botId, patch: { pinned: true, section: "" } });

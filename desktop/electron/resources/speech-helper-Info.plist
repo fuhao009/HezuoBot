@@ -3,22 +3,22 @@
 <plist version="1.0">
   <dict>
     <key>CFBundleDisplayName</key>
-    <string>Hezuo</string>
+    <string>HezuoBot</string>
     <key>CFBundleExecutable</key>
     <string>speech-helper</string>
     <key>CFBundleIdentifier</key>
-    <string>com.hezuo.app.speech-helper</string>
+    <string>com.hezuobot.app.speech-helper</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>Hezuo Speech</string>
+    <string>HezuoBot Speech</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>LSBackgroundOnly</key>
     <true/>
     <key>NSMicrophoneUsageDescription</key>
-    <string>Hezuo listens while you dictate messages or talk to a bot.</string>
+    <string>HezuoBot listens while you dictate messages or talk to a bot.</string>
     <key>NSSpeechRecognitionUsageDescription</key>
-    <string>Hezuo converts your speech into text during dictation and calls.</string>
+    <string>HezuoBot converts your speech into text during dictation and calls.</string>
   </dict>
 </plist>

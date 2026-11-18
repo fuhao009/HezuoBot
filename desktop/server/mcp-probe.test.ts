@@ -71,7 +71,7 @@ describe("custom MCP probe", () => {
     const anyBot = await opts({ asBot: {} });
     expect(anyBot.box).toEqual({ allowEnv: ["OP_SERVICE_ACCOUNT_TOKEN"] });
     expect(anyBot).not.toHaveProperty("cwd");
-    const folder = mkdtempSync(join(tmpdir(), "omb-probe-bot-"));
+    const folder = mkdtempSync(join(tmpdir(), "hezuo-probe-bot-"));
     try {
       expect(await opts({ asBot: { id: "ada", cwd: folder } })).toMatchObject({ cwd: folder, box: { botId: "ada", allowEnv: ["OP_SERVICE_ACCOUNT_TOKEN"] } });
     } finally { await removeTempDir(folder); }
@@ -90,7 +90,7 @@ describe("custom MCP probe", () => {
   });
 
   it("lists a command's Whop-sized catalog and says how many tools it has", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "omb-probe-big-"));
+    const dir = mkdtempSync(join(tmpdir(), "hezuo-probe-big-"));
     try {
       const file = join(dir, "tools.json");
       writeFileSync(file, JSON.stringify(whopSizedCatalog()));

@@ -60,7 +60,7 @@ const callSignal = (call: PagesCall, ms: number) => call.signal ? AbortSignal.an
 const said = (body: Record<string, unknown>, fallback: string) => typeof body.message === "string" && body.message.trim() ? body.message.trim().slice(0, 500) : fallback;
 
 export function createPagesClient(options: { access: () => PagesAccess | null; notOffered?: () => boolean; selfHosted?: boolean; fetch?: typeof fetch; now?: () => number }) {
-  const http = options.fetch ?? fetch, now = options.now ?? Date.now;
+  const http = options.fetch ?? fetch;
 
   const mint = async (action: "create" | "update" | "delete", call: PagesCall, pageId?: string): Promise<Minted | PagesFailure> => {
     const access = options.access();
@@ -73,12 +73,12 @@ export function createPagesClient(options: { access: () => PagesAccess | null; n
     call.assertActive?.();
     try {
       response = await http(access.url, { method: "POST", redirect: "error", signal: callSignal(call, TOKEN_TIMEOUT_MS), body,
-        headers: { "content-type": "application/json", accept: "application/json", ...pagesAuthHeaders(access, body, now()) } });
+        headers: { "content-type": "application/json", accept: "application/json", ...pagesAuthHeaders(access) } });
     } catch {
       return fail("unavailable", UNAVAILABLE);
     }
     const answer = await readJson(response);
-    if (response.status === 401) return fail("sign_in", access.kind === "desktop" ? "Your Hezuo sign-in has ended. Sign in to Hezuo again in the app's Settings, then ask again." : UNAVAILABLE);
+    if (response.status === 401) return fail("sign_in", "Your Hezuo sign-in has ended. Sign in to Hezuo again in the app's Settings, then ask again.");
     if (response.status === 402) {
       const usage = usageOf(answer.usage);
       return fail("limit", said(answer, "This account's pages are used up."), { ...(usage ? { usage } : {}), upgrade: answer.upgrade === true,

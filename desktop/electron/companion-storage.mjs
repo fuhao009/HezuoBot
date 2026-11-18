@@ -54,20 +54,19 @@ export function createCompanionStorage({ userData, busy = () => false }) {
 
 /**
  * The sidecar child's whole environment. Endpoint variables from the parent's environment are never inherited, and a
- * configured account folder wins over any inherited OMB_COMPANION_DIR so the paired fleet cannot land in another
+ * configured account folder wins over any inherited HEZUO_COMPANION_DIR so the paired fleet cannot land in another
  * account's folder or the home-directory default. Without a configured folder the inherited value stays, as before
  * product accounts. HOME stays untouched: the sidecar only reads it to find Tailscale.
  */
-export function sidecarEnvironment({ base = {}, hostedUrl = null, secretPublicKey = null, internalOrigin = null, directory = null, productAccountTrust = null }) {
+export function sidecarEnvironment({ base = {}, hostedUrl = null, internalOrigin = null, directory = null, productAccountTrust = null }) {
   const environment = { ...base };
-  delete environment.OMB_COMPANION_HOSTED_URL;
-  delete environment.OMB_COMPANION_INTERNAL_ORIGIN;
-  delete environment.OMB_PHONE_SECRET_PUBLIC_KEY;
-  delete environment.OMB_PRODUCT_ACCOUNT_TRUST;
-  if (directory !== null) environment.OMB_COMPANION_DIR = directory;
-  if (hostedUrl) environment.OMB_COMPANION_HOSTED_URL = hostedUrl;
-  if (internalOrigin) environment.OMB_COMPANION_INTERNAL_ORIGIN = internalOrigin;
-  if (/^[A-Za-z0-9_-]{87}$/.test(String(secretPublicKey ?? ""))) environment.OMB_PHONE_SECRET_PUBLIC_KEY = secretPublicKey;
-  if (productAccountTrust) environment.OMB_PRODUCT_ACCOUNT_TRUST = productAccountTrust;
+  delete environment.HEZUO_COMPANION_HOSTED_URL;
+  delete environment.HEZUO_COMPANION_INTERNAL_ORIGIN;
+  delete environment.HEZUO_PHONE_SECRET_PUBLIC_KEY;
+  delete environment.HEZUO_PRODUCT_ACCOUNT_TRUST;
+  if (directory !== null) environment.HEZUO_COMPANION_DIR = directory;
+  if (hostedUrl) environment.HEZUO_COMPANION_HOSTED_URL = hostedUrl;
+  if (internalOrigin) environment.HEZUO_COMPANION_INTERNAL_ORIGIN = internalOrigin;
+  if (productAccountTrust) environment.HEZUO_PRODUCT_ACCOUNT_TRUST = productAccountTrust;
   return environment;
 }

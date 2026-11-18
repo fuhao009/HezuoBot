@@ -52,7 +52,7 @@ const fixture = (displayName: string, environment: Record<string, string>) => ({
 });
 
 beforeAll(async () => {
-  home = mkdtempSync(join(tmpdir(), "omb-room-chat-wait-"));
+  home = mkdtempSync(join(tmpdir(), "hezuo-room-chat-wait-"));
   const data = join(home, ".hezuo");
   const staticDir = join(home, "static");
   mkdirSync(data, { recursive: true });
@@ -82,9 +82,9 @@ beforeAll(async () => {
       ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}),
       HOME: home,
       USERPROFILE: home,
-      OMB_PORT: String(port),
-      OMB_WEBHOOK_PORT: String(port + 1),
-      OMB_STATIC_DIR: staticDir,
+      HEZUO_PORT: String(port),
+      HEZUO_WEBHOOK_PORT: String(port + 1),
+      HEZUO_STATIC_DIR: staticDir,
     },
     stdio: ["ignore", "pipe", "pipe"],
   });

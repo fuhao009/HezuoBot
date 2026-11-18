@@ -15,7 +15,7 @@ import type { LocaleKey } from "@/locales";
 export function useProductAccount(): ProductAccountState {
   const [state, setState] = useState<ProductAccountState>({ auth: "signed_out", runtime: "stopped" });
   useEffect(() => {
-    const bridge = typeof window === "undefined" ? undefined : window.ogb?.productAccount;
+    const bridge = typeof window === "undefined" ? undefined : window.hezuo?.productAccount;
     if (!bridge) return;
     let active = true;
     let changed = false;
@@ -30,7 +30,7 @@ export function useProductAccount(): ProductAccountState {
 
 /** The bridge itself: undefined in a source build or a page that is not the product's. */
 export function useProductAccountBridge(): ProductAccountBridge | undefined {
-  const [bridge] = useState(() => (typeof window === "undefined" ? undefined : window.ogb?.productAccount));
+  const [bridge] = useState(() => (typeof window === "undefined" ? undefined : window.hezuo?.productAccount));
   return bridge;
 }
 

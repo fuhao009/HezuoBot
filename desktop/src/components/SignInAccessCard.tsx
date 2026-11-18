@@ -39,15 +39,12 @@ export function SignInAccessCard() {
   const [role, setRole] = useState<"admin" | "member">("admin");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [publicUrl, setPublicUrl] = useState<string | null>(null);
 
   async function load() {
     try {
       const config = await api("/api/config");
       const current = config?.signIn;
       setLists({ admins: Array.isArray(current?.admins) ? current.admins : [], members: Array.isArray(current?.members) ? current.members : [] });
-      const domain = await api("/api/settings/custom-domain").catch(() => null);
-      setPublicUrl(typeof domain?.publicUrl === "string" ? domain.publicUrl : null);
     } catch (e) {
       setError(t("remote.signInAccess.error", { error: e instanceof Error ? e.message : String(e) }));
     }
@@ -88,12 +85,7 @@ export function SignInAccessCard() {
   const rows = [...lists.admins.map((entry) => ({ entry, role: "admin" as const })), ...lists.members.map((entry) => ({ entry, role: "member" as const }))];
 
   return (
-    <Card title={t("remote.signInAccess.title")} subtitle={t("remote.signInAccess.subtitle")}>
-      {publicUrl ? (
-        <p className="mt-2 text-[13px] text-ink-secondary">
-          {t("remote.signInAccess.link")} <code className="select-all text-ink">{publicUrl}/pair</code>
-        </p>
-      ) : null}
+    <Card title={t("remote.signInAccess.title")}>
       <form
         className="mt-3 flex flex-wrap items-center gap-2"
         onSubmit={(e) => {

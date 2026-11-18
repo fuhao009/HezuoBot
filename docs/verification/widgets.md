@@ -36,10 +36,10 @@ Launch the headless chat UI with a slow fake engine, as in
 
 ```sh
 FAKE_CLAUDE_SLOW_FINISH_GATE=/tmp/widget-gate \
-  node --experimental-strip-types scripts/control-omb.ts ui launch --mode slow
+  node --experimental-strip-types scripts/control-hezuo.ts ui launch --mode slow
 ```
 
-Send Pepper a message so a turn is open, read that turn's `OMB_COMMS_TOKEN`
+Send Pepper a message so a turn is open, read that turn's `HEZUO_COMMS_TOKEN`
 from `fake-claude-dump.json` in the printed data directory, and post two of
 the samples in `packages/shared/widget-samples.ts` to `/api/internal/options-card` as
 `{"tool":"show_widget","widget":…}` with that bearer token. Create the gate
@@ -47,12 +47,12 @@ file to let the turn finish, then:
 
 ```sh
 H=/tmp/hezuo-verify-data-XXXXXX/ui.json
-pnpm control:omb ui snapshot --ui $H
-pnpm control:omb ui click --ui $H --name "Create routine"
-pnpm control:omb ui wait-settle --ui $H --timeout 60
-pnpm control:omb ui click --ui $H --name "Details"
-pnpm control:omb ui screenshot --ui $H --out .omb-scratch/verify-evidence/widgets.png
-pnpm control:omb ui console --ui $H
+pnpm control:hezuo ui snapshot --ui $H
+pnpm control:hezuo ui click --ui $H --name "Create routine"
+pnpm control:hezuo ui wait-settle --ui $H --timeout 60
+pnpm control:hezuo ui click --ui $H --name "Details"
+pnpm control:hezuo ui screenshot --ui $H --out .hezuo-scratch/verify-evidence/widgets.png
+pnpm control:hezuo ui console --ui $H
 ```
 
 Expected: the snapshot holds a `Pull requests` list with three rows and the

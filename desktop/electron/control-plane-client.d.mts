@@ -49,7 +49,7 @@ export interface ControlPlaneEndpoint {
 
 export interface ProductAiCredential {
   id: string;
-  /** `omb_product_ai_…`: only ever held in memory by the account service. */
+  /** `hezuo_product_ai_…`: only ever held in memory by the account service. */
   token: string;
   expiresAt: number;
 }

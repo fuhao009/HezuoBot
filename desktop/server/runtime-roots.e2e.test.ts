@@ -8,7 +8,7 @@ import { DatabaseSync } from "node:sqlite";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { expect, it } from "vitest";
 
-import { launchVerificationServer, runControlOmb, verificationServerArgs, verificationServerEnvironment } from "../../scripts/control-omb.ts";
+import { launchVerificationServer, runControlHezuo, verificationServerArgs, verificationServerEnvironment } from "../../scripts/control-hezuo.ts";
 import { createControlClient } from "./control-client.ts";
 import { removeTempDir, waitForExit } from "./testing/cleanup.ts";
 import { freePortBlock } from "./testing/ports.ts";
@@ -110,7 +110,7 @@ async function composioStub() {
   await new Promise<void>((resolve) => stub.listen(0, "127.0.0.1", resolve));
   const origin = `http://127.0.0.1:${(stub.address() as AddressInfo).port}`;
   return {
-    env: { OMB_COMPOSIO_API: `${origin}/api/v3.1`, OMB_COMPOSIO_TOOLKITS_API: `${origin}/api/v3` },
+    env: { HEZUO_COMPOSIO_API: `${origin}/api/v3.1`, HEZUO_COMPOSIO_TOOLKITS_API: `${origin}/api/v3` },
     connect: (slug: string) => connected.add(slug),
     close: async () => { stub.closeAllConnections(); await new Promise<void>((resolve) => stub.close(() => resolve())); },
   };
@@ -145,7 +145,7 @@ async function scenario(test: (f: any) => Promise<void>, options: { env?: Record
       try { parsed = JSON.parse(raw); } catch {}
       return { status: response.status, body: parsed };
     };
-    const cli = (...args: string[]) => runControlOmb([...args, "--url", url]) as Promise<any>;
+    const cli = (...args: string[]) => runControlHezuo([...args, "--url", url]) as Promise<any>;
     const bot = async (name: string, section: string) => (await cli("new-bot", "--name", name, "--section", section)).bot;
     const clive = await bot("Clive", "Leadership");
     const planPath = join(dataDir, "room-plan.json");
@@ -186,7 +186,7 @@ async function scenario(test: (f: any) => Promise<void>, options: { env?: Record
     const settle = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
     const token = (server: "agents" | "composio" = "agents") => {
       const env = JSON.parse(readFileSync(session.fixtureDumpPath, "utf8")).mcpConfig.mcpServers[server].env;
-      return (server === "agents" ? env.OMB_COMMS_TOKEN : env.OMB_CONNECTOR_TOKEN) as string;
+      return (server === "agents" ? env.HEZUO_COMMS_TOKEN : env.HEZUO_CONNECTOR_TOKEN) as string;
     };
     const internal = async (path: string, body: unknown, bearer: string) => {
       const response = await fetch(`${url}${path}`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${bearer}` },
@@ -392,7 +392,7 @@ it("T6 continues a person's step-capped turn in place on the same root", async (
 const itHost = process.platform === "linux" ? it.skip : it;
 itHost("T7 queues a root on the computer seat at the wait ceiling and continues it when the seat frees", async () => {
   const CEILING_MS = 1_500;
-  const home = mkdtempSync(join(tmpdir(), "omb-runtime-roots-seat-"));
+  const home = mkdtempSync(join(tmpdir(), "hezuo-runtime-roots-seat-"));
   const data = join(home, "data");
   const ui = join(home, "static");
   const stateFile = join(home, "vm.json");
@@ -422,9 +422,9 @@ itHost("T7 queues a root on the computer seat at the wait ceiling and continues 
   };
   const dumpFor = (botId: string): Promise<any> => until((): any => {
     if (!existsSync(dumpFile)) return null;
-    try { const sent = JSON.parse(readFileSync(dumpFile, "utf8")); return sent.mcpConfig?.mcpServers?.computer?.env?.OMB_CONTROL_URL?.includes(botId) ? sent : null; } catch { return null; }
+    try { const sent = JSON.parse(readFileSync(dumpFile, "utf8")); return sent.mcpConfig?.mcpServers?.computer?.env?.HEZUO_CONTROL_URL?.includes(botId) ? sent : null; } catch { return null; }
   }, Boolean);
-  const gate = (sent: any) => createControlClient({ url: sent.mcpConfig.mcpServers.computer.env.OMB_CONTROL_URL, token: sent.mcpConfig.mcpServers.computer.env.OMB_CONTROL_TOKEN }).state(true);
+  const gate = (sent: { mcpConfig: { mcpServers: { computer: { env: { HEZUO_CONTROL_URL: string; HEZUO_CONTROL_TOKEN: string } } } } }) => createControlClient({ url: sent.mcpConfig.mcpServers.computer.env.HEZUO_CONTROL_URL, token: sent.mcpConfig.mcpServers.computer.env.HEZUO_CONTROL_TOKEN }).state(true, { observation: "1" });
   const taskOf = (botId: string, threadId: string) => api("GET", "/api/bots?messages=0").then(({ body }) =>
     body.bots.find((bot: any) => bot.id === botId)?.tasks.find((task: any) => task.threadId === threadId));
   const roots = () => readRuntimeDb(data).assignments.filter((row) => !row.parentId);
@@ -440,17 +440,17 @@ itHost("T7 queues a root on the computer seat at the wait ceiling and continues 
       mode: "embedded", status: "ready", socketPath: join(home, "cua.sock"), mcpCommand: "/fixture/cua-driver", mcpArgs: ["mcp"], mcpEnv: {},
     }), { mode: 0o600 });
     writeFileSync(join(data, "config.json"), JSON.stringify({ instances: { claude: {
-      driver: "claudeAgent", config: { cli: join(ROOT, "server/testing/fake-claude-cli.ts") },
+      driver: "claudeAgent", config: { cli: join(ROOT, "desktop/server/testing/fake-claude-cli.ts") },
       environment: { FAKE_CLAUDE_MODE: "slow", FAKE_CLAUDE_DUMP: dumpFile, FAKE_CLAUDE_SLOW_FINISH_GATE: finishFile },
     } } }));
-    const proc = spawn(process.execPath, ["--import", pathToFileURL(join(ROOT, "server/testing/group-local-vm-hooks.mjs")).href,
-      "--import", pathToFileURL(join(ROOT, "server/testing/desktop-parent.mjs")).href, join(ROOT, "server/index.ts")], {
+    const proc = spawn(process.execPath, ["--import", pathToFileURL(join(ROOT, "desktop/server/testing/group-local-vm-hooks.mjs")).href,
+      "--import", pathToFileURL(join(ROOT, "desktop/server/testing/desktop-parent.mjs")).href, join(ROOT, "desktop/server/index.ts")], {
       cwd: ROOT, env: {
         PATH: dirname(process.execPath), ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}),
-        HOME: home, USERPROFILE: home, OMB_DATA_DIR: data, APPDATA: join(home, "appdata"), LOCALAPPDATA: join(home, "localappdata"),
-        TEMP: home, TMP: home, TMPDIR: home, OMB_PORT: String(port), OMB_WEBHOOK_PORT: String(port + 1), OMB_STATIC_DIR: ui, OMB_TEST_VM_STATE: stateFile,
-        OMB_TEST_DESKTOP_CUA_CONNECTION: join(home, "user-data", "cua-connection.json"), OMB_COMPUTER_CALL_WAIT_MS: "4000", OMB_COMPUTER_CALL_ACT_WITHIN_MS: "1000",
-        OMB_COMPUTER_WAIT_MAX_MS: String(CEILING_MS),
+        HOME: home, USERPROFILE: home, HEZUO_DATA_DIR: data, APPDATA: join(home, "appdata"), LOCALAPPDATA: join(home, "localappdata"),
+        TEMP: home, TMP: home, TMPDIR: home, HEZUO_PORT: String(port), HEZUO_WEBHOOK_PORT: String(port + 1), HEZUO_STATIC_DIR: ui, HEZUO_TEST_VM_STATE: stateFile,
+        HEZUO_TEST_DESKTOP_CUA_CONNECTION: join(home, "user-data", "cua-connection.json"), HEZUO_COMPUTER_CALL_WAIT_MS: "4000", HEZUO_COMPUTER_CALL_ACT_WITHIN_MS: "1000",
+        HEZUO_COMPUTER_WAIT_MAX_MS: String(CEILING_MS),
       }, stdio: ["ignore", "pipe", "pipe"],
     });
     child = proc;
@@ -697,7 +697,7 @@ it("T10 parks a teammate's turn on its credential card, tells the Chief at once,
 }), hostTimeout(90_000));
 
 it("T11 does not rerun a cut turn that already pushed: the root ends with what it did, said once", async () => {
-  const home = mkdtempSync(join(tmpdir(), "omb-runtime-roots-outward-"));
+  const home = mkdtempSync(join(tmpdir(), "hezuo-runtime-roots-outward-"));
   try {
     await scenario(async (f) => {
       const job = f.clive.activeTaskId;
@@ -734,7 +734,7 @@ it("T11 does not rerun a cut turn that already pushed: the root ends with what i
   }
 }, hostTimeout(90_000));
 
-const STALL_CLOCK = { OMB_TEST_STALL_CLOCK: "1" };
+const STALL_CLOCK = { HEZUO_TEST_STALL_CLOCK: "1" };
 
 type CardState = { status?: string; stopped?: boolean; resumed?: boolean };
 type StallFixture = {

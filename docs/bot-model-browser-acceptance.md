@@ -19,13 +19,13 @@
 
 ## 测试账号与凭据定位
 
-- 测试账号：`beta-a@hezuo.test`。用户已于 2026-11-14 提供开发密码并授权本机保存；凭据文件为 `.omb-scratch/development-test-credentials.md`（Git 忽略，权限 `0600`）。后续从该文件读取并通过正常登录流程验证，不再次索要已保存密码。
+- 测试账号：`beta-a@hezuo.test`。用户已于 2026-11-14 提供开发密码并授权本机保存；凭据文件为 `.hezuo-scratch/development-test-credentials.md`（Git 忽略，权限 `0600`）。后续从该文件读取并通过正常登录流程验证，不再次索要已保存密码。
 - 服务端：`root@192.168.66.193`，账号网关 `https://192.168.66.193:18487`；连接内网时取消代理环境变量。
 - 数据目录：`/var/lib/hezuo-gateway/`。数据库位置和模型目录见 [网关部署记录](gateway-deployment-193.md)。
 - 只读核对已确认存在认证表 `user`、`account`、`session`；其中有 `account.password`、`session.token` 等敏感字段。不要将它们导出到文档或日志；密码字段不等于可直接登录的明文密码，已有 session 也不能当作永久测试凭据。
 - `/var/lib/hezuo-gateway/secrets/better-auth-secret` 是服务端认证密钥，不是测试账号密码，不能用于模拟用户登录或复制到电脑端。
 - 上游模型渠道的 `encryptedKey` 是网关使用的加密模型凭据，不是测试账号凭据；Bot 应通过账号网关使用模型，不绕过网关直连上游。
-- 已有隔离验收登录入口 `.omb-scratch/acceptance-relay.mjs` 从进程环境变量 `HEZUO_ACCEPTANCE_PASSWORD` 读取该测试账号密码。使用前须检查脚本的临时路径及账号状态；通过安全存储在运行时注入，不写入命令参数、受版本控制的文件或报告。
+- 已有隔离验收登录入口 `.hezuo-scratch/acceptance-relay.mjs` 从进程环境变量 `HEZUO_ACCEPTANCE_PASSWORD` 读取该测试账号密码。使用前须检查脚本的临时路径及账号状态；通过安全存储在运行时注入，不写入命令参数、受版本控制的文件或报告。
 - `/tmp/hezuo-acceptance-relay.json` 是临时中继连接描述，包含敏感认证信息；文件存在不表示中继仍运行，不输出其内容或复制到文档。本次检查旧中继连接被拒绝，不能直接复用。
 - 2026-11-14 已使用用户提供的开发密码，通过项目 `signInWithPassword` 正常登录成功，耗时 186 ms；未修改密码。该结果仅证明账号登录，不代表 Bot 网页任务通过。测试时只在内存中读取和传递凭据，不输出登录令牌。
 

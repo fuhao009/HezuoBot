@@ -24,7 +24,6 @@ quick ask to land.
 - Typing into the box (it cannot take focus by design).
 - Choosing another bot or a free-form key (three presets only).
 - Reading the reply aloud.
-- Asking from the phone apps.
 
 ## Anti-goals
 
@@ -119,19 +118,17 @@ in `REMOTE_SAFE`.
   replaced callback fires; the panel state machine (listening → reply → hide,
   needs-you, empty transcript, server down, timeout) against a fake server and
   fake SSE.
-- Swift: release detection by injecting the flags reader (a flag that pretends
-  the keys were released).
-- By hand on a Mac (OMB2 side-by-side build): hold, speak, release from Safari;
+- By hand on a Mac (Hezuo side-by-side build): hold, speak, release from Safari;
   the box never takes focus; a call in progress blocks it; the reply lands in
   Hezuo's chat.
 
 ## Decisions
 
-- Omkar, 2026-10-27: asks land in one dedicated Hezuo chat, "Quick asks",
+- maintainer, 2026-10-27: asks land in one dedicated Hezuo chat, "Quick asks",
   created on first use and reused (follow-ups keep context; asks never mix into
   work running in another chat). If it was deleted, a new one is made. Its id is
   kept in desktop prefs per server.
-- Omkar, 2026-10-27: default key ⌃⌥Space. macOS uses ⌃⌥Space for "Select next
+- maintainer, 2026-10-27: default key ⌃⌥Space. macOS uses ⌃⌥Space for "Select next
   source in Input menu", which clashes for people with two keyboard layouts, so
   Settings offers ⌃⌥Space, ⌃⇧Space and ⌥⇧Space (⌥⌘Space is the Finder search window). Release detection follows the
   chosen key's modifiers. This replaces the "no remapping" non-goal.

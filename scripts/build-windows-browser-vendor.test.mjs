@@ -11,11 +11,17 @@ describe("reviewed Windows browser dependency build", () => {
     expect(WINDOWS_VENDOR_SOURCE.commit).toBe("eb05921bad874cd2a1b4fa5d1149f1ed26576cae");
     expect(WINDOWS_VENDOR_SOURCE.url).toContain(WINDOWS_VENDOR_SOURCE.commit);
     expect(WINDOWS_VENDOR_TARGET).toBe("x86_64-pc-windows-gnu");
-    expect(WINDOWS_VENDOR_VERSION).toBe("0.36.0-omb.2");
+    expect(WINDOWS_VENDOR_VERSION).toBe("0.36.0-hezuo.2");
     expect(WINDOWS_VENDOR_RUST).toBe("1.97.1");
     expect(WINDOWS_VENDOR_PNPM).toBe("11.1.3");
-    expect(WINDOWS_VENDOR_PATCH_SHA256).toMatch(/^[0-9a-f]{64}$/);
+    expect(WINDOWS_VENDOR_PATCH_SHA256).toBe("82853c63e369ce7dffb6cff4924b5582e4ae5d296154eb1888feb28054c3a45f");
     const patch = readFileSync(new URL("../third_party/browser/agent-browser-windows-stdio.patch", import.meta.url));
+    expect(patch.toString()).toContain(`Hezuo Windows vendor revision ${WINDOWS_VENDOR_VERSION}.`);
+    const packageVersions = [...patch.toString().matchAll(/^\+version = "([^"]+)"$/gm)].map((match) => match[1]);
+    expect(packageVersions).toEqual([WINDOWS_VENDOR_VERSION, WINDOWS_VENDOR_VERSION]);
+    expect(patch.toString()).toContain("Original Windows modifications by OpenMausBot; modification notices retained below.");
+    expect(patch.toString().match(/Modified by OpenMausBot:/g)).toHaveLength(4);
+    expect(patch.toString()).toContain("81a98c349d04195396ffae6898bd375ad64280de");
     expect(() => verifyVendorPatch(patch)).not.toThrow();
     expect(() => verifyVendorPatch(Buffer.concat([patch, Buffer.from("\n")]))).toThrow(/SHA-256/);
     const changed = [...patch.toString().matchAll(/^diff --git a\/(\S+) /gm)].map((match) => match[1]);
@@ -44,7 +50,7 @@ describe("reviewed Windows browser dependency build", () => {
   });
 
   it("requires an explicit absolute output without accepting extra options", () => {
-    const output = join(tmpdir(), "omb-vendor-output");
+    const output = join(tmpdir(), "hezuo-vendor-output");
     expect(parseVendorBuildArgs(["--output", output])).toBe(output);
     for (const args of [[], ["--output", "relative"], ["--output", output, "--skip-verify"], ["--source", output]]) {
       expect(() => parseVendorBuildArgs(args)).toThrow(/Usage/);

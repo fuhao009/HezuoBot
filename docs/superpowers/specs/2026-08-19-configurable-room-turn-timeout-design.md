@@ -2,7 +2,7 @@
 
 ## Summary
 
-Hezuo currently stops every room member turn after five minutes, even when the engine is still producing output. The duration and the error message are hard-coded in `desktop/server/index.ts`. This behavior is separate from the activity-based turn stall watchdog controlled by `OMB_TURN_STALL_MS`.
+Hezuo currently stops every room member turn after five minutes, even when the engine is still producing output. The duration and the error message are hard-coded in `desktop/server/index.ts`. This behavior is separate from the activity-based turn stall watchdog controlled by `HEZUO_TURN_STALL_MS`.
 
 Add one global, persisted room turn timeout setting. Keep five minutes as the default, expose the setting in the existing General settings UI, and use the configured value for room turns started after the setting is saved.
 
@@ -18,7 +18,7 @@ Add one global, persisted room turn timeout setting. Keep five minutes as the de
 ## Non-goals
 
 - Per-room or per-bot timeout overrides.
-- Changing `OMB_TURN_STALL_MS` or the semantics of the stall watchdog.
+- Changing `HEZUO_TURN_STALL_MS` or the semantics of the stall watchdog.
 - Changing provider-specific approval or RPC timeouts.
 - Retiming room turns that are already running when the setting changes.
 - Adding an environment-variable override for the room turn ceiling.
@@ -78,7 +78,6 @@ When a config status update arrives, the field synchronizes to the server value 
 ## Data Flow
 
 1. `GET /api/config` returns `rooms.turnTimeoutMinutes` with an effective default of 5.
-2. The app store hydrates and folds config events with the `rooms` status included.
 3. The General settings card edits the value and sends `PUT /api/config` with only the `rooms` patch.
 4. The server validates and persists the patch, updates the live config object, and broadcasts the resulting config status.
 5. Each new room member turn captures the effective duration and starts its absolute timeout timer.

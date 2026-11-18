@@ -1,9 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createRequire } from "node:module";
-
-// Node tests run without Electron: satisfy preload's require("electron") from the require cache; the real preload still runs.
-const require = createRequire(import.meta.url);
+import { readFileSync } from "node:fs";
+import { runInNewContext } from "node:vm";
 
 const listeners = new Map();
 const exposed = { name: null, api: null };
@@ -17,7 +15,8 @@ const fakeIpcRenderer = {
     listeners.get(channel)?.delete(handler);
   },
   invoke: async (...args) => { invocations.push(args); },
-  send: () => undefined,
+  send: (...args) => { invocations.push(args); },
+  sendSync: (...args) => { invocations.push(args); return null; },
 };
 const fakeElectron = {
   ipcRenderer: fakeIpcRenderer,
@@ -30,31 +29,25 @@ const fakeElectron = {
   webUtils: { getPathForFile: () => "" },
 };
 
-const electronEntry = require.resolve("electron");
-require.cache[electronEntry] = {
-  id: electronEntry,
-  filename: electronEntry,
-  loaded: true,
-  exports: fakeElectron,
-};
-require("./preload.cjs");
+const source = readFileSync(new URL("./preload.cjs", import.meta.url), "utf8");
+const localOrigin = "http://127.0.0.1:43123";
+runInNewContext(source, {
+  require: (name) => { assert.equal(name, "electron"); return fakeElectron; },
+  process: { platform: process.platform, argv: [`--hezuo-local-origin=${localOrigin}`] },
+  location: { origin: localOrigin },
+  navigator: { userActivation: { isActive: false } },
+  queueMicrotask,
+}, { filename: "preload.cjs" });
 
 const emit = (channel, ...args) => {
   for (const handler of listeners.get(channel) ?? []) handler({}, ...args);
 };
 const subscriberCount = (channel) => listeners.get(channel)?.size ?? 0;
 
-test("exposes the full local-shell bridge on window.ogb", () => {
-  assert.equal(exposed.name, "ogb");
+test("exposes the full local-shell bridge on window.hezuo", () => {
+  assert.equal(exposed.name, "hezuo");
   assert.equal(typeof exposed.api, "object");
   assert.equal(typeof exposed.api.onOpenAppSettings, "function");
-});
-
-test("desktopNotices keeps shown() for a Cloud page on an older release, and asks main nothing", async () => {
-  // 0.1.135's page calls desktopNotices.shown(...) as its Cloud Pro popup opens; without it the page threw and went blank.
-  const before = invocations.length;
-  assert.equal(await exposed.api.desktopNotices.shown("cloud-pro-update-2026-10"), false);
-  assert.deepEqual(invocations.slice(before), []);
 });
 
 test("openLogsFolder asks main for its own logs folder and names no path", async () => {
@@ -70,7 +63,7 @@ test("copyText forwards only the text over the explicit clipboard:write-text cha
   assert.equal("ipcRenderer" in exposed.api, false);
 });
 
-test("browser control forwards a separate per-device capability, not the cloud grant", async () => {
+test("browser control forwards a separate per-device capability", async () => {
   const before = invocations.length;
   await exposed.api.companion.browserControl("phone-1", true);
   await exposed.api.companion.browserControl("phone-1", false);
@@ -86,13 +79,7 @@ test("the talk bridge asks main over its own channels with only what it understa
   await exposed.api.talkShortcut.set({ enabled: false, key: "ctrl-shift-space", extra: "x" });
   await exposed.api.callActive(true);
   await exposed.api.callActive("yes");
-  assert.deepEqual(invocations.slice(before), [["talk-shortcut:state"], ["talk-shortcut:set", { enabled: false, key: "ctrl-shift-space" }], ["call:active", true], ["call:active", false]]);
-});
-
-test("account prepare asks for the secure address over its own channel and sends nothing from the page", async () => {
-  const before = invocations.length;
-  await exposed.api.companionAccount.prepare({ endpoint: "https://evil.example.test" });
-  assert.deepEqual(invocations.slice(before), [["companion-account:prepare"]]);
+  assert.deepEqual(JSON.parse(JSON.stringify(invocations.slice(before))), [["talk-shortcut:state"], ["talk-shortcut:set", { enabled: false, key: "ctrl-shift-space" }], ["call:active", true], ["call:active", false]]);
 });
 
 test("onOpenAppSettings subscribes to the exact app:open-settings channel, forwards every emit, and unsubscribes cleanly", () => {
@@ -138,7 +125,7 @@ test("a transient subscription cannot consume a cold-start action before the act
   unsubscribe();
 });
 
-test("native Settings requests accept only the fixed organisation section, Cloud link and plain Cloud settings", () => {
+test("native Settings requests accept only the fixed organisation section", () => {
   const calls = [];
   const unsubscribe = exposed.api.onOpenAppSettings(section => calls.push(section));
   emit("app:open-settings", "organization");
@@ -146,23 +133,77 @@ test("native Settings requests accept only the fixed organisation section, Cloud
   emit("app:open-settings", "cloud-settings");
   emit("app:open-settings", "https://other.example");
   emit("app:open-settings", "cloudAccount");
-  emit("app:open-settings", "hezuo://cloud");
+  emit("app:open-settings", "hezuobot://cloud");
   emit("app:open-settings", { section: "organization", url: "https://other.example" });
   emit("app:open-settings", ["cloud"]);
-  assert.deepEqual(calls, ["organization", "cloud", "cloud-settings", undefined, undefined, undefined, undefined, undefined]);
+  assert.deepEqual(calls, ["organization", undefined, undefined, undefined, undefined, undefined, undefined, undefined]);
   unsubscribe();
 });
 
-test("a Cloud link arriving before React subscriptions is delivered exactly once after mount", async () => {
+test("unrecognised Settings requests are not retained before subscriptions mount", async () => {
   emit("app:open-settings", "https://other.example");
   emit("app:open-settings", "cloud");
   const calls = [];
   const unsubscribe = exposed.api.onOpenAppSettings(section => calls.push(section));
   await Promise.resolve();
-  assert.deepEqual(calls, ["cloud"]);
+  assert.deepEqual(calls, []);
   unsubscribe();
   const late = exposed.api.onOpenAppSettings(section => calls.push(section));
   await Promise.resolve();
-  assert.deepEqual(calls, ["cloud"], "later subscriptions must not reopen Settings");
+  assert.deepEqual(calls, [], "unrecognised requests must not reopen Settings");
   late();
+});
+
+test("local permission and policy controls use dedicated native channels", async () => {
+  const before = invocations.length;
+  await exposed.api.permStatus();
+  await exposed.api.permRequestMic();
+  await exposed.api.permOpenSettings("microphone");
+  await exposed.api.localControl.status();
+  await exposed.api.localControl.enable();
+  await exposed.api.localControl.disable();
+  await exposed.api.localControl.retry();
+  await exposed.api.computerUsePolicy.get();
+  const policy = { enabled: false };
+  await exposed.api.computerUsePolicy.set(policy);
+  await exposed.api.approvals.setMode("bot-1", "custom", { source: "settings" });
+  assert.deepEqual(invocations.slice(before), [
+    ["perm:status"], ["perm:request-mic"], ["perm:open-settings", "microphone"],
+    ["cua:linux-status"], ["cua:linux-enable"], ["cua:linux-disable"], ["cua:linux-retry"],
+    ["computer-use-policy:get"], ["computer-use-policy:set", policy],
+    ["approvals:set-trusted-mode", "bot-1", "custom", { source: "settings" }],
+  ]);
+});
+
+test("screen preview intent uses a synchronous one-shot channel with no renderer payload", () => {
+  const before = invocations.length;
+  exposed.api.beginScreenPreviewIntent({ sourceId: "arbitrary" });
+  assert.deepEqual(invocations.slice(before), [["screen:preview-intent"]]);
+});
+
+test("capability updates omit the Electron event and release their listener", () => {
+  const calls = [];
+  const before = subscriberCount("desktop:capabilities-changed");
+  const unsubscribe = exposed.api.onCapabilitiesChanged(value => calls.push(value));
+  assert.equal(subscriberCount("desktop:capabilities-changed"), before + 1);
+  const capabilities = { localControl: true };
+  emit("desktop:capabilities-changed", capabilities);
+  assert.deepEqual(calls, [capabilities]);
+  unsubscribe();
+  assert.equal(subscriberCount("desktop:capabilities-changed"), before);
+  emit("desktop:capabilities-changed", {});
+  assert.deepEqual(calls, [capabilities]);
+});
+
+test("desktop notices use the active state and seen channels", async () => {
+  const before = invocations.length;
+  await exposed.api.desktopNotices.state();
+  await exposed.api.desktopNotices.seen(42);
+  assert.deepEqual(invocations.slice(before), [["desktop-notices:state"], ["desktop-notices:seen", "42"]]);
+});
+
+test("desktop capabilities are queried without renderer-supplied claims", async () => {
+  const before = invocations.length;
+  await exposed.api.getCapabilities({ fullControl: true });
+  assert.deepEqual(invocations.slice(before), [["desktop:capabilities"]]);
 });

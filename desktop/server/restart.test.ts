@@ -1,8 +1,8 @@
 import { EventEmitter } from "node:events";
 import type { ChildProcess } from "node:child_process";
 import { expect, it, vi } from "vitest";
-import type { CliOptions } from "./cli.ts";
-import { serveUntilStopped } from "./cli.ts";
+import type { CliOptions } from "./server-control.ts";
+import { serveUntilStopped } from "./server-control.ts";
 import { RESTART_EXIT_CODE, restartPolicy, STABLE_RUN_MS } from "./restart.ts";
 import { superviseServer } from "./server-launcher.ts";
 
@@ -23,7 +23,7 @@ it("one policy counts for every launcher: again only on 75, not while stopping, 
   expect(policy.again(RESTART_EXIT_CODE)).toBe(false);
 });
 
-const options = { command: "serve", port: 8799, dataDir: "/tmp/omb", tailscale: false, tunnel: false, client: false, pair: true, json: false } as CliOptions;
+const options = { command: "serve", port: 8799, dataDir: "/tmp/omb", tailscale: false, client: false, pair: true, json: false } as CliOptions;
 
 it("`serve` starts the server again in the same process on 75, without a second pairing code or browser tab", async () => {
   const codes = [RESTART_EXIT_CODE, RESTART_EXIT_CODE, 0];

@@ -257,7 +257,7 @@ async function run() {
     const initialPublication = {
       revision: 0, reason: "Publish disposable admin fixture",
       channels: [{ id: "fixture", name: "Disposable fixture", baseURL: `https://${HOST}:${upstreamPort}/v1`, enabled: true, apiKey: upstreamKey }],
-      models: [...MODELS.map(value => ({ ...value, channelId: "fixture" })), ...(taskBilling ? taskModels.map(({ capacity, ...value }) => ({ ...model, ...value, maxContextTokens: 2048, maxOutputTokens: 128, channelId: "fixture" })) : [])], defaultModel: model.id,
+      models: [...MODELS.map(value => ({ ...value, channelId: "fixture" })), ...(taskBilling ? taskModels.map(({ capacity: _capacity, ...value }) => ({ ...model, ...value, maxContextTokens: 2048, maxOutputTokens: 128, channelId: "fixture" })) : [])], defaultModel: model.id,
     };
     await (await request("/v1/operator/channels", 200, operatorToken, initialPublication)).json();
     const discovery = await (await request("/v1/operator/channels/fixture/probe", 200, operatorToken, {})).json();

@@ -122,7 +122,7 @@ export function stopCompanion() {
   return serialize(() => stop());
 }
 
-async function start({ resourcesPath, harnessPort, mutationToken, hostedUrl = null, secretPublicKey = null, productAccountTrust = null, log }, directory) {
+async function start({ resourcesPath, harnessPort, mutationToken, hostedUrl = null, productAccountTrust = null, log }, directory) {
   if (proc) return companionState();
   lastError = null;
   const resolved = entryPoint(resourcesPath);
@@ -149,7 +149,7 @@ async function start({ resourcesPath, harnessPort, mutationToken, hostedUrl = nu
   };
 
   // Never inherit an endpoint from the launch environment: main passes one only after verifying the connector.
-  const childEnvironment = sidecarEnvironment({ base: process.env, hostedUrl, secretPublicKey, internalOrigin: allocatedOrigin.socketPath, directory, productAccountTrust });
+  const childEnvironment = sidecarEnvironment({ base: process.env, hostedUrl, internalOrigin: allocatedOrigin.socketPath, directory, productAccountTrust });
 
   controlToken = randomBytes(32).toString("base64url");
   let child;
@@ -157,9 +157,9 @@ async function start({ resourcesPath, harnessPort, mutationToken, hostedUrl = nu
     child = utilityProcess.fork(resolved.entry, [], {
       env: {
         ...childEnvironment,
-        OMB_PORT: String(harnessPort),
-        OMB_COMPANION_PORT: String(COMPANION_PORT),
-        OMB_CONTROL_PORT: String(CONTROL_PORT),
+        HEZUO_PORT: String(harnessPort),
+        HEZUO_COMPANION_PORT: String(COMPANION_PORT),
+        HEZUO_CONTROL_PORT: String(CONTROL_PORT),
       },
       execArgv: resolved.execArgv,
       stdio: ["ignore", "pipe", "pipe"],
@@ -326,7 +326,7 @@ export async function companionPairing(open, expectedToken) {
   if (!proc) return companionState();
   const conditionalClose = !open && expectedToken !== undefined;
   const candidate = String(expectedToken ?? "");
-  const token = /^omb_pair_[A-Za-z0-9_-]{43}$/.test(candidate)
+  const token = /^hezuo_pair_[A-Za-z0-9_-]{43}$/.test(candidate)
     ? candidate
     : "invalid-pairing-token";
   const path = conditionalClose

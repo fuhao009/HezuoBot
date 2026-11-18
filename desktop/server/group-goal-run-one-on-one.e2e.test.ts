@@ -55,7 +55,7 @@ const sendGoal = (bot: { id: string; threadId: string }, text: string, extra: Re
   api("POST", `/api/bots/${bot.id}/messages`, { text, mode: "goal", threadId: bot.threadId, ...extra });
 
 beforeAll(async () => {
-  home = mkdtempSync(join(tmpdir(), "omb-one-on-one-goal-"));
+  home = mkdtempSync(join(tmpdir(), "hezuo-one-on-one-goal-"));
   slowGate = join(home, "slow-finish");
   patientGate = join(home, "patient-finish");
   const data = join(home, ".hezuo");
@@ -108,8 +108,8 @@ beforeAll(async () => {
       ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}),
       HOME: home,
       USERPROFILE: home,
-      OMB_PORT: String(port),
-      OMB_WEBHOOK_PORT: String(port + 1),
+      HEZUO_PORT: String(port),
+      HEZUO_WEBHOOK_PORT: String(port + 1),
     },
     stdio: ["ignore", "pipe", "pipe"],
   });

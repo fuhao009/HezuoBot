@@ -22,7 +22,7 @@ const electron = electronBinary();
 const xvfb = process.platform === "linux" && !process.env.DISPLAY ? spawnSync("which", ["xvfb-run"], { encoding: "utf8" }).stdout.trim() : "";
 const canRun = Boolean(electron) && (process.platform !== "linux" || Boolean(process.env.DISPLAY) || Boolean(xvfb));
 
-it.runIf(canRun)("embedded browser logs real webpage network metadata without replacing its security gate", async () => {
+it.runIf(canRun)("embedded browser logs real network metadata and preserves native takeover state", async () => {
   const fixture = fileURLToPath(new URL("./fixtures/embedded-browser-network-smoke.mjs", import.meta.url));
   const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !/TOKEN|SECRET|API_KEY|PASSWORD|CREDENTIAL|SESSION|OTP|OPERATOR|ELECTRON_RUN_AS_NODE/i.test(key)));
   const directory = mkdtempSync(path.join(tmpdir(), "hezuo-browser-network-receipt-"));
@@ -41,6 +41,14 @@ it.runIf(canRun)("embedded browser logs real webpage network metadata without re
     const diagnostic = `receipt:\n${JSON.stringify(evidence)}\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`;
     expect(result.code, diagnostic).toBe(0);
     expect(evidence.complete, diagnostic).toBe(true);
+    expect(evidence.takeover, diagnostic).toEqual({
+      sameWebContents: true,
+      profileCookiePreserved: true,
+      focusesExisting: true,
+      independentTitledWindows: true,
+      closeReleaseIPC: true,
+      humanScan: "manual, not exercised",
+    });
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

@@ -28,7 +28,7 @@ describe("Codex account identity", () => {
   };
 
   beforeEach(() => {
-    home = mkdtempSync(join(tmpdir(), "omb-codex-identity-"));
+    home = mkdtempSync(join(tmpdir(), "hezuo-codex-identity-"));
     mkdirSync(join(home, ".codex"));
     chmodSync(FAKE_CLI, 0o755);
   });

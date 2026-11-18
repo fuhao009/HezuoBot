@@ -42,7 +42,7 @@ function importComputerProvidersInChild(dataDir: string): Promise<void> {
       process.execPath,
       ["--experimental-strip-types", "--input-type=module", "--eval", source],
       {
-        env: { ...process.env, OMB_DATA_DIR: dataDir },
+        env: { ...process.env, HEZUO_DATA_DIR: dataDir },
         stdio: ["ignore", "ignore", "pipe"],
       },
     );
@@ -60,13 +60,13 @@ function importComputerProvidersInChild(dataDir: string): Promise<void> {
 
 afterEach(() => {
   for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
-  delete process.env.OMB_APP_VERSION;
-  delete process.env.OMB_ENVIRONMENT_LABEL;
+  delete process.env.HEZUO_APP_VERSION;
+  delete process.env.HEZUO_ENVIRONMENT_LABEL;
 });
 
 describe("environment identity", () => {
   it("creates the id once, owner-only, and keeps it across restarts", () => {
-    const dir = mkdtempSync(join(tmpdir(), "omb-env-"));
+    const dir = mkdtempSync(join(tmpdir(), "hezuo-env-"));
     dirs.push(dir);
     const id = loadEnvironmentId(dir);
     expect(id).toMatch(/^[0-9a-f-]{36}$/);
@@ -75,7 +75,7 @@ describe("environment identity", () => {
   });
 
   it("publishes one complete id when independent processes start together", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "omb-env-"));
+    const dir = mkdtempSync(join(tmpdir(), "hezuo-env-"));
     dirs.push(dir);
 
     const ids = await Promise.all(Array.from({ length: 12 }, () => loadEnvironmentIdInChild(dir)));
@@ -86,7 +86,7 @@ describe("environment identity", () => {
   });
 
   it("fails closed instead of rotating a malformed existing identity", () => {
-    const dir = mkdtempSync(join(tmpdir(), "omb-env-"));
+    const dir = mkdtempSync(join(tmpdir(), "hezuo-env-"));
     dirs.push(dir);
     const file = join(dir, "environment-id");
     writeFileSync(join(dir, "environment-id"), "garbage\n");
@@ -95,19 +95,19 @@ describe("environment identity", () => {
   });
 
   it("rejects UUID-shaped garbage and an unreadable identity path", () => {
-    const malformedDir = mkdtempSync(join(tmpdir(), "omb-env-"));
+    const malformedDir = mkdtempSync(join(tmpdir(), "hezuo-env-"));
     dirs.push(malformedDir);
     writeFileSync(join(malformedDir, "environment-id"), "------------------------------------\n");
     expect(() => loadEnvironmentId(malformedDir)).toThrow(/not a valid UUID/);
 
-    const unreadableDir = mkdtempSync(join(tmpdir(), "omb-env-"));
+    const unreadableDir = mkdtempSync(join(tmpdir(), "hezuo-env-"));
     dirs.push(unreadableDir);
     mkdirSync(join(unreadableDir, "environment-id"));
     expect(() => loadEnvironmentId(unreadableDir)).toThrow(/Cannot read the existing environment identity/);
   });
 
   it("does not create the data directory merely by importing computer providers", async () => {
-    const parent = mkdtempSync(join(tmpdir(), "omb-provider-import-"));
+    const parent = mkdtempSync(join(tmpdir(), "hezuo-provider-import-"));
     dirs.push(parent);
     const dataDir = join(parent, "not-created-yet");
     await importComputerProvidersInChild(dataDir);
@@ -115,55 +115,32 @@ describe("environment identity", () => {
   });
 
   it("describes the server for clients without leaking anything secret", () => {
-    process.env.OMB_APP_VERSION = "0.1.99";
-    process.env.OMB_ENVIRONMENT_LABEL = "cab mini";
+    process.env.HEZUO_APP_VERSION = "0.1.99";
+    process.env.HEZUO_ENVIRONMENT_LABEL = "cab mini";
     const d = environmentDescriptor({ environmentId: "abc", desktopManaged: true });
     expect(d).toEqual({
       environmentId: "abc",
       label: "cab mini",
       platform: process.platform,
       version: "0.1.99",
-      capabilities: { remoteSessions: true, selfUpdate: "desktop-managed", emailSignIn: false, jobs: true },
+      capabilities: { remoteSessions: true, selfUpdate: "desktop-managed", jobs: true },
     });
     expect(environmentDescriptor({ environmentId: "abc", desktopManaged: false }).capabilities.selfUpdate).toBe("operator");
     expect(environmentDescriptor({ environmentId: "abc", desktopManaged: true, sharedComputers: false }).capabilities)
       .not.toHaveProperty("sharedComputers");
     expect(environmentDescriptor({ environmentId: "abc", desktopManaged: true, sharedComputers: true }).capabilities)
-      .toEqual({ remoteSessions: true, sharedComputers: true, lendingDetails: true, commandTimeouts: true, longCommands: true, fileEdits: true, selfUpdate: "desktop-managed", emailSignIn: false, jobs: true });
-    expect(environmentDescriptor({ environmentId: "abc", desktopManaged: false, cloudHome: true }).capabilities)
-      .toEqual({ remoteSessions: true, cloudHome: true, move: 1, selfUpdate: "operator", emailSignIn: false, jobs: true });
-    expect(environmentDescriptor({ environmentId: "abc", desktopManaged: false, cloudHome: false }).capabilities).not.toHaveProperty("cloudHome");
-    expect(environmentDescriptor({ environmentId: "abc", desktopManaged: true }).capabilities, "only a Cloud home, or a server one person owns, takes a move").not.toHaveProperty("move");
-    expect(environmentDescriptor({ environmentId: "abc", desktopManaged: false, ownHome: true }).capabilities).toEqual({ remoteSessions: true, move: 1, selfUpdate: "operator", emailSignIn: false, jobs: true });
-    expect(environmentDescriptor({ environmentId: "abc", desktopManaged: false, ownHome: false }).capabilities).not.toHaveProperty("move");
-    // A lent computer may lend its internet connection only to a Cloud home that lends at all.
-    expect(environmentDescriptor({ environmentId: "abc", desktopManaged: false, cloudHome: true, sharedComputers: true }).capabilities)
-      .toEqual({ remoteSessions: true, sharedComputers: true, lendingDetails: true, commandTimeouts: true, longCommands: true, fileEdits: true, deviceLink: true, myChromeLink: true, computerAsks: true, cloudHome: true, move: 1, selfUpdate: "operator", emailSignIn: false, jobs: true });
-    expect(environmentDescriptor({ environmentId: "abc", desktopManaged: true, sharedComputers: true }).capabilities).not.toHaveProperty("deviceLink");
-  });
+      .toEqual({ remoteSessions: true, sharedComputers: true, lendingDetails: true, commandTimeouts: true, longCommands: true, fileEdits: true, selfUpdate: "desktop-managed", jobs: true });
 
-  it("advertises myChromeLink only on a personal Cloud home with lending", () => {
-    const base = { environmentId: "abc", desktopManaged: false };
-    expect(environmentDescriptor({ ...base, sharedComputers: true, cloudHome: true }).capabilities.myChromeLink).toBe(true);
-    expect(environmentDescriptor({ ...base, sharedComputers: true, cloudHome: true, cloudTeam: true }).capabilities).not.toHaveProperty("myChromeLink");
-    expect(environmentDescriptor({ ...base, sharedComputers: true, cloudHome: false }).capabilities).not.toHaveProperty("myChromeLink");
-    expect(environmentDescriptor({ ...base, sharedComputers: false, cloudHome: true }).capabilities).not.toHaveProperty("myChromeLink");
-  });
-
-  it("says a team's Cloud home is a team's, so a sign-in page names the team", () => {
-    const base = { environmentId: "abc", desktopManaged: false, label: "Acme Labs" };
-    expect(environmentDescriptor({ ...base, cloudHome: true, cloudTeam: true }).capabilities.cloudTeam).toBe(true);
-    expect(environmentDescriptor({ ...base, cloudHome: true }).capabilities).not.toHaveProperty("cloudTeam");
   });
 
   it("falls back to the checkout's package.json version, then to unknown", () => {
-    delete process.env.OMB_APP_VERSION;
+    delete process.env.HEZUO_APP_VERSION;
     expect(serverVersion()).toMatch(/^\d+\.\d+\.\d+/);
   });
 
   it("reads the version the bundle carries when no package.json sits beside it, as in the Cloud home image", () => {
-    delete process.env.OMB_APP_VERSION;
-    const image = mkdtempSync(join(tmpdir(), "omb-image-"));
+    delete process.env.HEZUO_APP_VERSION;
+    const image = mkdtempSync(join(tmpdir(), "hezuo-image-"));
     dirs.push(image);
     const bundle = join(image, "dist-server");
     mkdirSync(bundle);
@@ -172,8 +149,8 @@ describe("environment identity", () => {
     expect(serverVersion(bundle)).toBe("unknown");
     writeFileSync(join(bundle, "package.json"), '{"type":"module","version":"0.1.117"}\n');
     expect(serverVersion(bundle)).toBe("0.1.117");
-    process.env.OMB_APP_VERSION = "0.1.120";
+    process.env.HEZUO_APP_VERSION = "0.1.120";
     expect(serverVersion(bundle)).toBe("0.1.120");
-    delete process.env.OMB_APP_VERSION;
+    delete process.env.HEZUO_APP_VERSION;
   });
 });

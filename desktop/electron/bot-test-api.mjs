@@ -241,7 +241,7 @@ export function createBotTestApi({ request, descriptorPath, ready = () => true }
         if (!terminal.has(run.status)) {
           run.status = "stopping";
           run.controller.abort();
-          await Promise.allSettled([...pending]);
+          await Promise.allSettled(pending);
           await interrupt(run);
           finish(run, "stopped");
         }
@@ -293,7 +293,7 @@ export function createBotTestApi({ request, descriptorPath, ready = () => true }
         await new Promise(resolve => server.close(() => resolve()));
       }
       if (descriptorOwned) { await unlink(descriptorPath).catch(error => { if (error.code !== "ENOENT") throw error; }); descriptorOwned = false; }
-      await Promise.allSettled([...pending]);
+      await Promise.allSettled(pending);
       if (run) {
         try { await interrupt(run); } finally { finish(run, "stopped"); }
       }

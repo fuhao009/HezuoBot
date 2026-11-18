@@ -13,8 +13,8 @@ import { createInterface } from "node:readline";
 import { parseArgs } from "node:util";
 import { inflateSync } from "node:zlib";
 import { browserBundlePaths, browserBundleSpec } from "../desktop/server/browser-bundle-release.ts";
-import { executableTarget } from "./prepare-cloudflared.mjs";
-import { WINDOWS_VENDOR_VERSION, verifyVendorCandidate, verifyVendorPatch } from "./build-windows-browser-vendor.mjs";
+import { executableTarget } from "./executable-target.mjs";
+import { verifyVendorCandidate, verifyVendorPatch } from "./build-windows-browser-vendor.mjs";
 
 const { values } = parseArgs({ options: {
   resources: { type: "string" }, target: { type: "string" },
@@ -41,7 +41,7 @@ assert((await readdir(paths.licenses)).length > 0, "Missing bundled third-party 
 assert((await stat(join(paths.directory, spec.chrome.license))).size > 0, "Missing Chromium license");
 assert((await stat(join(paths.directory, spec.chrome.about))).size > 0, "Missing Chromium notice");
 let enginePath = paths.engine;
-let engineVersionExpected = spec.engine.version;
+const engineVersionExpected = spec.engine.version;
 if (values["engine-candidate"] !== undefined) {
   // Only the artifact-only vendor workflow uses this explicit mode. Standard
   // app release calls still discover and execute the bundled, pinned engine.
@@ -58,7 +58,6 @@ if (values["engine-candidate"] !== undefined) {
   for (const license of ["agent-browser-LICENSE.txt", "LICENSE-axe-core.txt", "LICENSE-axe-core-THIRD-PARTY.txt"]) {
     assert.deepEqual(await readFile(join(candidateDirectory, license)), await readFile(join(paths.licenses, license)), `Candidate changed upstream notice ${license}`);
   }
-  engineVersionExpected = WINDOWS_VENDOR_VERSION;
 }
 // Signing changes Mach-O bytes. Source-archive digests are checked before signing;
 // this gate checks the final layout, versions, and real browser behavior instead.
@@ -86,7 +85,7 @@ if (process.platform === "linux") {
   assert(!/docker|kubepods|lxc/.test(cgroup), "Sandbox verification requires a non-container Linux host; upstream agent-browser disables Chromium's sandbox for this cgroup");
 }
 
-const fixture = await mkdtemp(join(tmpdir(), "omb-browser-smoke-"));
+const fixture = await mkdtemp(join(tmpdir(), "hezuo-browser-smoke-"));
 const fixtureHome = join(fixture, "home");
 const env = {
   PATH: process.platform === "win32" ? join(process.env.SystemRoot ?? "C:\\Windows", "System32") : "/usr/bin:/bin",
@@ -95,17 +94,17 @@ const env = {
   XDG_CONFIG_HOME: join(fixture, "config"), XDG_CACHE_HOME: join(fixture, "cache"),
   XDG_DATA_HOME: join(fixture, "data"), XDG_RUNTIME_DIR: join(fixture, "run"),
   TMPDIR: join(fixture, "tmp"), TMP: join(fixture, "tmp"), TEMP: join(fixture, "tmp"),
-  OMB_DATA_DIR: join(fixture, "omb"), OMB_RESOURCES_PATH: resolve(values.resources),
-  ...(values["engine-candidate"] ? { OMB_AGENT_BROWSER_PATH: enginePath, AGENT_BROWSER_EXECUTABLE_PATH: paths.chrome } : {}),
+  HEZUO_DATA_DIR: join(fixture, "hezuo"), HEZUO_RESOURCES_PATH: resolve(values.resources),
+  ...(values["engine-candidate"] ? { HEZUO_AGENT_BROWSER_PATH: enginePath, AGENT_BROWSER_EXECUTABLE_PATH: paths.chrome } : {}),
   // macOS's per-user temp directory is long; keep Unix socket paths <104 bytes.
   AGENT_BROWSER_SOCKET_DIR: join(fixture, "s"),
   AGENT_BROWSER_DEFAULT_TIMEOUT: "15000", LANG: "en_US.UTF-8", NO_COLOR: "1",
 };
-for (const key of ["SystemRoot", "WINDIR", "SYSTEMDRIVE", "COMSPEC", "PATHEXT"]) {
+for (const key of ["SystemRoot", "WINDIR", "SYSTEMDRIVE", "COMSPEC", "PATHEXT", "HEZUO_BROWSER_ENGINE_WINDOWS_URL", "HEZUO_BROWSER_ENGINE_WINDOWS_SHA256", "HEZUO_BROWSER_ENGINE_WINDOWS_VERSION", "HEZUO_BROWSER_ENGINE_WINDOWS_BYTES"]) {
   if (process.platform === "win32" && process.env[key]) env[key] = process.env[key];
 }
 for (const directory of new Set([fixtureHome, env.APPDATA, env.LOCALAPPDATA, env.XDG_CONFIG_HOME,
-  env.XDG_CACHE_HOME, env.XDG_DATA_HOME, env.XDG_RUNTIME_DIR, env.TMPDIR, env.OMB_DATA_DIR, env.AGENT_BROWSER_SOCKET_DIR])) {
+  env.XDG_CACHE_HOME, env.XDG_DATA_HOME, env.XDG_RUNTIME_DIR, env.TMPDIR, env.HEZUO_DATA_DIR, env.AGENT_BROWSER_SOCKET_DIR])) {
   await mkdir(directory, { recursive: true, mode: 0o700 });
 }
 // Isolate even source-module initialization. No inherited account credentials,
@@ -268,7 +267,7 @@ process.once("SIGTERM", interrupt);
 try {
   const { browserEngineStatus, agentBrowserIntegration, prepareBrowserSessionState, closeBrowserSession: closeSession } = await import("../desktop/server/browser-engine.ts");
   closeBrowserSession = closeSession;
-  const status = browserEngineStatus({ dataDir: env.OMB_DATA_DIR, env });
+  const status = browserEngineStatus({ dataDir: env.HEZUO_DATA_DIR, env });
   assert.equal(status.kind, "ready", `Fresh-home runtime did not discover the bundle: ${JSON.stringify(status)}`);
   assert.equal(resolve(status.binaryPath), resolve(enginePath), "Runtime did not select the engine under test");
   const engineVersion = await run(enginePath, ["--version"], env);
@@ -296,7 +295,7 @@ try {
   gate = await openGate({ decide: (target, addresses) => refusalFor(target, addresses, rules) });
   for (const name of ["alpha", "beta"]) {
     const integration = agentBrowserIntegration({ binaryPath: status.binaryPath,
-      session: `omb-${name[0]}-${randomBytes(4).toString("hex")}`,
+      session: `hezuo-${name[0]}-${randomBytes(4).toString("hex")}`,
       encryptionKey: randomBytes(32).toString("hex"), persistent: false, env, egressPort: gate.port });
     assert.equal(resolve(integration.env.AGENT_BROWSER_EXECUTABLE_PATH ?? ""), resolve(paths.chrome), "MCP did not receive bundled Chromium");
     assert.equal(integration.env.AGENT_BROWSER_RESTORE_SAVE, "never");
@@ -307,7 +306,7 @@ try {
     await assert.rejects(readFile(join(env.AGENT_BROWSER_SOCKET_DIR, `${integration.env.AGENT_BROWSER_SESSION}.pid`)), { code: "ENOENT" });
     const client = mcp(integration);
     clients.push(client);
-    await client.request("initialize", { protocolVersion: "2025-11-25", capabilities: {}, clientInfo: { name: "omb-bundle-smoke", version: "1" } });
+    await client.request("initialize", { protocolVersion: "2025-11-25", capabilities: {}, clientInfo: { name: "hezuo-bundle-smoke", version: "1" } });
     client.proc.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" })}\n`);
     const inventory = await client.request("tools/list");
     assert(inventory.tools.some((tool) => tool.name === "agent_browser_open"), "Browser tools missing from MCP core profile");
@@ -341,12 +340,12 @@ try {
   const relayShot = join(fixture, "relay.jpg");
   await relayed({ action: "screenshot", path: relayShot, format: "jpeg", quality: 70 });
   assert((await stat(relayShot)).size > 0, "relayed screenshot wrote nothing");
-  const storage = "({ local: localStorage.getItem('omb-smoke'), cookie: document.cookie })";
-  const setStorage = (value) => `(() => { localStorage.setItem('omb-smoke', '${value}'); document.cookie = 'omb_smoke=${value}; Path=/; SameSite=Lax'; return ${storage}; })()`;
-  assert.deepEqual((await alpha.tool("agent_browser_eval", { script: setStorage("alpha") })).data.result, { local: "alpha", cookie: "omb_smoke=alpha" });
+  const storage = "({ local: localStorage.getItem('hezuo-smoke'), cookie: document.cookie })";
+  const setStorage = (value) => `(() => { localStorage.setItem('hezuo-smoke', '${value}'); document.cookie = 'hezuo_smoke=${value}; Path=/; SameSite=Lax'; return ${storage}; })()`;
+  assert.deepEqual((await alpha.tool("agent_browser_eval", { script: setStorage("alpha") })).data.result, { local: "alpha", cookie: "hezuo_smoke=alpha" });
   assert.deepEqual((await beta.tool("agent_browser_eval", { script: storage })).data.result, { local: null, cookie: "" }, "Second bot inherited first bot's state");
-  assert.deepEqual((await beta.tool("agent_browser_eval", { script: setStorage("beta") })).data.result, { local: "beta", cookie: "omb_smoke=beta" });
-  assert.deepEqual((await alpha.tool("agent_browser_eval", { script: storage })).data.result, { local: "alpha", cookie: "omb_smoke=alpha" }, "First bot's state was overwritten by the second bot");
+  assert.deepEqual((await beta.tool("agent_browser_eval", { script: setStorage("beta") })).data.result, { local: "beta", cookie: "hezuo_smoke=beta" });
+  assert.deepEqual((await alpha.tool("agent_browser_eval", { script: storage })).data.result, { local: "alpha", cookie: "hezuo_smoke=alpha" }, "First bot's state was overwritten by the second bot");
   // Reopen through the SAME MCP process: warming a daemon before MCP would
   // conceal the Windows inherited-pipe bug, which returns after a close.
   const previousDaemonPid = await ownedDaemonPid(alpha);
@@ -358,7 +357,7 @@ try {
   assert.notEqual(await ownedDaemonPid(alpha), previousDaemonPid, "Reopen reused the closed daemon");
   assert.equal((await alpha.tool("agent_browser_get_title")).data.title, title);
   assert.deepEqual((await alpha.tool("agent_browser_eval", { script: storage })).data.result, { local: null, cookie: "" }, "Guest state was restored after close");
-  assert.deepEqual((await beta.tool("agent_browser_eval", { script: storage })).data.result, { local: "beta", cookie: "omb_smoke=beta" }, "Restarting the first bot changed the second bot's state");
+  assert.deepEqual((await beta.tool("agent_browser_eval", { script: storage })).data.result, { local: "beta", cookie: "hezuo_smoke=beta" }, "Restarting the first bot changed the second bot's state");
   await alpha.tool("agent_browser_fill", { selector: "#message", text: "Reopened browser works" });
   await alpha.tool("agent_browser_click", { selector: "#submit" });
   assert.equal((await alpha.tool("agent_browser_get_text", { selector: "#result" })).data.text, "Reopened browser works");

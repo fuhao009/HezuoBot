@@ -400,8 +400,8 @@ const ALLOWED: Array<[command: string, on?: Platform | "posix"]> = [
   ["rm -rf /usr/local/lib/node_modules/typescript"],
   ["rm -rf /Applications/Example.app"],
   ["rm -rf /Library/Caches/com.example.app"],
-  ["rm -rf /Users/omkar/project/dist"],
-  ["rm -rf /home/omkar/project/.next"],
+  ["rm -rf /Users/morgan/project/dist"],
+  ["rm -rf /home/morgan/project/.next"],
   ["rm -rf /opt/homebrew/Cellar/example"],
   ["rm -rf /etc/../tmp/y"],
   ["rm -rf /../tmp/x"],
@@ -456,7 +456,7 @@ const ALLOWED: Array<[command: string, on?: Platform | "posix"]> = [
   // Windows
   ["rd /s /q build"],
   ["rmdir /s /q .\\dist"],
-  ["rd /s /q C:\\Users\\omkar\\project\\node_modules"],
+  ["rd /s /q C:\\Users\\morgan\\project\\node_modules"],
   ["rd /s /q %TEMP%\\scratch"],
   ["rd /s /q %USERPROFILE%\\Downloads\\old"],
   ["rd C:\\Windows"],
@@ -472,12 +472,12 @@ const ALLOWED: Array<[command: string, on?: Platform | "posix"]> = [
   ["dir C:\\Windows"],
   ["Format-Table -AutoSize"],
   ["cmd /c echo rd /s /q C:\\"],
-  ["rd /s /q C:\\\\Users\\\\omkar\\\\project\\\\dist"],
+  ["rd /s /q C:\\\\Users\\\\morgan\\\\project\\\\dist"],
   ["rd /s /q \\\\server\\share\\old"],
   ["rmdir /srv/s /etc"],
   ['powershell -Command "Write-Host \'rd /s /q C:\\\'"'],
-  ["rm -rf /c/Users/omkar/project/node_modules", "win32"],
-  ["rm -rf C:\\Users\\omkar\\project\\dist", "win32"],
+  ["rm -rf /c/Users/morgan/project/node_modules", "win32"],
+  ["rm -rf C:\\Users\\morgan\\project\\dist", "win32"],
   ["rm -rf /tmp/build", "win32"],
   // review round 1: text a cmd or PowerShell line only prints
   // review round 1: escaped quotes in a POSIX line are not the end of a string
@@ -701,16 +701,16 @@ describe("floorVerdict", () => {
   });
 
   it("knows the home directory by its absolute path when it is told where home is", () => {
-    expect(floorVerdict("rm -rf /Users/omkar", "darwin")).toBeNull();
-    expect(floorVerdict("rm -rf /Users/omkar", "darwin", "/Users/omkar")?.rule).toBe("delete-home");
-    expect(floorVerdict("rm -rf /Users/omkar/", "darwin", "/Users/omkar/")?.rule).toBe("delete-home");
-    expect(floorVerdict("rm -rf /users/OMKAR/*", "darwin", "/Users/omkar")?.rule).toBe("delete-home");
-    expect(floorVerdict("rm -rf /home/omkar", "linux", "/home/omkar")?.rule).toBe("delete-home");
-    expect(floorVerdict("rm -rf /home/Omkar", "linux", "/home/omkar")).toBeNull();
-    expect(floorVerdict("rm -rf /Users/omkar/project", "darwin", "/Users/omkar")).toBeNull();
-    expect(floorVerdict("rd /s /q C:\\Users\\Omkar", "win32", "C:\\Users\\omkar")?.rule).toBe("delete-home");
-    expect(floorVerdict("rm -rf /c/Users/omkar", "win32", "C:\\Users\\omkar")?.rule).toBe("delete-home");
-    expect(floorVerdict("rd /s /q C:\\Users\\omkar\\project", "win32", "C:\\Users\\omkar")).toBeNull();
+    expect(floorVerdict("rm -rf /Users/morgan", "darwin")).toBeNull();
+    expect(floorVerdict("rm -rf /Users/morgan", "darwin", "/Users/morgan")?.rule).toBe("delete-home");
+    expect(floorVerdict("rm -rf /Users/morgan/", "darwin", "/Users/morgan/")?.rule).toBe("delete-home");
+    expect(floorVerdict("rm -rf /users/MORGAN/*", "darwin", "/Users/morgan")?.rule).toBe("delete-home");
+    expect(floorVerdict("rm -rf /home/morgan", "linux", "/home/morgan")?.rule).toBe("delete-home");
+    expect(floorVerdict("rm -rf /home/Morgan", "linux", "/home/morgan")).toBeNull();
+    expect(floorVerdict("rm -rf /Users/morgan/project", "darwin", "/Users/morgan")).toBeNull();
+    expect(floorVerdict("rd /s /q C:\\Users\\Morgan", "win32", "C:\\Users\\morgan")?.rule).toBe("delete-home");
+    expect(floorVerdict("rm -rf /c/Users/morgan", "win32", "C:\\Users\\morgan")?.rule).toBe("delete-home");
+    expect(floorVerdict("rd /s /q C:\\Users\\morgan\\project", "win32", "C:\\Users\\morgan")).toBeNull();
   });
 
   it("does not take a scratch directory for the home directory, wherever HOME points", () => {
@@ -718,7 +718,7 @@ describe("floorVerdict", () => {
     expect(floorVerdict("rm -rf /tmp", "linux", "/tmp")).toBeNull();
     expect(floorVerdict("rm -rf /tmp/sandbox-home", "linux", "/tmp/sandbox-home")).toBeNull();
     expect(floorVerdict("rm -rf /private/tmp", "darwin", "/private/tmp")).toBeNull();
-    expect(floorVerdict("rm -rf /var/folders/ab/cd/T/omb-home", "darwin", "/var/folders/ab/cd/T/omb-home")).toBeNull();
+    expect(floorVerdict("rm -rf /var/folders/ab/cd/T/hezuo-home", "darwin", "/var/folders/ab/cd/T/hezuo-home")).toBeNull();
     expect(floorVerdict("rd /s /q C:\\Users\\ci\\AppData\\Local\\Temp\\home", "win32", "C:\\Users\\ci\\AppData\\Local\\Temp\\home")).toBeNull();
     // the command that says "home" still means it
     expect(floorVerdict("rm -rf ~", "linux", "/tmp")?.rule).toBe("delete-home");

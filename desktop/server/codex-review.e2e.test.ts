@@ -24,7 +24,7 @@ const api = async (method: string, path: string, body?: unknown) => {
 };
 const start = async () => {
   child = spawn(process.execPath, [join(root, "desktop", "server", "index.ts")], {
-    cwd: root, env: { ...process.env, HOME: home, USERPROFILE: home, OMB_PORT: String(port) },
+    cwd: root, env: { ...process.env, HOME: home, USERPROFILE: home, HEZUO_PORT: String(port) },
     stdio: ["ignore", "pipe", "pipe"],
   });
   stderr = "";
@@ -39,7 +39,7 @@ const start = async () => {
 
 beforeAll(async () => {
   chmodSync(fake, 0o755);
-  home = mkdtempSync(join(tmpdir(), "omb-codex-review-"));
+  home = mkdtempSync(join(tmpdir(), "hezuo-codex-review-"));
   mkdirSync(join(home, ".hezuo"));
   writeFileSync(join(home, ".hezuo", "config.json"), JSON.stringify({ instances: {
     codex: { driver: "codex", environment: {

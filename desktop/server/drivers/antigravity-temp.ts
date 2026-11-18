@@ -23,7 +23,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { DATA_DIR } from "../config.ts";
 
 const UNPACK_PREFIX = "_MEI";
-const CLAIM_PREFIX = ".omb-removing-";
+const CLAIM_PREFIX = ".hezuo-removing-";
 /** Other programs use PyInstaller too; without both files a folder is not Antigravity's. */
 const ANTIGRAVITY_MARKERS = ["agy_acp_licenses.txt", "python310.dll"] as const;
 /** A folder this recent may still be unpacking, even if its ID looks free. */

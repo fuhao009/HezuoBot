@@ -21,7 +21,7 @@ export const MAX_WORKSPACE_BACKUP_BYTES = 10 * 1024 ** 3;
 export const MAX_WORKSPACE_BACKUP_FILES = 100_000;
 export const MAX_WORKSPACE_BACKUP_UPLOAD_BYTES = MAX_WORKSPACE_BACKUP_BYTES + 256 * 1024 ** 2;
 const MAX_METADATA_BYTES = 16 * 1024 ** 2;
-const MAGIC = Buffer.from("OMB-WORKSPACE-1\n");
+const MAGIC = Buffer.from("HEZUO-WORKSPACE-1\n");
 const HEADER_BYTES = MAGIC.length + 16 + 12;
 const TAG_BYTES = 16;
 const ID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -37,7 +37,7 @@ const EXCLUDED = new Set([
   "sync",
   // "Also use my Claude Code skills": a link to the person's own ~/.claude/skills, made again on each turn.
   "claude-user-skills",
-  // The bot box's live sockets and seccomp filter (bot-box/box.ts), made again each time the server starts.
+  // The bot box's live sockets and seccomp filter (execution-sandbox/box.ts), made again each time the server starts.
   "box",
   // A Team Cloud's engine homes (engine-homes/layout.ts): CLI login homes, each audience's own transcripts and the held
   // folder, which no admin reads.
@@ -415,7 +415,7 @@ export async function createWorkspaceBackupSnapshot(dataDir: string, options: Cr
     };
     writeJson(join(snapshot, "manifest.json"), manifest);
     validateManifest(privateJson(join(snapshot, "manifest.json")));
-    const path = join(job.directory, "workspace.ombbackup");
+    const path = join(job.directory, "workspace.hezuobackup");
     const iv = randomBytes(12);
     const header = Buffer.concat([MAGIC, salt, iv]);
     const cipher = createCipheriv("aes-256-gcm", key, iv);
@@ -434,21 +434,6 @@ export async function createWorkspaceBackupSnapshot(dataDir: string, options: Cr
 }
 
 function validateManifest(value: unknown): Manifest {
-  // Historical archives retain their signed file contents; normalize only the parsed manifest identity.
-  if (record(value) && record(value.summary) && value.summary.format === "openmaus.workspace-backup") {
-    value = { ...value, summary: { ...value.summary, format: "hezuo.workspace-backup" } };
-  }
-  if (record(value) && record(value.clientState)) {
-    const clientState = { ...value.clientState };
-    for (const suffix of ["sidebarDensity", "sidebarToolsLayout", "sidebarCollapsedSections.v1", "sidebarSectionOrder.v1", "remote-voice.v1"]) {
-      const oldKey = `openmausbot.${suffix}`, newKey = `hezuo.${suffix}`;
-      if (Object.hasOwn(clientState, oldKey)) {
-        if (!Object.hasOwn(clientState, newKey)) clientState[newKey] = clientState[oldKey];
-        delete clientState[oldKey];
-      }
-    }
-    value = { ...value, clientState };
-  }
   if (!record(value) || !record(value.summary) || value.summary.format !== "hezuo.workspace-backup" || value.summary.version !== 1 ||
     typeof value.summary.id !== "string" || !ID.test(value.summary.id) || typeof value.summary.createdAt !== "string" ||
     !Number.isFinite(Date.parse(value.summary.createdAt)) || typeof value.summary.appVersion !== "string" ||
@@ -873,13 +858,13 @@ export function readLastWorkspaceRestore(dataDir: string): LastWorkspaceRestore 
 function finishRestore(dataDir: string, id: string, consumePending = true): LastWorkspaceRestore {
   const root = backupRoot(dataDir);
   const { summary, clientState } = readStagedWorkspaceBackup(dataDir, id);
-  const draftAttachments = clientState["omb-draft-attachments"];
+  const draftAttachments = clientState["hezuo-draft-attachments"];
   if (draftAttachments) {
     try {
       const value: unknown = JSON.parse(draftAttachments);
       const manifest = validateManifest(privateJson(join(jobPath(dataDir, id), "staged", "manifest.json")));
       restorePaths(manifest.sourceDataDir, resolve(dataDir)).fields(value);
-      clientState["omb-draft-attachments"] = JSON.stringify(value);
+      clientState["hezuo-draft-attachments"] = JSON.stringify(value);
     } catch {}
   }
   const leftBehind = join(jobPath(dataDir, id), "left-behind.json");

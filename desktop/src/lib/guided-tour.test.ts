@@ -14,7 +14,7 @@ describe("guided tour", () => {
   });
 
   it("resumes at the first unfinished step", () => {
-    expect(currentStep(withDone(["tour.composer", "tour.model"]))?.id).toBe("tour.computer");
+    expect(currentStep(withDone(["tour.composer", "tour.model"]))?.id).toBe("tour.tools");
     expect(currentStep(withDone(TOUR_STEPS.map((s) => s.id)))).toBeNull();
     expect(currentStep(withDone(["spot.composer"]))?.id).toBe("tour.composer");
   });
@@ -42,51 +42,43 @@ describe("guided tour", () => {
   });
 
   it("rebuilds the scene on enter so a reload mid-tour resumes cleanly", () => {
-    expect(step("tour.computer-browser").onEnter).toBe("openComputer");
-    expect(step("tour.computer-browser").fallbackAnchor).toBe("computer-tabs");
     expect(step("tour.apps").onEnter).toBe("openTools");
     expect(step("tour.apps-panel").onEnter).toBe("openApps");
     expect(step("tour.automations-page").onEnter).toBe("openAutomations");
   });
 
   it("closes everything it opened and returns to the chat", () => {
-    expect(step("tour.computer").onExit).toBe("openComputer");
-    expect(step("tour.computer-browser").onExit).toBe("closeComputer");
     expect(step("tour.apps-panel").onExit).toBe("closeApps");
     expect(step("tour.automations-page").onExit).toBe("backToChat");
   });
 
   it("knows which effects the control's own click performs", () => {
     for (const s of TOUR_STEPS) {
-      if (s.onExit && ANCHOR_EFFECTS.has(s.onExit)) expect(s.anchor).not.toBeNull();
+      if (s.onExit && ANCHOR_EFFECTS[s.onExit]) expect(s.anchor).not.toBeNull();
     }
-    expect(ANCHOR_EFFECTS.has("closeApps")).toBe(false);
+    expect(ANCHOR_EFFECTS.closeApps).toBeUndefined();
   });
 
-  it("keeps Advanced mode's steps exactly as they were", () => {
+  it("keeps the model step without a computer panel step", () => {
     expect(tourSteps(true)).toBe(TOUR_STEPS);
     expect(step("tour.model")).toEqual({ id: "tour.model", anchor: "model", placement: "below" });
-    expect(step("tour.computer")).toEqual({ id: "tour.computer", anchor: "computer", placement: "below", onExit: "openComputer" });
+    expect(TOUR_STEPS.some(s => s.anchor?.startsWith("computer"))).toBe(false);
   });
 
-  it("walks Simple mode through the bot pill where the header's model chip and Computer button were", () => {
+  it("walks Simple mode through the bot settings entry without removed panels", () => {
     const simple = tourSteps(false);
     expect(simple.map((s) => s.id)).toEqual(TOUR_STEPS.map((s) => s.id));
     expect(simple.map((s) => s.anchor)).toEqual([
-      "composer", "bot-pill", "bot-pill", "computer-browser", "tools", "nav-apps", "apps-panel", "nav-automations", "automations-page", "composer",
+      "composer", "bot-pill", "tools", "nav-apps", "apps-panel", "nav-automations", "automations-page", "composer",
     ]);
-    // Simple's header renders neither "model" nor "computer"; a step that needs them would wait forever.
     for (const s of simple) expect(["model", "computer"]).not.toContain(s.anchor);
-    for (const id of ["tour.model", "tour.computer"]) {
+    for (const id of ["tour.model"]) {
       const simpleStep = simple.find((s) => s.id === id)!;
       expect(simpleStep.skipIfMissing, id).toBe(true);
       expect((en as Record<string, string>)[simpleStep.copy!], id).toBeTruthy();
     }
     const simpleModel = (en as Record<string, string>)[simple.find((s) => s.id === "tour.model")!.copy!]!;
     expect(simpleModel, "Simple mode picks no model, so its tour never points at one").not.toMatch(/\bmodel\b/i);
-    // The computer step still opens the Computer panel for the next step, as its Advanced button did.
-    expect(simple.find((s) => s.id === "tour.computer")!.onExit).toBe("openComputer");
-    expect(simple.find((s) => s.id === "tour.computer-browser")!.onEnter).toBe("openComputer");
   });
 
   it("resumes at the same step and number in either mode", () => {

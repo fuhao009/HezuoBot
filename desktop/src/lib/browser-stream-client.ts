@@ -96,6 +96,8 @@ export type PreviewStreamInput =
   | { readonly type: "releaseControl" }
   | { readonly type: "dialog"; readonly accept: boolean; readonly promptText?: string }
   | { readonly type: "viewport"; readonly setting: PreviewViewportSetting }
+  /** Extends only this viewer's existing control; never takes or transfers the browser. */
+  | { readonly type: "renewControl" }
   | { readonly type: "zoom"; readonly factor: number }
   | {
       readonly type: "mouse";
@@ -270,7 +272,8 @@ export interface PreviewStreamClient {
 /** A viewer that may operate sizes the page while it watches, and may restart or wake it; the person holding the browser
  * hands it back from any of their views; everything else needs control. */
 const allowed = (input: PreviewStreamInput, control: PreviewStreamControl): boolean =>
-  input.type === "takeControl" || input.type === "resize" || input.type === "frameCap" || input.type === "restart" || input.type === "wake"
+  input.type === "renewControl" ? control.controller === "you"
+  : input.type === "takeControl" || input.type === "resize" || input.type === "frameCap" || input.type === "restart" || input.type === "wake"
   || (input.type === "releaseControl" && control.owned === true) || control.controller === "you";
 
 const ACK_MESSAGE = JSON.stringify({ type: "ack" });

@@ -3,11 +3,13 @@
 // profile (Settings → Profile) is the person's, and this answers 404.
 import { botAvatarUrlSchema } from "../../../packages/shared/bot-avatar.ts";
 import type { CloudTeam } from "../cloud-team.ts";
-import type { MemberProfile, MemberProfilePatch } from "../host/cloud-team-host.ts";
-import { ABOUT_ME_MAX, PERSON_NAME_MAX, type SeedField } from "../people-about.ts";
+import { ABOUT_ME_MAX, PERSON_NAME_MAX, type PersonProfilePatch, type SeedField } from "../people-about.ts";
 import type { RequestAuth } from "../request-auth.ts";
 import type { SessionRecord } from "../sessions.ts";
 import { PASS, type RouteHandler } from "./table.ts";
+
+interface MemberProfile { name: string; email: string; aboutMe: string; avatarUrl?: string }
+type MemberProfilePatch = Omit<PersonProfilePatch, "email" | "seeded"> & { aboutMe?: string };
 
 export interface MeRouteDeps {
   team: CloudTeam | null;

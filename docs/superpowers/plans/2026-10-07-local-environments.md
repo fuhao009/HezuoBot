@@ -1,10 +1,10 @@
-# Local Environments Implementation Plan
+# Local Environments Implementation Plan — Hezuo
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Desktop users can create, switch, and forget named local environments (separate data directories = separate bots/providers/settings), one active at a time, switching via a ~15s in-app server restart.
 
-**Architecture:** Environments are directories; isolation already exists end-to-end via `OMB_DATA_DIR` (`desktop/server/config.ts:963`). All work is Electron-side: extend the pure registry module `desktop/electron/environments.cjs` with versioned local entries, add an injectable-deps switch orchestrator `desktop/electron/environment-switch.mjs`, wire it in `desktop/electron/main.mjs` (per-environment data-dir lease handoff + child re-fork), and expose it through the existing `ogb.environments` bridge to the existing switcher/settings screens. The server binary is NOT modified.
+**Architecture:** Environments are directories; isolation already exists end-to-end via `HEZUO_DATA_DIR` (`desktop/server/config.ts:963`). All work is Electron-side: extend the pure registry module `desktop/electron/environments.cjs` with versioned local entries, add an injectable-deps switch orchestrator `desktop/electron/environment-switch.mjs`, wire it in `desktop/electron/main.mjs` (per-environment data-dir lease handoff + child re-fork), and expose it through the existing `hezuo.environments` bridge to the existing switcher/settings screens. The server binary is NOT modified.
 
 **Tech Stack:** Electron (CJS + .mjs, `node:test` via `node --test "desktop/electron/*.node-test.mjs"`), React 19 + vitest, flat dotted `en.json` copy.
 
@@ -83,9 +83,9 @@
 - Produces (Task 4 IPC payloads): `environments:state` now also returns `packaged: boolean` and each entry `{ id, kind, name, origin?, dataDir?, missing }` (`missing` = local whose `dataDir` is absent at read time); `environments:create(name, dataDir?) → { ok, error?, state }`; `environments:pick-dir → { ok, path? }` via `dialog.showOpenDialog({ properties: ["openDirectory","createDirectory"] })`; `environments:switch(id)` returns `{ ok, error? }` for local targets, unchanged for remote; `environments:forget(id, purge?)` — `purge:true` additionally `fs.rm(dir, {recursive:true})` only when `path.basename(dir).startsWith(".hezuo")` and dir is outside the app's own default dir.
 
 - [ ] **Step 1: Supervisor pause test** — while paused, a tracked child exit schedules no restart; `resume()` re-arms. Verify failure, then implement pause/resume, verify pass.
-- [ ] **Step 2: Boot-environment selection** — extract pure `startupEnvironmentDir(environmentsState, defaultDir)` into `environments.cjs` (`activeLocalDataDir(state, defaultDir) ?? defaultDir`); wire `whenReady`: read environments BEFORE the lease block (:3368), lease + child env (`OMB_DATA_DIR`) both use the selected dir; dev mode keeps today's behavior untouched.
+- [ ] **Step 2: Boot-environment selection** — extract pure `startupEnvironmentDir(environmentsState, defaultDir)` into `environments.cjs` (`activeLocalDataDir(state, defaultDir) ?? defaultDir`); wire `whenReady`: read environments BEFORE the lease block (:3368), lease + child env (`HEZUO_DATA_DIR`) both use the selected dir; dev mode keeps today's behavior untouched.
 - [ ] **Step 3: Boot fallback (Review Focus 3)** — when `startServerPackaged()` fails and the boot dir is a named environment: `persistEnvironments({ ...state, activeId: LOCAL_ID })`, release that lease, acquire the default-dir lease, retry once, `dialog.showErrorBox` noting the environment was unhealthy.
-- [ ] **Step 4: Switch wiring** — `switchEnvironment(id)`: when the entry is `kind:"local"`, pause supervisor, call `switchLocalEnvironment` with real deps (startServerOn gains `dataDir` second param defaulting to `desktopDataDir()`; env spread replaces the `OMB_DATA_DIR` line :1336), reload the window to `rendererOrigin()`, resume supervisor; return the orchestrator result through the existing `environments:switch` handler.
+- [ ] **Step 4: Switch wiring** — `switchEnvironment(id)`: when the entry is `kind:"local"`, pause supervisor, call `switchLocalEnvironment` with real deps (startServerOn gains `dataDir` second param defaulting to `desktopDataDir()`; env spread replaces the `HEZUO_DATA_DIR` line :1336), reload the window to `rendererOrigin()`, resume supervisor; return the orchestrator result through the existing `environments:switch` handler.
 - [ ] **Step 5: Create/pick/forget IPC** (payloads in Interfaces; register next to :3203 inside `localOnly(workspaceOnly(...))`); create validates through `withLocalEnvironment` with `defaultDir = desktopDataDir()`; when `dataDir` is omitted, default to `path.join(os.homedir(), ".hezuo-" + slug)` where `slug` = `name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")` (reject error `"name"` if the slug is empty).
 - [ ] **Step 6: Verify** — `pnpm typecheck && pnpm test:electron && pnpm lint` green.
 - [ ] **Step 7: Commit** — `feat(electron): switch the server child between local environment data dirs`
@@ -93,15 +93,15 @@
 ### Task 4: Bridge + settings UI
 
 **Files:**
-- Modify: `desktop/electron/preload.cjs` (bridge :305–317), `desktop/src/types/ogb.d.ts` (:145–157), `desktop/src/components/ConnectedWorkspacesSettings.tsx`, `desktop/src/components/ConnectedWorkspacesSettings.test.ts`
+- Modify: `desktop/electron/preload.cjs` (bridge :305–317), `desktop/src/types/hezuo.d.ts` (:145–157), `desktop/src/components/ConnectedWorkspacesSettings.tsx`, `desktop/src/components/ConnectedWorkspacesSettings.test.ts`
 
 **Interfaces:**
 - Consumes: Task 3 IPC shapes exactly.
 - Produces: bridge methods `create(name, dataDir?)`, `pickDir()`; `switch(id)` result now checked by callers; new section title "Environments on this computer" above the existing "Your servers" list; "New environment" form (name field, path field + "Choose…" + Create) shown only when `state.packaged`; local rows show `name` + `dataDir` (+ "missing" tag) and a Forget button.
 
-- [ ] **Step 1: Write failing renderer tests** — stub `window.ogb.environments` (state with one local entry, `packaged:true`); assert the local row renders its `dataDir`, a missing entry shows "missing", Create calls `create(name, dir)`, Forget shows the keep-files choice and only passes `purge:true` when checked, and switching a local row calls `switch(id)` after confirm.
+- [ ] **Step 1: Write failing renderer tests** — stub `window.hezuo.environments` (state with one local entry, `packaged:true`); assert the local row renders its `dataDir`, a missing entry shows "missing", Create calls `create(name, dir)`, Forget shows the keep-files choice and only passes `purge:true` when checked, and switching a local row calls `switch(id)` after confirm.
 - [ ] **Step 2: Run to verify failure** — `pnpm vitest run desktop/src/components/ConnectedWorkspacesSettings.test.ts`.
-- [ ] **Step 3: Implement** preload channel additions + `ogb.d.ts` types (keep `REMOTE_SAFE` exposure unchanged: `environments` stays local-only).
+- [ ] **Step 3: Implement** preload channel additions + `hezuo.d.ts` types (keep `REMOTE_SAFE` exposure unchanged: `environments` stays local-only).
 - [ ] **Step 4: Implement UI** in `ConnectedWorkspacesSettings.tsx` following its existing `perform()` pattern.
 - [ ] **Step 5: Run to verify pass** — `pnpm vitest run desktop/src/components/ConnectedWorkspacesSettings.test.ts`.
 - [ ] **Step 6: Commit** — `feat(ui): manage local environments from settings`
@@ -113,7 +113,7 @@
 - Create: `docs/verification/local-environments.md` (manual recipe: create env → switch (watch ~15s reload) → verify empty bot list + separate `environment-id` → unplug-drive abort case → fallback case)
 - Modify: none (spec already committed)
 
-- [ ] **Step 1: Write both docs** per `CONTRIBUTING.md` conventions.
+- [ ] **Step 1: Write both docs** following the existing spec and plan structure (the community contribution guide has been removed).
 - [ ] **Step 2: Full gate** — `pnpm install`, `pnpm typecheck`, `pnpm lint`, `pnpm test:electron`, `pnpm i18n:check`; all green.
 - [ ] **Step 3: Commit** — `docs: local environments plan and verification recipe`
 

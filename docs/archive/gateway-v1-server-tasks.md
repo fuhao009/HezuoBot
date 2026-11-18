@@ -20,7 +20,6 @@
   git worktree add ../HezuoBot-gw-v1 -b backend/gateway-v1-lan personal/backend/gateway-deploy-admin-193
   ```
 
-- 只改 `gateway/`、`docs/gateway-*.md`。不改 `desktop/`、`mobile/`、`packages/shared/`（如确需改共享类型，先和桌面端负责人确认）。
 - 遵守仓库根目录 `AGENTS.md` 的注释规则；新 migration 递增，不改历史 migration（本文任务预计不需要 migration）。
 - 必读：`docs/backend-development.md`、`docs/gateway-client-api.md`、`docs/gateway-channels.md`。
 

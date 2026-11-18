@@ -1,4 +1,4 @@
-import { readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createAgentCard } from "./chat-widgets.ts";
@@ -59,6 +59,46 @@ function fixture() {
 
 describe("additive portable team backups", () => {
   beforeEach(() => rmSync(DATA_DIR, { recursive: true, force: true }));
+
+  it("rejects the old backup identity before import without changing input or local data", () => {
+    const { store, routines } = fixture();
+    const backup = createTeamBackup(store, routines.listRoutines(), "Current team");
+    const legacy = { ...structuredClone(backup), format: "openmaus.backup" };
+    const inputBefore = structuredClone(legacy);
+    const botsBefore = structuredClone(store.bots);
+    const groupsBefore = structuredClone(store.groups);
+    const routinesBefore = structuredClone(routines.listRoutines());
+    const localFiles = (dir: string): Record<string, string> => {
+      const entries = readdirSync(dir, { withFileTypes: true });
+      return Object.fromEntries(entries.flatMap((entry): Array<[string, string]> => {
+        const path = join(dir, entry.name);
+        return entry.isDirectory() ? Object.entries(localFiles(path)) : [[path, readFileSync(path).toString("base64")]];
+      }));
+    };
+    const filesBefore = localFiles(DATA_DIR);
+    expect(() => parseTeamBackup(legacy)).toThrow(/Invalid backup: format/);
+    expect(() => importTeamBackup(store, routines, legacy, selection())).toThrow(/Invalid backup: format/);
+    expect(legacy).toEqual(inputBefore);
+    expect(store.bots).toEqual(botsBefore);
+    expect(store.groups).toEqual(groupsBefore);
+    expect(routines.listRoutines()).toEqual(routinesBefore);
+    expect(localFiles(DATA_DIR)).toEqual(filesBefore);
+  });
+
+  it("still normalizes historical responder and routine fields under the current backup identity", () => {
+    const { store, routines, chief } = fixture();
+    const backup = createTeamBackup(store, routines.listRoutines(), "Historical fields");
+    const historical = structuredClone(backup);
+    Object.assign(historical.groups[0]!, { defaultResponder: { kind: "future-responder" } });
+    for (const routine of historical.routines) Object.assign(routine, { runOn: "maus" });
+    const before = structuredClone(historical);
+    const parsed = parseTeamBackup(historical);
+    expect(parsed.groups[0]!.defaultResponder).toEqual({ kind: "member", botId: chief.id });
+    expect(parsed.routines.every((routine) => routine.runOn === "hezuo")).toBe(true);
+    const restored = importTeamBackup(store, routines, historical, selection());
+    expect(restored.groups[0]!.defaultResponder).toEqual({ kind: "member", botId: restored.bots.find((bot) => bot.name === "Mira 2")!.id });
+    expect(historical).toEqual(before);
+  });
 
   it("carries tool restrictions through backup and import without restoring execution grants", () => {
     const { store, routines, chief, scout } = fixture();

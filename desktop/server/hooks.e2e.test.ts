@@ -47,7 +47,7 @@ function harness(label: string, serverEnv: Record<string, string>, instanceEnv: 
   };
   beforeAll(async () => {
     chmodSync(FAKE_CLAUDE, 0o755);
-    home = mkdtempSync(join(tmpdir(), `omb-hooks-${label}-`));
+    home = mkdtempSync(join(tmpdir(), `hezuo-hooks-${label}-`));
     mkdirSync(join(home, ".hezuo"), { recursive: true });
     writeFileSync(join(home, ".hezuo", "config.json"), JSON.stringify({
       instances: {
@@ -67,7 +67,7 @@ function harness(label: string, serverEnv: Record<string, string>, instanceEnv: 
         },
       },
     }));
-    const env: NodeJS.ProcessEnv = { HOME: home, USERPROFILE: home, OMB_PORT: String(PORT), ...serverEnv };
+    const env: NodeJS.ProcessEnv = { HOME: home, USERPROFILE: home, HEZUO_PORT: String(PORT), ...serverEnv };
     if (process.env.PATH) env.PATH = process.env.PATH;
     child = spawn(process.execPath, [join(SERVER_DIR, "index.ts")], { cwd: join(SERVER_DIR, "..", ".."), env, stdio: ["ignore", "pipe", "pipe"] });
     child.stderr!.on("data", (c) => (stderr += c));
@@ -165,7 +165,7 @@ posixOnly("engine hooks e2e: compaction", () => {
 });
 
 posixOnly("engine hooks e2e: a shell call that hit its time limit", () => {
-  const dumpDir = mkdtempSync(join(tmpdir(), "omb-hooks-timeout-dump-"));
+  const dumpDir = mkdtempSync(join(tmpdir(), "hezuo-hooks-timeout-dump-"));
   const dump = join(dumpDir, "turn.json");
   afterAll(() => removeTempDir(dumpDir));
   const h = harness("timeout", {}, {
@@ -192,8 +192,8 @@ posixOnly("engine hooks e2e: a shell call that hit its time limit", () => {
   }, 60_000);
 });
 
-posixOnly("engine hooks e2e with OMB_HOOKS=0", () => {
-  const h = harness("off", { OMB_HOOKS: "0" });
+posixOnly("engine hooks e2e with HEZUO_HOOKS=0", () => {
+  const h = harness("off", { HEZUO_HOOKS: "0" });
 
   it("registers nothing: rows keep only previews and the digest says so", async () => {
     const bot = await h.runTurn();

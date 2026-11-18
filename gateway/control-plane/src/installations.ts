@@ -55,7 +55,7 @@ const createInstallationSchema = z.strictObject({
 });
 
 const INSTALLATION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const INSTALLATION_CREDENTIAL = /^omb_install_([A-Za-z0-9_-]{22})\.([A-Za-z0-9_-]{43})$/;
+const INSTALLATION_CREDENTIAL = /^hezuo_install_([A-Za-z0-9_-]{22})\.([A-Za-z0-9_-]{43})$/;
 const INSTALLATION_CREDENTIAL_TTL_MS = 90 * 24 * 60 * 60 * 1_000;
 const CREATION_RATE_WINDOW_MS = 60 * 60 * 1_000;
 const CREATION_RATE_MAX_ATTEMPTS = 100;
@@ -105,7 +105,7 @@ export async function sha256(value: string): Promise<string> {
 async function newCredential(createdAt: number) {
   const lookupId = base64URL(randomBytes(16));
   const secret = base64URL(randomBytes(32));
-  const raw = `omb_install_${lookupId}.${secret}`;
+  const raw = `hezuo_install_${lookupId}.${secret}`;
   return {
     lookupId,
     raw,
@@ -308,7 +308,6 @@ export async function revokeInstallation(
       env.DB.prepare(
         "UPDATE installation_credentials SET revoked_at = ? WHERE installation_id = ? AND revoked_at IS NULL",
       ).bind(now, installationId),
-      env.DB.prepare("DELETE FROM installation_push_devices WHERE installation_id = ?").bind(installationId),
     ]);
   }
   return new Response(null, { status: 204, headers: { "cache-control": "no-store" } });

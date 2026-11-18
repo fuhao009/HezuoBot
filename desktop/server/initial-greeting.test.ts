@@ -21,7 +21,7 @@ describe("the line after Set me up", () => {
 
 describe("a new bot's greeting", () => {
   it("names the person by their first name, in the app's language", () => {
-    expect(initialGreeting("Scout", "en", "Milind Soni")).toBe("Hi Milind, I'm Scout. What would you like me to do?");
+    expect(initialGreeting("Scout", "en", "Alex Soni")).toBe("Hi Alex, I'm Scout. What would you like me to do?");
     expect(initialGreeting("Scout", "es-MX", "  Ana  María ")).toBe("Hola Ana, soy Scout. ¿Qué te gustaría que hiciera?");
     expect(initialGreeting("Scout", "pt-BR", "João")).toBe("Oi João, eu sou Scout. O que você gostaria que eu fizesse?");
   });

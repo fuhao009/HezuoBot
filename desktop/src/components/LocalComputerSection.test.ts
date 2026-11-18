@@ -46,7 +46,7 @@ const cloudVm: LocalVmInventoryInstance = {
 
 const ownedCloudComputer: CloudComputerInventoryInstance = {
   boxId: "provider-id-must-not-render",
-  name: "ogb-current0-a1b2c3",
+  name: "hezuo-current0-a1b2c3",
   state: "ready",
   ownerBotId: "current-owner",
   ownerName: "Research",
@@ -258,7 +258,7 @@ describe("cloud computer inventory UI", () => {
         ownedCloudComputer,
         {
           boxId: "another-provider-id",
-          name: "ogb-orphaned-abcdef",
+          name: "hezuo-orphaned-abcdef",
           state: "archived",
           ownerBotId: null,
           ownerName: null,
@@ -274,7 +274,7 @@ describe("cloud computer inventory UI", () => {
     expect(markup).toContain("Its bot no longer exists");
     expect(markup).toContain("Running");
     expect(markup).toContain("Sleeping");
-    expect(markup).toContain("ogb-current0-a1b2c3");
+    expect(markup).toContain("hezuo-current0-a1b2c3");
     expect(markup).not.toMatch(/provider-id-must-not-render|another-provider-id|desktopUrl|password|token=/);
   });
 

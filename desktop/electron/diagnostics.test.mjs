@@ -58,31 +58,6 @@ describe("buildDiagnosticsReport", () => {
     expect(report).toContain("rooms.turnTimeoutMinutes=5");
     expect(report).toContain("(no desktop crash events available)");
     expect(report).toContain("(server log unavailable)");
-    expect(report).toContain("(updater log unavailable)");
-  });
-
-  it("includes updater diagnostics separately and redacts signed redirects and headers", () => {
-    const report = buildDiagnosticsReport({
-      appInfo,
-      logTail: "server ready",
-      updaterLogTail: [
-        "[info] Downloading version 0.1.61",
-        "[error] GET https://release-assets.example.test/update.zip?X-Amz-Credential=private-account&X-Amz-Signature=signed-secret&jwt=private-jwt HTTP 403",
-        'headers {"authorization":"Basic dXNlcjpwYXNzd29yZA==","apiKey":"opaque-private-key"}',
-        "Set-Cookie: session=private-session; Secure; HttpOnly",
-      ].join("\n"),
-    });
-    expect(report).toContain("## Updater log tail — credentials and URL parameters auto-masked");
-    expect(report).toContain("Downloading version 0.1.61");
-    expect(report).toContain("https://release-assets.example.test/update.zip?«redacted URL parameters» HTTP 403");
-    for (const secret of ["private-account", "signed-secret", "private-jwt", "dXNlcjpwYXNzd29yZA==", "opaque-private-key", "private-session"]) {
-      expect(report).not.toContain(secret);
-    }
-    expect(report.indexOf("server ready")).toBeLessThan(report.indexOf("Downloading version 0.1.61"));
-  });
-
-  it.each(["", null, undefined])("handles an absent updater log (%s)", (updaterLogTail) => {
-    expect(buildDiagnosticsReport({ appInfo, updaterLogTail })).toContain("(updater log unavailable)");
   });
 
   it("removes URL userinfo, fragments, and unfamiliar query capabilities without hiding public paths", () => {
@@ -97,9 +72,9 @@ describe("buildDiagnosticsReport", () => {
     }
   });
 
-  it("masks JSON credential fields and cookies in updater HTTP dumps", () => {
+  it("masks JSON credential fields and cookies in HTTP dumps", () => {
     const redacted = redactSecretsInLine([
-      '{"OMB_COMPOSIO_BROKER_TOKEN":"opaque-broker-value","password":"opaque-password-value"}',
+      '{"HEZUO_COMPOSIO_BROKER_TOKEN":"opaque-broker-value","password":"opaque-password-value"}',
       '{"Cookie":"session=private-cookie; tracking=private-tracker"}',
       "Cookie: session=private-session; tracking=private-tracking",
     ].join("\n"));
@@ -110,15 +85,13 @@ describe("buildDiagnosticsReport", () => {
 
   it("masks Groq keys in diagnostic log exports while retaining useful status", () => {
     const key = `gsk_${"a".repeat(48)}`;
-    const otherKey = `gsk_${"b".repeat(48)}`;
     const workspaceKey = "opaque-groq-fixture-key";
     const report = buildDiagnosticsReport({
       appInfo,
       configSummary: { groq: { configured: true } },
-      logTail: `Groq HTTP 401: invalid key ${key}\nspawn env OMB_GROQ_API_KEY=${workspaceKey}`,
-      updaterLogTail: `upstream rejected ${otherKey}`,
+      logTail: `Groq HTTP 401: invalid key ${key}\nspawn env HEZUO_GROQ_API_KEY=${workspaceKey}`,
     });
-    for (const secret of [key, otherKey, workspaceKey]) expect(report).not.toContain(secret);
+    for (const secret of [key, workspaceKey]) expect(report).not.toContain(secret);
     expect(report).toContain("groq.configured=true");
     expect(report).toContain("Groq HTTP 401");
   });
@@ -176,7 +149,7 @@ describe("buildDiagnosticsReport", () => {
       appInfo,
       configSummary: {},
       logTail: "server ready",
-      logPath: "/Users/ada/Library/Logs/Hezuo/server.log",
+      logPath: "/Users/ada/Library/Logs/HezuoBot/server.log",
     });
     expect(report).toContain("## Server log tail");
     expect(report).not.toContain("/Users/ada");
@@ -289,7 +262,7 @@ describe("formatDesktopCrashRecord", () => {
     error.stack = [
       "TypeError: secret user text from C:\\Users\\Ada\\private.txt",
       "secret-client.ts:1:1",
-      "    at boot (file:///C:/Users/Ada/Hezuo/electron/main.mjs:412:7)",
+      "    at boot (file:///C:/Users/Ada/HezuoBot/electron/main.mjs:412:7)",
     ].join("\n");
     const record = formatDesktopCrashRecord({ kind: "main", origin: "unhandledRejection", error });
     expect(record).toBe("event=main-process-failure origin=unhandledRejection error=TypeError");
@@ -380,20 +353,20 @@ describe("decodeLogTail", () => {
 });
 
 describe("readSafeLogTail", () => {
-  it("exports only a bounded complete-line updater tail from an isolated log fixture", () => {
-    const directory = mkdtempSync(join(tmpdir(), "hezuo-updater-diagnostics-"));
+  it("exports only a bounded complete-line server tail from an isolated log fixture", () => {
+    const directory = mkdtempSync(join(tmpdir(), "hezuo-server-diagnostics-"));
     try {
-      const log = join(directory, "updater.log");
+      const log = join(directory, "server.log");
       const tail = "[info] update staged\n[error] https://updates.example.test/app.zip?jwt=private-query-token\n";
       writeFileSync(log, `${"old-private-line\n".repeat(20_000)}${tail}`, { mode: 0o600 });
       const result = readSafeLogTail(log);
       expect(result.bytes).toBeLessThanOrEqual(256 * 1024);
       expect(result.tail.endsWith(tail)).toBe(true);
-      const report = buildDiagnosticsReport({ updaterLogTail: result.tail });
+      const report = buildDiagnosticsReport({ logTail: result.tail });
       expect(report).toContain("[info] update staged");
       expect(report).not.toContain("private-query-token");
       expect(report).not.toContain(directory);
-      expect(readSafeLogTail(join(directory, "absent-updater.log"))).toBeNull();
+      expect(readSafeLogTail(join(directory, "absent-server.log"))).toBeNull();
     } finally {
       rmSync(directory, { force: true, recursive: true });
     }
@@ -433,7 +406,7 @@ describe("diagnosticsFileName", () => {
 });
 
 it("appends a crash line, truncates a full log, and refuses a hard-linked one", () => {
-  const dir = mkdtempSync(join(tmpdir(), "omb-crash-"));
+  const dir = mkdtempSync(join(tmpdir(), "hezuo-crash-"));
   const file = join(dir, "logs", "desktop-crashes.log");
   appendDesktopCrashRecord(file, 64, "first crash");
   expect(readFileSync(file, "utf8")).toMatch(/^\[.+\] first crash\n$/);

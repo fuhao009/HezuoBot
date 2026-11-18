@@ -57,7 +57,7 @@ function normalizeRecipients(message) {
 }
 
 function buildMime(message, fromEmail) {
-  const boundary = `omb-${Buffer.from(`${Date.now()}-${Math.random()}`).toString("hex")}`;
+  const boundary = `hezuo-${Buffer.from(`${Date.now()}-${Math.random()}`).toString("hex")}`;
   const text = String(message.text ?? "");
   const html = String(message.html ?? "");
   const headers = [

@@ -269,7 +269,7 @@ const SENT_HIGHLIGHT_MS = 1_400;
 export function TeamMapPage() {
   const { state, dispatch } = useStore();
   const { dragProps } = useCaptionChrome();
-  const remoteClient = window.ogb?.remoteClient?.active === true;
+  const remoteClient = window.hezuo?.remoteClient?.active === true;
   const teamPeople = useTeamPeople();
   const admin = useOwnerOrAdmin();
   const reportsChart = useMapMode() === "people" && teamPeople !== null;
@@ -396,7 +396,7 @@ export function TeamMapPage() {
         connectedBotIds={state.settingsOpen ? edges.flatMap((edge) => edge.sourceBotId === state.selectedId ? [edge.targetBotId] : edge.targetBotId === state.selectedId ? [edge.sourceBotId] : []) : []}
         onComputer={(bot) => openBotSettings(dispatch, "access", { botId: bot.id })}
         computers={showComputers && computersChoiceLoaded && !remoteClient ? mapComputers.computers : undefined} computerFrames={mapComputers.frames}
-        onOpenComputer={(computer) => computer.kind === "team" ? setComputersOpen(true) : dispatch({ type: "toggleComputer", open: true, botId: computer.id })}
+        onOpenComputer={(computer) => computer.kind === "team" ? setComputersOpen(true) : openBotSettings(dispatch, "access", { botId: computer.id })}
         teamComputers={Object.fromEntries(computers.filter((computer) => computer.section !== null).map((computer) => [computer.section!, { name: computer.name, state: computer.state }]))}
         onTeamComputer={() => setComputersOpen(true)}
         onComputerDrop={(id, section) => { if (!remoteClient) { setComputersOpen(true); setComputerDrop({ id, section }); } }}

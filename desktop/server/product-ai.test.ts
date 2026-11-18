@@ -27,8 +27,8 @@ import {
   productAiInstanceConfigs,
 } from "./product-ai.ts";
 
-const TOKEN = `omb_product_ai_${"a".repeat(22)}.${"b".repeat(43)}`;
-const NEXT_TOKEN = `omb_product_ai_${"c".repeat(22)}.${"d".repeat(43)}`;
+const TOKEN = `hezuo_product_ai_${"a".repeat(22)}.${"b".repeat(43)}`;
+const NEXT_TOKEN = `hezuo_product_ai_${"c".repeat(22)}.${"d".repeat(43)}`;
 const ORIGIN = "https://operator.example";
 const NOW = 1_800_000_000_000;
 
@@ -51,7 +51,7 @@ const parsed = (raw: unknown, options: { now?: number; allowLoopback?: boolean }
 
 /** A throwaway leaf certificate for 127.0.0.1, or null where openssl is absent. */
 function loopbackCertificate(altName = "IP:127.0.0.1", commonName = "127.0.0.1"): string | null {
-  const directory = mkdtempSync(join(tmpdir(), "omb-product-ai-ca-"));
+  const directory = mkdtempSync(join(tmpdir(), "hezuo-product-ai-ca-"));
   const key = join(directory, "key.pem");
   const cert = join(directory, "cert.pem");
   const made = spawnSync("openssl", ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "2",

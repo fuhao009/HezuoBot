@@ -64,8 +64,8 @@ async function officialBinary() {
   const archive = join(cache, release.file);
   await writeFile(archive, bytes);
   await run("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command",
-    "Expand-Archive -LiteralPath $env:OMB_CUA_ARCHIVE -DestinationPath $env:OMB_CUA_EXTRACT"], {
-    env: { ...process.env, OMB_CUA_ARCHIVE: archive, OMB_CUA_EXTRACT: cache },
+    "Expand-Archive -LiteralPath $env:HEZUO_CUA_ARCHIVE -DestinationPath $env:HEZUO_CUA_EXTRACT"], {
+    env: { ...process.env, HEZUO_CUA_ARCHIVE: archive, HEZUO_CUA_EXTRACT: cache },
     timeout: 60_000,
     windowsHide: true,
   });

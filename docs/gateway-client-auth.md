@@ -18,7 +18,7 @@ Send `Accept: application/json`, and `Content-Type: application/json` when sendi
 Authorization: Bearer <signed-set-auth-token-value>
 ```
 
-Do not decode, re-sign or substitute a cookie, installation credential (`omb_install_…`), or model credential (`omb_product_ai_…`). `/v1/me` and the other account routes explicitly require an account bearer; cookie-only requests do not authenticate these routes.
+Do not decode, re-sign or substitute a cookie, installation credential (`hezuo_install_…`), or model credential (`hezuo_product_ai_…`). `/v1/me` and the other account routes explicitly require an account bearer; cookie-only requests do not authenticate these routes.
 
 ### Native versus browser requests
 
@@ -158,12 +158,12 @@ Keep account tokens in native credential storage, not renderer state, URLs, logs
 
 The relay is used by the desktop/Cloud home's HighLevel connector, not by password signin. It requires **no Hezuo account bearer**. The unguessable returned `state` authorizes a one-time claim; protect it like a credential. `refreshToken` is likewise a credential. HighLevel's client secret remains on the Worker and must never be supplied by a client. These are location-level flows only, not company/agency flows.
 
-For application UI integration, prefer the local owner-session routes documented in [HighLevel: owner routes](highlevel.md#owner-routes-desktopserverrouteshighlevelts-admin-or-owner-session-only). Those `/api/highlevel/*` routes are on the OMB server, **not** the relay Worker; they manage polling, encrypted token storage and connector state without returning tokens to the UI. The relay defaults to `https://accounts.openmausbot.com`; use the configured `OMB_HIGHLEVEL_RELAY_URL` when overridden.
+For application UI integration, prefer the local owner-session routes documented in [HighLevel: owner routes](highlevel.md#owner-routes-desktopserverrouteshighlevelts-admin-or-owner-session-only). Those `/api/highlevel/*` routes are on the HezuoBot server, **not** the relay Worker; they manage polling, encrypted token storage and connector state without returning tokens to the UI. Set `HEZUO_HIGHLEVEL_RELAY_URL` to the operator-provisioned relay before using these examples.
 
 ### 1. Start
 
 ```sh
-curl -i 'https://accounts.openmausbot.com/v1/highlevel/start' \
+curl -i '${HEZUO_HIGHLEVEL_RELAY_URL}/v1/highlevel/start' \
   -H 'Content-Type: application/json' --data '{"kind":"location"}'
 ```
 
@@ -188,7 +188,7 @@ This is a **browser navigation**, not a client token-exchange request. The Worke
 ### 3. Claim once
 
 ```sh
-curl -i 'https://accounts.openmausbot.com/v1/highlevel/claim' \
+curl -i '${HEZUO_HIGHLEVEL_RELAY_URL}/v1/highlevel/claim' \
   -H 'Content-Type: application/json' --data '{"state":"<exact-state-from-start>"}'
 ```
 
@@ -199,7 +199,7 @@ curl -i 'https://accounts.openmausbot.com/v1/highlevel/claim' \
 ### 4. Refresh and persist the rotated pair
 
 ```sh
-curl -i 'https://accounts.openmausbot.com/v1/highlevel/refresh' \
+curl -i '${HEZUO_HIGHLEVEL_RELAY_URL}/v1/highlevel/refresh' \
   -H 'Content-Type: application/json' \
   --data '{"refreshToken":"<current-HighLevel-refresh-token>"}'
 ```

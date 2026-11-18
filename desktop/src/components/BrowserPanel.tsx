@@ -85,7 +85,7 @@ export function LiveBrowser({ bot, signIn, page, takeover }: { bot: Bot; signIn?
   const [nativeSurface, setNativeSurface] = useState<EmbeddedBrowserSurfaceState | null>(null);
   useEffect(() => { setNativeViewer(""); setNativeSurface(null); }, [bot.id, bot.browserProfile, attempt]);
   useEffect(() => {
-    const bridge = window.ogb?.browserSurface;
+    const bridge = window.hezuo?.browserSurface;
     if (!bridge || !nativeViewer || !connected) return;
     let alive = true;
     let attached: EmbeddedBrowserSurfaceState | null = null;
@@ -100,7 +100,7 @@ export function LiveBrowser({ bot, signIn, page, takeover }: { bot: Bot; signIn?
     return () => { alive = false; stop(); setNativeSurface(null); if (attached) void bridge.detach(attached); };
   }, [bot.id, bot.browserProfile, scopedThread, nativeViewer, connected]);
   useEffect(() => {
-    const bridge = window.ogb?.browserSurface;
+    const bridge = window.hezuo?.browserSurface;
     const element = nativeViewport.current;
     if (!bridge || !element || !nativeSurface) return;
     const update = () => {
@@ -119,7 +119,7 @@ export function LiveBrowser({ bot, signIn, page, takeover }: { bot: Bot; signIn?
     return () => { observer.disconnect(); mutations.disconnect(); window.removeEventListener("resize", update); window.removeEventListener("scroll", update, true); };
   }, [nativeSurface?.surfaceId, nativeSurface?.revision, pageVisible, showProfiles, showTyping, maximized, fullscreen]);
   useEffect(() => {
-    if (nativeSurface?.interactive && nativeSurface.visible) void window.ogb?.browserSurface?.focus(nativeSurface).catch(() => {});
+    if (nativeSurface?.interactive && nativeSurface.visible) void window.hezuo?.browserSurface?.focus(nativeSurface).catch(() => {});
   }, [nativeSurface?.surfaceId, nativeSurface?.interactive, nativeSurface?.visible]);
   const latest = useRef({ openSignInPage: () => {}, takeControl: () => {} });
   const signInOpen = state.computerControl?.[bot.id]?.help?.place === "browser";

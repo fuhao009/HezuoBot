@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 export const SERVER_ROOT = dirname(fileURLToPath(import.meta.url));
 
-/** The directory that holds package.json, skills/ and enterprise/: two levels above a checkout's desktop/server, one above a bundle's dist-server. */
+/** The directory that holds package.json and skills/: two levels above a checkout's desktop/server, one above a bundle's dist-server. */
 export function repoRootOf(serverRoot: string): string {
   return basename(serverRoot) === "server" && basename(dirname(serverRoot)) === "desktop" ? resolve(serverRoot, "..", "..") : resolve(serverRoot, "..");
 }
@@ -26,8 +26,7 @@ export const SPAWNED_PROXIES = {
   connectors: resolveProxy("connector-proxy"),
   mcpGate: resolveProxy("mcp-gate"),
   mcpRemote: resolveProxy("mcp-remote-proxy"),
-  phone: resolveProxy("drivers/phone-proxy"),
-  hook: resolveProxy("hooks/omb-hook"),
+  hook: resolveProxy("hooks/hezuo-hook"),
   piMcpExtension: resolveProxy("drivers/pi-mcp-extension"),
 } as const;
 

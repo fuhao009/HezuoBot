@@ -21,7 +21,7 @@ function relay(answers: Record<string, (args: Record<string, unknown>) => { succ
       if (frame.method !== "tools/call") return { status: 202, bytes: new Uint8Array() };
       const response = answers[String(item!.tool_slug)]!(item!.arguments as Record<string, unknown>);
       const text = JSON.stringify({ successful: true, data: { results: [{ tool_slug: item!.tool_slug, response }] } });
-      return { status: 200, bytes: new TextEncoder().encode(JSON.stringify({ jsonrpc: "2.0", id: "omb-check-call", result: { content: [{ type: "text", text }] } })) };
+      return { status: 200, bytes: new TextEncoder().encode(JSON.stringify({ jsonrpc: "2.0", id: "hezuo-check-call", result: { content: [{ type: "text", text }] } })) };
     },
   };
   return { deps, frames };
@@ -46,7 +46,7 @@ describe("reading Composio's answers", () => {
     expect(emails[0]!.preview).toBe("Can you send the Q3 numbers by Friday? Thanks");
     expect(profileFromData(fixture("composio-gmail-profile"))).toBe("admin@example.test");
     expect(messageFromData(fixture("composio-gmail-message"))).toMatchObject({ id: "m-1", threadId: "t-1", subject: "Q3 numbers" });
-    expect(threadFromData(fixture("composio-gmail-thread")).map((message) => message.from)).toEqual(["ada@pin.example", "omkar@example.test"]);
+    expect(threadFromData(fixture("composio-gmail-thread")).map((message) => message.from)).toEqual(["ada@pin.example", "morgan@example.test"]);
     expect(calendarsFromData(fixture("composio-calendar-list")).filter((calendar) => calendar.read).map((calendar) => calendar.id))
       .toEqual(["admin@example.test", "team@group.calendar.google.com", "ada@example.test"]);
   });

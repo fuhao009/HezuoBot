@@ -13,16 +13,16 @@ describe("sentinel paths", () => {
   });
 
   it("gives any other data dir its own subfolder, the same one every time", () => {
-    const other = defaultSentinelOut("/srv/omb-data", "linux", "/home/hezuo", {});
+    const other = defaultSentinelOut("/srv/hezuo-data", "linux", "/home/hezuo", {});
     expect(other).toMatch(/^\/home\/hezuo\/\.local\/state\/hezuo-sentinel\/data-[0-9a-f]{12}$/);
-    expect(defaultSentinelOut("/srv/omb-data", "linux", "/home/hezuo", {})).toBe(other);
-    expect(defaultSentinelOut("/srv/omb-data-2", "linux", "/home/hezuo", {})).not.toBe(other);
+    expect(defaultSentinelOut("/srv/hezuo-data", "linux", "/home/hezuo", {})).toBe(other);
+    expect(defaultSentinelOut("/srv/hezuo-data-2", "linux", "/home/hezuo", {})).not.toBe(other);
   });
 
   it("knows when a folder is inside another", () => {
     expect(isInside("/d/omb/sentinel", "/d/omb", "linux")).toBe(true);
     expect(isInside("/d/omb", "/d/omb", "linux")).toBe(true);
-    expect(isInside("/d/omb-sentinel", "/d/omb", "linux")).toBe(false);
+    expect(isInside("/d/hezuo-sentinel", "/d/omb", "linux")).toBe(false);
     expect(isInside("/d", "/d/omb", "linux")).toBe(false);
     expect(isInside("C:\\d\\omb\\x", "C:\\d\\omb", "win32")).toBe(true);
   });

@@ -6,13 +6,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { verificationServerEnvironment } from "../../scripts/control-omb.ts";
+import { verificationServerEnvironment } from "../../scripts/control-hezuo.ts";
 import { removeTempDir, waitForExit } from "./testing/cleanup.ts";
 import { freePortBlock } from "./testing/ports.ts";
 import { excludedWorkspaceAuthPath } from "./workspace-backup-policy.ts";
 
-const ROOT = fileURLToPath(new URL("../..", import.meta.url));
-const FAKE_CODEX = join(ROOT, "server/testing/fake-codex-app-server.ts");
+const ROOT = fileURLToPath(new URL("../../", import.meta.url));
+const FAKE_CODEX = join(ROOT, "desktop/server/testing/fake-codex-app-server.ts");
 let child: ChildProcess | undefined;
 let home: string;
 let base: string;
@@ -48,19 +48,19 @@ function expectSignedOut(instance: Record<string, any>) {
 }
 
 beforeAll(async () => {
-  home = mkdtempSync(join(tmpdir(), "omb-chatgpt-api-"));
+  home = mkdtempSync(join(tmpdir(), "hezuo-chatgpt-api-"));
   mkdirSync(join(home, "tmp"));
   const port = await freePortBlock([0, 1]);
   base = `http://127.0.0.1:${port}`;
-  logPath = join(tmpdir(), `omb-chatgpt-api-${port}-${process.pid}.log`);
+  logPath = join(tmpdir(), `hezuo-chatgpt-api-${port}-${process.pid}.log`);
   // Non-product instance names avoid adding unrelated native CLIs to this fixture.
   writeFileSync(join(home, "config.json"), JSON.stringify({ instances: {
-    fixture: { driver: "claudeAgent", config: { cli: join(ROOT, "server/testing/fake-claude-cli.ts") } },
+    fixture: { driver: "claudeAgent", config: { cli: join(ROOT, "desktop/server/testing/fake-claude-cli.ts") } },
     chatgpt: { driver: "codex", displayName: "ChatGPT plan", config: { authMode: "chatgpt-plan", cli: FAKE_CODEX } },
   } }));
   const log = openSync(logPath, "a", 0o600);
   try {
-    child = spawn(process.execPath, ["--experimental-strip-types", join(ROOT, "server/index.ts")], {
+    child = spawn(process.execPath, ["--experimental-strip-types", join(ROOT, "desktop/server/index.ts")], {
       cwd: ROOT, env: verificationServerEnvironment({}, home, port), stdio: ["ignore", log, log],
     });
   } finally { closeSync(log); }

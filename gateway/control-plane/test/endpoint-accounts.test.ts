@@ -16,12 +16,12 @@ import {
   type AccountSnapshot,
 } from "../src/endpoint-accounts";
 
-const TOKEN_SECRET = "CLOUDFLARE_API_TOKEN_MAUSBOT_SI";
+const TOKEN_SECRET = "CLOUDFLARE_API_TOKEN_SECONDARY";
 const TOKEN = "test-only-second-zone-api-token-with-no-real-access";
 const SECOND_ENTRY = {
   accountId: "2B".repeat(16),
   zoneId: "3c".repeat(16),
-  companionHostSuffix: "mausbot.si",
+  companionHostSuffix: "secondary.example.test",
   apiTokenSecret: TOKEN_SECRET,
 };
 
@@ -49,35 +49,33 @@ describe("endpoint account configuration", () => {
     }
   });
 
-  it("parses the production account list once its token is saved, and only then", () => {
-    const production = JSON.parse(env.TEST_PRODUCTION_ENDPOINT_ACCOUNTS) as unknown[];
-    const configured = readConfig(withAccounts(production));
+  it("parses an explicitly configured account once its token is saved, and only then", () => {
+    const accounts = [{ ...SECOND_ENTRY, tunnelLimit: 1000, dnsRecordLimit: 3500, minAppVersion: "0.1.104" }];
+    const configured = readConfig(withAccounts(accounts));
     expect(configured.endpointAccountIssues).toEqual([]);
     expect(configured.endpointAccounts.slice(1).map(({ apiToken: _token, ...account }) => account)).toEqual([{
-      accountId: "bbb5305f06e28a6f2abaac299f3b09dc",
-      companionHostSuffix: "mausbot.si",
+      accountId: SECOND_ENTRY.accountId.toLowerCase(),
+      companionHostSuffix: "secondary.example.test",
       dnsRecordLimit: 3500,
       minAppVersion: "0.1.104",
       newEndpoints: true,
       tunnelLimit: 1000,
-      zoneId: "4ded3da43e7b2c3a5f27b0fb33e5bd7a",
+      zoneId: SECOND_ENTRY.zoneId,
     }]);
     // Deployed before its token: the entry is dropped and reported, nothing breaks.
-    const unsaved = readConfig(withAccounts(production, {}));
+    const unsaved = readConfig(withAccounts(accounts, {}));
     expect(unsaved.endpointAccounts).toEqual([unsaved.cloudflare]);
     expect(unsaved.endpointAccountIssues).toEqual(["entry_1_token"]);
   });
 
-  it("deploys every account's limits at its real Cloudflare quotas", () => {
-    // openmausbot.com and mausbot.si are both Pro zones (3,500 DNS records;
-    // mausbot.si was Free, 200, until Oct 21). Both accounts allow 1,000 tunnels.
+  it("ships no additional provisioning accounts by default", () => {
     const production = JSON.parse(env.TEST_PRODUCTION_ENDPOINT_ACCOUNTS) as unknown[];
+    expect(production).toEqual([]);
     const deployed = readConfig(withAccounts(production)).endpointAccounts;
     expect(deployed.map(({ companionHostSuffix, dnsRecordLimit, tunnelLimit }) => (
       { companionHostSuffix, dnsRecordLimit, tunnelLimit }
     ))).toEqual([
-      { companionHostSuffix: "openmausbot.com", dnsRecordLimit: 3500, tunnelLimit: 1000 },
-      { companionHostSuffix: "mausbot.si", dnsRecordLimit: 3500, tunnelLimit: 1000 },
+      { companionHostSuffix: env.COMPANION_HOST_SUFFIX, dnsRecordLimit: 3500, tunnelLimit: 1000 },
     ]);
   });
 
@@ -89,7 +87,7 @@ describe("endpoint account configuration", () => {
       expect(config.endpointAccounts).toEqual([config.cloudflare, {
         accountId: "2b".repeat(16),
         apiToken: TOKEN,
-        companionHostSuffix: "mausbot.si",
+        companionHostSuffix: "secondary.example.test",
         dnsRecordLimit: 200,
         minAppVersion: "0.1.103",
         newEndpoints: true,
@@ -110,7 +108,7 @@ describe("endpoint account configuration", () => {
     // Closed to new endpoints, keeping the ones it holds.
     const closed = readConfig(withAccounts([{ ...SECOND_ENTRY, newEndpoints: false }]));
     expect(closed.endpointAccountIssues).toEqual([]);
-    expect(closed.endpointAccounts[1]).toMatchObject({ companionHostSuffix: "mausbot.si", newEndpoints: false });
+    expect(closed.endpointAccounts[1]).toMatchObject({ companionHostSuffix: "secondary.example.test", newEndpoints: false });
   });
 
   it("drops a bad entry with a redacted issue code and never throws", () => {
@@ -131,7 +129,7 @@ describe("endpoint account configuration", () => {
       { value: [{ ...SECOND_ENTRY, apiTokenSecret: "BETTER_AUTH_SECRET" }], accounts: 1, issues: ["entry_1_shape"] },
       { value: [SECOND_ENTRY], secrets: {}, accounts: 1, issues: ["entry_1_token"] },
       { value: [SECOND_ENTRY], secrets: { [TOKEN_SECRET]: "short" }, accounts: 1, issues: ["entry_1_token"] },
-      { value: [{ ...SECOND_ENTRY, companionHostSuffix: "Mausbot.si" }], accounts: 1, issues: ["entry_1_suffix"] },
+      { value: [{ ...SECOND_ENTRY, companionHostSuffix: "Secondary.example.test" }], accounts: 1, issues: ["entry_1_suffix"] },
       { value: [{ ...SECOND_ENTRY, companionHostSuffix: "si" }], accounts: 1, issues: ["entry_1_suffix"] },
       { value: [{ ...SECOND_ENTRY, accountId: "not-an-account" }], accounts: 1, issues: ["entry_1_shape"] },
       { value: [{ ...SECOND_ENTRY, minAppVersion: "0.1" }], accounts: 1, issues: ["entry_1_shape"] },
@@ -154,7 +152,7 @@ describe("endpoint account configuration", () => {
 const PRIMARY: EndpointAccount = {
   accountId: "0c92969a82eb9e173b013a7e7a02333d",
   apiToken: "primary-token-for-pure-tests-only",
-  companionHostSuffix: "openmausbot.com",
+  companionHostSuffix: "gateway.example.test",
   dnsRecordLimit: 1000,
   minAppVersion: null,
   newEndpoints: true,
@@ -164,7 +162,7 @@ const PRIMARY: EndpointAccount = {
 const SECOND: EndpointAccount = {
   accountId: "2b".repeat(16),
   apiToken: "second-token-for-pure-tests-only",
-  companionHostSuffix: "mausbot.si",
+  companionHostSuffix: "secondary.example.test",
   dnsRecordLimit: 200,
   minAppVersion: null,
   newEndpoints: true,
@@ -214,8 +212,8 @@ describe("endpoint account rules", () => {
   });
 
   it("never chooses an account with no free tunnel or DNS record while another has both", () => {
-    // Production on 2026-10-20: openmausbot.com (a Pro zone) had 26 tunnels
-    // free and 1,878 dormant endpoints; mausbot.si (a Free zone) 770 tunnels
+    // Production on 2026-10-20: gateway.example.test (a Pro zone) had 26 tunnels
+    // free and 1,878 dormant endpoints; secondary.example.test (a Free zone) 770 tunnels
     // free, all 200 DNS records used, and 207 dormant endpoints.
     const primary = { ...PRIMARY, dnsRecordLimit: 3500 };
     const config = accounts(primary, SECOND);
@@ -287,17 +285,17 @@ describe("endpoint account rules", () => {
   it("ties a row to its own configured account and that account's suffix only", () => {
     const config = accounts(PRIMARY, SECOND);
     const label = `c-${"0123456789abcdef".repeat(2)}`;
-    expect(endpointAccountFor(config, { hostname: `${label}.mausbot.si`, provider_account: SECOND.accountId })).toBe(SECOND);
-    expect(endpointAccountFor(config, { hostname: `${label}.openmausbot.com`, provider_account: PRIMARY.accountId })).toBe(PRIMARY);
+    expect(endpointAccountFor(config, { hostname: `${label}.secondary.example.test`, provider_account: SECOND.accountId })).toBe(SECOND);
+    expect(endpointAccountFor(config, { hostname: `${label}.gateway.example.test`, provider_account: PRIMARY.accountId })).toBe(PRIMARY);
     for (const [providerAccount, hostname] of [
-      [SECOND.accountId, `${label}.openmausbot.com`],
-      [PRIMARY.accountId, `${label}.mausbot.si`],
-      ["9".repeat(32), `${label}.mausbot.si`],
-      [SECOND.accountId, `www.${label}.mausbot.si`],
-      [SECOND.accountId, `${label.toUpperCase()}.mausbot.si`],
-      [SECOND.accountId, "c-abc.mausbot.si"],
-      [SECOND.accountId, `${label}.evilmausbot.si`],
-      [SECOND.accountId, "mausbot.si"],
+      [SECOND.accountId, `${label}.gateway.example.test`],
+      [PRIMARY.accountId, `${label}.secondary.example.test`],
+      ["9".repeat(32), `${label}.secondary.example.test`],
+      [SECOND.accountId, `www.${label}.secondary.example.test`],
+      [SECOND.accountId, `${label.toUpperCase()}.secondary.example.test`],
+      [SECOND.accountId, "c-abc.secondary.example.test"],
+      [SECOND.accountId, `${label}.evilsecondary.example.test`],
+      [SECOND.accountId, "secondary.example.test"],
     ]) {
       expect(endpointAccountFor(config, { hostname, provider_account: providerAccount }), hostname).toBeNull();
     }
@@ -307,23 +305,23 @@ describe("endpoint account rules", () => {
     const config = accounts(PRIMARY, SECOND);
     const label = (index: number) => `c-${index.toString(16).padStart(32, "0")}`;
     const cases: Array<[string, string]> = [
-      [SECOND.accountId, `${label(1)}.mausbot.si`],
-      [PRIMARY.accountId, `${label(2)}.openmausbot.com`],
-      [SECOND.accountId, `c-${"0123456789abcdef".repeat(2)}.mausbot.si`],
-      [SECOND.accountId, `${label(3)}.openmausbot.com`],
-      [PRIMARY.accountId, `${label(4)}.mausbot.si`],
-      ["9".repeat(32), `${label(5)}.mausbot.si`],
-      [SECOND.accountId, `www.${label(6)}.mausbot.si`],
-      [SECOND.accountId, `${label(7).toUpperCase()}.mausbot.si`],
-      [SECOND.accountId, `c-${"0123456789abcdeg".repeat(2)}.mausbot.si`],
-      [SECOND.accountId, "c-abc.mausbot.si"],
-      [SECOND.accountId, `${label(8)}0.mausbot.si`],
-      [SECOND.accountId, `${label(9)}.evilmausbot.si`],
-      [SECOND.accountId, `${label(10)}.mausbot.si.evil.test`],
-      [SECOND.accountId, `${label(11)}.mausbot.si.`],
-      [SECOND.accountId, `d-${"0".repeat(31)}c.mausbot.si`],
-      [SECOND.accountId, `${label(12)}mausbot.si`],
-      [SECOND.accountId, "mausbot.si"],
+      [SECOND.accountId, `${label(1)}.secondary.example.test`],
+      [PRIMARY.accountId, `${label(2)}.gateway.example.test`],
+      [SECOND.accountId, `c-${"0123456789abcdef".repeat(2)}.secondary.example.test`],
+      [SECOND.accountId, `${label(3)}.gateway.example.test`],
+      [PRIMARY.accountId, `${label(4)}.secondary.example.test`],
+      ["9".repeat(32), `${label(5)}.secondary.example.test`],
+      [SECOND.accountId, `www.${label(6)}.secondary.example.test`],
+      [SECOND.accountId, `${label(7).toUpperCase()}.secondary.example.test`],
+      [SECOND.accountId, `c-${"0123456789abcdeg".repeat(2)}.secondary.example.test`],
+      [SECOND.accountId, "c-abc.secondary.example.test"],
+      [SECOND.accountId, `${label(8)}0.secondary.example.test`],
+      [SECOND.accountId, `${label(9)}.evilsecondary.example.test`],
+      [SECOND.accountId, `${label(10)}.secondary.example.test.evil.test`],
+      [SECOND.accountId, `${label(11)}.secondary.example.test.`],
+      [SECOND.accountId, `d-${"0".repeat(31)}c.secondary.example.test`],
+      [SECOND.accountId, `${label(12)}secondary.example.test`],
+      [SECOND.accountId, "secondary.example.test"],
     ];
     const now = Date.now();
     await env.DB.batch(cases.map(([providerAccount, hostname], index) => env.DB.prepare(

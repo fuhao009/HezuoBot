@@ -67,5 +67,5 @@ room posts never raise escalations: a room's question stays in the room. A
 assigner, which the runtime already tells, not to the Chief.
 
 What the person sees: the Chief's *Team escalations* thread in the sidebar
-(and on the phone), one entry per gate with the Chief's one-line report of
+(including remote companion views), one entry per gate with the Chief's one-line report of
 what it told them — instead of a healthy teammate waiting in silence.

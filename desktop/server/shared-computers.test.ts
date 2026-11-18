@@ -31,7 +31,7 @@ describe("shared computer authority and lifecycle", () => {
     broker.close();
   });
   it("chromeLender names the newest computer that lends Chrome, and whether it is online", () => {
-    const dir = mkdtempSync(join(tmpdir(), "omb-chrome-"));
+    const dir = mkdtempSync(join(tmpdir(), "hezuo-chrome-"));
     let live = true;
     const broker = new SharedComputers(() => live, new LentComputers(join(dir, "lent.json")));
     const a = { ...registration(), name: "A", platform: "darwin" as const, chrome: true };

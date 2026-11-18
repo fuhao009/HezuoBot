@@ -33,7 +33,7 @@ export function ExecutionConnectorsSection({ search, connectedOnly, onConnection
   const busyRef = useRef(false);
   const inventoryError = useRef(false);
   const bots = state.bots.filter((bot) => !bot.hidden);
-  const remoteClient = window.ogb?.remoteClient?.active === true;
+  const remoteClient = window.hezuo?.remoteClient?.active === true;
   const localAvailable = inventory?.localAvailable === true && !remoteClient;
   const canManage = inventory?.canManage === true;
   const refresh = useCallback(async (background = false) => {

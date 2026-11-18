@@ -17,7 +17,7 @@ import { StoreContext } from "@/state/store";
 import { usePanelPage, type PanelPage } from "@/lib/page-open";
 import { PublishedPageCard } from "./PublishedPageCard";
 
-const URL = "https://abcdefghijklmnopqrstuvwxyz.mausbot.page/";
+const URL = "https://abcdefghijklmnopqrstuvwxyz.hezuobot.page/";
 const page = (card: Message["publishedPage"]): Message => ({ id: "m1", at: 1, role: "bot", kind: "text", text: "fallback", publishedPage: card });
 const live = page({ state: "live", title: "Bake sale", pageId: "abcdefghijklmnopqrstuvwxyz", url: URL, usage: { pages: 3, limit: 5 } });
 /** The app's state with Pepper's chat open; Pepper's browser is on and installed. */
@@ -34,10 +34,10 @@ function render(message: Message, state = app()) {
     createElement(PublishedPageCard, { message }), createElement(Panel))));
   return { container, root, panel };
 }
-const desktop = (bridge: Record<string, unknown> = {}) => { (window as { ogb?: unknown }).ogb = { platform: "darwin", ...bridge }; };
+const desktop = (bridge: Record<string, unknown> = {}) => { (window as { hezuo?: unknown }).hezuo = { platform: "darwin", ...bridge }; };
 const buttons = (container: HTMLElement) => [...container.querySelectorAll("button")];
 
-afterEach(() => { vi.clearAllMocks(); delete (window as { ogb?: unknown }).ogb; });
+afterEach(() => { vi.clearAllMocks(); delete (window as { hezuo?: unknown }).hezuo; });
 
 describe("a published page's card", () => {
   it("shows the title, the link and the usage; on the web Open and the link open a new tab; and it unpublishes the page", async () => {
@@ -58,15 +58,15 @@ describe("a published page's card", () => {
     } finally { root.unmount(); }
   });
 
-  it("in the desktop app, Open and the link show the page in the bot's browser panel, and never send anything", () => {
+  it("opens desktop page links externally without starting a bot turn or opening a panel", () => {
     desktop();
     const { container, root, panel } = render(live);
     try {
       buttons(container)[1]!.click();
       container.querySelector("a")!.click();
-      expect(panel.map(({ botId, url }) => [botId, url])).toEqual([["pepper", URL], ["pepper", URL]]);
-      expect(dispatch.mock.calls).toEqual([[{ type: "toggleComputer", open: true }], [{ type: "toggleComputer", open: true }]]);
-      expect(openExternalLink).not.toHaveBeenCalled();
+      expect(panel).toEqual([]);
+      expect(dispatch).not.toHaveBeenCalled();
+      expect(openExternalLink.mock.calls).toEqual([[URL], [URL]]);
       expect(api).not.toHaveBeenCalled();
     } finally { root.unmount(); }
   });
@@ -98,13 +98,13 @@ describe("a published page's card", () => {
     } finally { root.unmount(); }
   });
 
-  it("at the free limit, says so in the person's words and opens the app's Get Cloud flow", () => {
+  it("at the free limit, keeps the receipt without a purchase action even on desktop", () => {
     desktop({ cloudAccount: {} });
     const { container, root } = render(page({ state: "limit", title: "Bake sale", plan: "free", upgrade: true, usage: { pages: 5, limit: 5 }, message: "server words" }));
     try {
       expect(container.textContent).toContain("5 of 5 pages");
-      container.querySelector("button")!.click();
-      expect(dispatch).toHaveBeenCalledWith({ type: "openCloudAdd", source: "app_pages" });
+      expect(container.querySelectorAll("button")).toHaveLength(0);
+      expect(dispatch).not.toHaveBeenCalled();
     } finally { root.unmount(); }
   });
 

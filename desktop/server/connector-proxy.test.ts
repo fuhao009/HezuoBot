@@ -59,13 +59,13 @@ describe("connector MCP bridge", () => {
       });
     });
     const lines = start({
-      OMB_HARNESS_URL: harness,
-      OMB_CONNECTOR_TOKEN: "bridge-secret",
+      HEZUO_HARNESS_URL: harness,
+      HEZUO_CONNECTOR_TOKEN: "bridge-secret",
       // A simultaneously mounted agents proxy may define this different
       // value in Codex's flattened child environment.
-      OMB_COMMS_TOKEN: "agents-secret",
-      OMB_BOT_ID: "bot-1",
-      OMB_THREAD_ID: "thread-1",
+      HEZUO_COMMS_TOKEN: "agents-secret",
+      HEZUO_BOT_ID: "bot-1",
+      HEZUO_THREAD_ID: "thread-1",
     });
     child!.stdin.write(`${JSON.stringify({
       jsonrpc: "2.0",
@@ -93,10 +93,10 @@ describe("connector MCP bridge", () => {
       });
     });
     const lines = start({
-      OMB_HARNESS_URL: harness,
-      OMB_CONNECTOR_TOKEN: "bridge-secret",
-      OMB_BOT_ID: "bot-1",
-      OMB_THREAD_ID: "thread-1",
+      HEZUO_HARNESS_URL: harness,
+      HEZUO_CONNECTOR_TOKEN: "bridge-secret",
+      HEZUO_BOT_ID: "bot-1",
+      HEZUO_THREAD_ID: "thread-1",
     });
     child!.stdin.write(`${JSON.stringify({
       jsonrpc: "2.0",
@@ -140,7 +140,7 @@ describe("connector MCP bridge", () => {
         response.end("{}");
       });
     });
-    const lines = start({ OMB_HARNESS_URL: harness, OMB_CONNECTOR_TOKEN: "bridge-secret", OMB_BOT_ID: "bot-1", OMB_THREAD_ID: "thread-1" });
+    const lines = start({ HEZUO_HARNESS_URL: harness, HEZUO_CONNECTOR_TOKEN: "bridge-secret", HEZUO_BOT_ID: "bot-1", HEZUO_THREAD_ID: "thread-1" });
     const manage = async (id: number, args: Record<string, unknown>) => {
       child!.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id, method: "tools/call", params: { name: "COMPOSIO_MANAGE_CONNECTIONS", arguments: args } })}\n`);
       return nextJson(lines);
@@ -178,7 +178,7 @@ describe("connector MCP bridge", () => {
         }));
       });
     });
-    const lines = start({ OMB_HARNESS_URL: harness, OMB_CONNECTOR_TOKEN: "bridge-secret", OMB_BOT_ID: "bot-1", OMB_THREAD_ID: "thread-1" });
+    const lines = start({ HEZUO_HARNESS_URL: harness, HEZUO_CONNECTOR_TOKEN: "bridge-secret", HEZUO_BOT_ID: "bot-1", HEZUO_THREAD_ID: "thread-1" });
     child!.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "COMPOSIO_MANAGE_CONNECTIONS", arguments: { toolkits: ["xero"] } } })}\n`);
     expect((await nextJson(lines)).result.content[0].text).toBe(
       "Hezuo showed the user a secure connection card for xero. xero connects with the person's own Composio auth config "
@@ -197,7 +197,7 @@ describe("connector MCP bridge", () => {
       response.writeHead(200, { "content-type": "application/json" });
       response.end(JSON.stringify({ jsonrpc: "2.0", id: 5, result: { tools: [manage, { name: "COMPOSIO_SEARCH_TOOLS" }] } }));
     });
-    const lines = start({ OMB_CONNECTOR_UPSTREAM_URL: upstream });
+    const lines = start({ HEZUO_CONNECTOR_UPSTREAM_URL: upstream });
     child!.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 5, method: "tools/list", params: {} })}\n`);
     const [listed, search] = (await nextJson(lines)).result.tools;
     expect(listed.inputSchema.required).toEqual(["toolkits"]);
@@ -237,7 +237,7 @@ describe("connector MCP bridge", () => {
       // Deliberately never respond. The proxy must abort this request and
       // return its local capability result instead of hanging OpenCode.
     });
-    const lines = start({ OMB_CONNECTOR_UPSTREAM_URL: upstream });
+    const lines = start({ HEZUO_CONNECTOR_UPSTREAM_URL: upstream });
     child!.stdin.write(`${JSON.stringify({
       jsonrpc: "2.0",
       id: 11,
@@ -279,8 +279,8 @@ describe("connector MCP bridge", () => {
       });
     });
     const lines = start({
-      OMB_CONNECTOR_UPSTREAM_URL: upstream,
-      OMB_CONNECTOR_UPSTREAM_HEADERS: JSON.stringify({ authorization: "Bearer upstream-secret" }),
+      HEZUO_CONNECTOR_UPSTREAM_URL: upstream,
+      HEZUO_CONNECTOR_UPSTREAM_HEADERS: JSON.stringify({ authorization: "Bearer upstream-secret" }),
     });
     child!.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 2, method: "initialize", params: { protocolVersion: "2024-11-05" } })}\n`);
     const reply = await nextJson(lines);
@@ -308,8 +308,8 @@ describe("connector MCP bridge", () => {
       }));
     });
     const lines = start({
-      OMB_CONNECTOR_UPSTREAM_URL: upstream,
-      OMB_CONNECTOR_UPSTREAM_HEADERS: JSON.stringify({ authorization: "Bearer upstream-secret" }),
+      HEZUO_CONNECTOR_UPSTREAM_URL: upstream,
+      HEZUO_CONNECTOR_UPSTREAM_HEADERS: JSON.stringify({ authorization: "Bearer upstream-secret" }),
     });
     child!.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 4, method: "tools/list", params: {} })}\n`);
     const reply = await nextJson(lines);
@@ -329,7 +329,7 @@ describe("connector MCP bridge", () => {
       response.writeHead(200, { "content-type": "application/json" });
       response.end(JSON.stringify({ jsonrpc: "2.0", id: 4, result: { tools } }));
     });
-    const lines = start({ OMB_CONNECTOR_UPSTREAM_URL: upstream, [TOOL_SCHEMA_PROFILE_ENV]: "moonshot" });
+    const lines = start({ HEZUO_CONNECTOR_UPSTREAM_URL: upstream, [TOOL_SCHEMA_PROFILE_ENV]: "moonshot" });
     child!.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 4, method: "tools/list", params: {} })}\n`);
     const [search, page] = (await nextJson(lines)).result.tools;
     expect(search).toEqual(tools[0]);
@@ -343,7 +343,7 @@ describe("connector MCP bridge", () => {
       response.writeHead(200, { "content-type": "application/json" });
       response.end(JSON.stringify({ jsonrpc: "2.0", id: 4, result: { tools } }));
     });
-    const lines = start({ OMB_CONNECTOR_UPSTREAM_URL: upstream, [TOOL_LIMIT_ENV]: "2" });
+    const lines = start({ HEZUO_CONNECTOR_UPSTREAM_URL: upstream, [TOOL_LIMIT_ENV]: "2" });
     child!.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 4, method: "tools/list", params: {} })}\n`);
     expect((await nextJson(lines)).result.tools).toEqual(tools.slice(0, 2));
   });
@@ -368,7 +368,7 @@ describe("connector MCP bridge", () => {
         response.end(JSON.stringify({ jsonrpc: "2.0", id, result: answers.shift() }));
       });
     });
-    const lines = start({ OMB_CONNECTOR_UPSTREAM_URL: upstream });
+    const lines = start({ HEZUO_CONNECTOR_UPSTREAM_URL: upstream });
     const call = (id: number) => child!.stdin.write(`${JSON.stringify({
       jsonrpc: "2.0",
       id,
@@ -399,7 +399,7 @@ describe("connector MCP bridge", () => {
         response.end(JSON.stringify({ jsonrpc: "2.0", id: 41, result: { tools: [{ name: "COMPOSIO_MANAGE_CONNECTIONS" }] } }));
       });
     });
-    const lines = start({ OMB_CONNECTOR_UPSTREAM_URL: upstream, OMB_CONNECTOR_ALLOWED_TOOLS: "{}" });
+    const lines = start({ HEZUO_CONNECTOR_UPSTREAM_URL: upstream, HEZUO_CONNECTOR_ALLOWED_TOOLS: "{}" });
     child!.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 41, method: "tools/list", params: {} })}\n`);
     const reply = await nextJson(lines);
     expect(listings).toBe(2);
@@ -439,8 +439,8 @@ describe("connector MCP bridge", () => {
       }));
     });
     const lines = start({
-      OMB_CONNECTOR_UPSTREAM_URL: upstream,
-      OMB_CONNECTOR_ALLOWED_TOOLS: JSON.stringify({ gmail: { tools: ["GMAIL_SEND_EMAIL"] } }),
+      HEZUO_CONNECTOR_UPSTREAM_URL: upstream,
+      HEZUO_CONNECTOR_ALLOWED_TOOLS: JSON.stringify({ gmail: { tools: ["GMAIL_SEND_EMAIL"] } }),
     });
     child!.stdin.write(JSON.stringify({ jsonrpc: "2.0", id: 21, method: "tools/list", params: {} }) + "\n");
     const reply = await nextJson(lines);
@@ -472,8 +472,8 @@ describe("connector MCP bridge", () => {
       response.end("data: " + JSON.stringify(frame) + "\n\n");
     });
     const lines = start({
-      OMB_CONNECTOR_UPSTREAM_URL: upstream,
-      OMB_CONNECTOR_ALLOWED_TOOLS: JSON.stringify({ notion: { tools: ["NOTION_CREATE_PAGE"] } }),
+      HEZUO_CONNECTOR_UPSTREAM_URL: upstream,
+      HEZUO_CONNECTOR_ALLOWED_TOOLS: JSON.stringify({ notion: { tools: ["NOTION_CREATE_PAGE"] } }),
     });
     child!.stdin.write(JSON.stringify({ jsonrpc: "2.0", id: 22, method: "tools/list", params: {} }) + "\n");
     const reply = await nextJson(lines);
@@ -496,8 +496,8 @@ describe("connector MCP bridge", () => {
         }));
       });
       const lines = start({
-        OMB_CONNECTOR_UPSTREAM_URL: upstream,
-        ...(allowlist === undefined ? {} : { OMB_CONNECTOR_ALLOWED_TOOLS: allowlist }),
+        HEZUO_CONNECTOR_UPSTREAM_URL: upstream,
+        ...(allowlist === undefined ? {} : { HEZUO_CONNECTOR_ALLOWED_TOOLS: allowlist }),
       });
       child!.stdin.write(JSON.stringify({ jsonrpc: "2.0", id: 23, method: "tools/list", params: {} }) + "\n");
       const reply = await nextJson(lines);
@@ -530,7 +530,7 @@ describe("connected-app tools by name", () => {
   it("lists the app tools after the upstream's, under the spelling the engine asked for", async () => {
     for (const [style, names] of [["dotted", ["gmail.search_emails", "gmail.read_email_thread"]], ["", ["gmail_search_emails", "gmail_read_email_thread"]]] as const) {
       const upstream = await upstreamFor([]);
-      const lines = start({ OMB_CONNECTOR_UPSTREAM_URL: upstream, OMB_CONNECTOR_APP_TOOLS: JSON.stringify(["gmail.search_emails", "gmail.read_email_thread", "not.a_tool"]), ...(style ? { OMB_CONNECTOR_APP_TOOL_NAMES: style } : {}) });
+      const lines = start({ HEZUO_CONNECTOR_UPSTREAM_URL: upstream, HEZUO_CONNECTOR_APP_TOOLS: JSON.stringify(["gmail.search_emails", "gmail.read_email_thread", "not.a_tool"]), ...(style ? { HEZUO_CONNECTOR_APP_TOOL_NAMES: style } : {}) });
       child!.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" })}\n`);
       const listed = await nextJson(lines);
       expect(listed.result.tools.map((tool: { name: string }) => tool.name)).toEqual(["COMPOSIO_MULTI_EXECUTE_TOOL", ...names]);
@@ -544,7 +544,7 @@ describe("connected-app tools by name", () => {
   it("runs a call by either name as its Composio tool through the multi-execute tool, and answers with that tool's data", async () => {
     const calls: any[] = [];
     const upstream = await upstreamFor(calls);
-    const lines = start({ OMB_CONNECTOR_UPSTREAM_URL: upstream, OMB_CONNECTOR_APP_TOOLS: JSON.stringify(["gmail.search_emails"]) });
+    const lines = start({ HEZUO_CONNECTOR_UPSTREAM_URL: upstream, HEZUO_CONNECTOR_APP_TOOLS: JSON.stringify(["gmail.search_emails"]) });
     child!.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "gmail_search_emails", arguments: { query: "from:ada" } } })}\n`);
     const reply = await nextJson(lines);
     expect(calls.at(-1).params).toEqual({ name: "COMPOSIO_MULTI_EXECUTE_TOOL", arguments: { tools: [{ tool_slug: "GMAIL_FETCH_EMAILS", arguments: { user_id: "me", query: "from:ada", max_results: 10, include_payload: false, verbose: false } }] } });
@@ -573,7 +573,7 @@ describe("connected-app tools by name", () => {
         response.end(JSON.stringify({ jsonrpc: "2.0", id: rpc.id, result: { content: [{ type: "text", text: JSON.stringify(refusal, null, 2) }], isError: true } }));
       });
     });
-    const lines = start({ OMB_CONNECTOR_UPSTREAM_URL: upstream, OMB_CONNECTOR_SERVICE_SLUGS: JSON.stringify(["gemini", "gmail"]) });
+    const lines = start({ HEZUO_CONNECTOR_UPSTREAM_URL: upstream, HEZUO_CONNECTOR_SERVICE_SLUGS: JSON.stringify(["gemini", "gmail"]) });
     child!.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} })}\n`);
     await nextJson(lines);
 

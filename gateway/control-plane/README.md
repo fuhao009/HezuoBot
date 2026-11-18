@@ -15,26 +15,27 @@ tool output.
 
 ### Hezuo identity migration boundaries
 
-Product presentation uses Hezuo. The deployed `openmausbot-control-plane`
-health service identifier stays unchanged because released hosted clients gate
-sign-in on that exact value. Real `openmausbot.com` and `mausbot.si` domains,
-Cloudflare account/database/Worker identities and the corresponding secret
-names remain deployment identifiers, not new Hezuo hosting promises. Historical
-SQL migrations are immutable.
+The health service identifier is `hezuobot-control-plane`. Worker naming defaults
+to `hezuobot`; the local gateway D1 identity is `hezuo-local-gateway`. There are
+no legacy runtime aliases. Historical applied SQL migrations are immutable;
+their comments describe the formats used when those migrations were introduced.
 
-The HighLevel relay retains `openmausbot-highlevel-relay-v1` as its HKDF salt:
-changing it would invalidate existing encrypted relay credentials. This is the
-legacy token-format boundary, not a product name to substitute. A future salt
-change requires an explicitly versioned credential migration.
+Deployments must explicitly configure their actual authentication origin,
+allowed origins, verified email sender and sender restrictions, companion DNS
+suffix, and matching Cloudflare account/zone/token. Empty production settings
+are not working defaults. Reserved `.test` domains below are examples only,
+not hosted services or domains to deploy. Preserve the existing D1 UUID and
+verify its database contents before cutover; renaming `database_name` does not
+rename a remote database or justify creating an empty replacement.
 
-The connector targets the separately operated Cloud Admin and its pinned
-published images. Its `MAUSBOT_*` installer placeholders/environment, Docker
-container/volume/label identities, `/etc/mausbot` host configuration, legacy
-image data-directory lease paths and image user `maus` remain that external
-deployment protocol. Renaming them without the Admin and published image
-cutover would break repair, self-update, rollback or access to existing data.
-Actual registry URLs and their allowlists remain unchanged for the same reason.
-`OMB`/`omb` protocol and token abbreviations are not part of the rename.
+Installation and model credentials use `hezuo_install_` and `hezuo_product_ai_`.
+Old raw credentials cannot be rewritten because only their full hashes are
+stored. Sign in again with the account, list its installations, and call
+`POST /v1/installations/:id/credentials/rotate` to retain the installation and
+endpoint while issuing a canonical credential. Obtain a new model credential
+with `POST /v1/account/ai/tokens` and `{ "deviceId": "<UUID>" }`. Do not delete
+account, installation, authentication, token-history, or ledger rows to reissue.
+Validate the canonical desktop sign-in and issuance flow before deployment.
 
 
 Authentication and `/healthz` require only the authentication URL, secret,
@@ -67,7 +68,7 @@ publishing; these are not prerequisites for authentication-only deployments.
   requirement for a code nobody can receive. Public sign-up starts every
   account with no AI permission and no balance; an operator grants both.
 - Owner-scoped desktop installations and independently revocable
-  `omb_install_…` credentials. Account bearer tokens are never accepted as
+  `hezuo_install_…` credentials. Account bearer tokens are never accepted as
   installation credentials, or vice versa.
 - Exact-origin CORS, bounded JSON bodies, redacted errors, and `no-store` on
   every response.
@@ -125,9 +126,6 @@ currency, and no stored value is rescaled.
 | `DELETE` | `/v1/installations/:id` | owning account bearer |
 | `GET` | `/v1/installations/self` | installation credential |
 | `GET`, `POST`, `DELETE` | `/v1/installations/self/endpoint` | installation credential |
-| `POST` | `/v1/installations/self/push/register` | installation credential |
-| `POST` | `/v1/installations/self/push/unregister` | installation credential |
-| `POST` | `/v1/installations/self/push/send` | installation credential |
 | `GET` | `/v1/account/ai` | account bearer |
 | `POST` | `/v1/account/ai/tokens` | account bearer |
 | `DELETE` | `/v1/account/ai/tokens/:id` | owning account bearer |
@@ -207,15 +205,15 @@ Operator setup: deploy first with `AI_OPERATOR_USER_IDS=[]`, sign in with
 `node gateway/scripts/account-ai-admin.mjs whoami --origin https://your-worker --operator-email you@example.com`,
 put the printed user ID in `AI_OPERATOR_USER_IDS`, redeploy, then use `lookup`,
 `enable`, and `grant`. The script reads the OTP from the terminal without
-echoing it, keeps the signed bearer in memory (or takes `OMB_OPERATOR_TOKEN`
+echoing it, keeps the signed bearer in memory (or takes `HEZUO_OPERATOR_TOKEN`
 for unattended runs), never retries a mutation, and never prints a token.
 
 For an operator-owned deployment of this Worker (separate account, D1, origin,
-and sender; tunnelling off), `node gateway/scripts/deploy-product-service.mjs` writes a
+and sender; tunnelling off), `node gateway/scripts/deploy-hezuobot-service.mjs` writes a
 generated Wrangler config and runs migration/deploy with the two secrets in one
 call; `--dry-run` compiles only. It refuses an origin or upstream on the
 upstream project's domains and needs `CLOUDFLARE_ACCOUNT_ID`,
-`OMB_PRODUCT_SERVICE_URL`, `OMB_PRODUCT_D1_ID`, and `EMAIL_FROM` in both modes.
+`HEZUO_PRODUCT_SERVICE_URL`, `HEZUO_PRODUCT_D1_ID`, and `EMAIL_FROM` in both modes.
 See [Shipping the hosted product build](../../docs/product-release.md).
 
 Inference uses `/v1/ai/chat/completions` and `/v1/ai/responses`; each public model is routed to its configured channel, or the deployment's single upstream before channel migration. Clients never choose a URL or key. A request is authenticated before its body is
@@ -233,7 +231,7 @@ are never returned or logged.
 
 ### Managed endpoint contract
 
-All three endpoint methods require `Authorization: Bearer <omb_install_…>`.
+All three endpoint methods require `Authorization: Bearer <hezuo_install_…>`.
 Account bearer tokens are rejected.
 
 - `GET` returns `{ "endpoint": null }` before allocation or after deletion.
@@ -308,7 +306,7 @@ Revoking an installation first revokes its local installation credentials, then
 schedules best-effort endpoint cleanup. Cloud cleanup failure cannot restore or
 delay credential revocation. Repeating the owner-scoped installation DELETE is
 safe and retries retained cleanup state. A five-minute cron also processes at
-most `OMB_CLEANUP_SWEEP_LIMIT` (code default 20, which `wrangler.jsonc` ships;
+most `HEZUO_CLEANUP_SWEEP_LIMIT` (code default 20, which `wrangler.jsonc` ships;
 it needs Workers Paid, whose per-invocation subrequest and D1 limits the
 default relies on) expired-lease rows per run when
 they are already deleting, belong to a revoked installation, or outlive a
@@ -328,82 +326,6 @@ installation or account identifiers. This bounded sweep prevents a transient
 provider failure from orphaning resources forever without creating an
 unbounded scheduled invocation.
 
-### Phone push relay
-
-Closed-app alerts for the iOS app (harness side: `desktop/server/phone-push.ts`,
-wire contract version 1 in `packages/shared/phone-push.ts`; app side:
-`docs/ios-companion.md`). Apple accepts pushes for an App Store or
-TestFlight build only when they are signed with the publishing team's key, and
-a harness may run on a VPS or in a container. So the project's key lives here,
-and a harness asks this Worker to push with the installation credential it
-already holds. Account bearer tokens are refused. All three routes take
-`application/json` and answer with the usual `{ "error": "<code>" }` shape.
-
-- `register` `{ "v": 1, "token": "<lowercase hex>", "environment": "production" | "sandbox" }`
-  stores the APNs device token for this installation (idempotent; it updates
-  the environment). At most 50 tokens per installation (`409
-  push_device_limit`) and 120 registrations per hour. An environment
-  `APNS_ENVIRONMENTS` does not list is `400 push_environment_not_allowed`.
-- `unregister` `{ "v": 1, "token": "…" }` deletes it. `204`.
-- `send` `{ "v": 1, "token": "…", "pairing"?: "…", "notification": { "kind",
-  "title", "botId", "botName", "threadId", "roomId"?, "roomName"? } }` pushes
-  to a token **this** installation registered, else `404
-  push_device_unknown` (the harness then registers and retries once). The
-  schema is strict: `kind` is `[a-z-]`, ids are `[\w-]{1,120}`, `title` is one
-  line of at most 200 characters, names at most 80. Any other field (a
-  `body`, a message) is `400 invalid_request`, never silently dropped, so no
-  message text can reach Apple through this route. `202 { "sent": true }` on
-  success. Limits: 600 sends per installation and 60 per token per hour (`429
-  rate_limited`, `Retry-After: 60`).
-
-The APNs request is `POST https://api.push.apple.com/3/device/<token>` (or
-`api.sandbox.push.apple.com` for a `sandbox` token) with `apns-push-type:
-alert`, `apns-priority: 10`, a 24-hour `apns-expiration`, `apns-topic` set to
-the bundle id, and an `apns-collapse-id` derived from the kind and thread, so
-a repeat replaces the older alert. The payload is
-`{ "aps": { "alert": { "title" }, "sound": "default", "thread-id",
-"interruption-level" }, "omb": { "v": 1, "kind", "botId", "botName",
-"threadId", "roomId"?, "roomName"?, "pairing"? } }`; `interruption-level` is
-`time-sensitive` for `approval`, `question`, `sign-in` and `mention`, else
-`active`.
-
-The provider token is an ES256 JWT signed with WebCrypto (no dependency):
-`{ "alg": "ES256", "kid": APNS_KEY_ID }`, `{ "iss": APNS_TEAM_ID, "iat" }`.
-Its `iat` is the start of the current 50-minute window, so every isolate
-signs for the same window and Apple's 20-to-60-minute refresh rule holds
-however many isolates send; each isolate caches its token for the window.
-
-APNs answers are mapped for the harness: `410 Unregistered`,
-`BadDeviceToken` and `DeviceTokenNotForTopic` delete the token for every
-installation that registered it in the same APNs environment (for a `410`,
-only registrations older than Apple's `timestamp`) and return `410
-push_device_unregistered` (the harness drops it too); an expired or invalid provider token is re-signed and retried once,
-then `503 push_unavailable`; APNs `429` is `429 rate_limited`; anything else
-is `502 push_failed`. Failures log the request id, APNs status and reason
-only, never the token or payload.
-
-Without all of the settings below every push route answers `503
-push_unavailable` and harnesses back off for an hour. Revoking an
-installation deletes its tokens. D1 stores, per row, the installation id, the
-token, its SHA-256, the environment and timestamps (`migrations/0008`).
-
-**Secrets the maintainer sets** (all with `wrangler secret put <NAME>
---config wrangler.jsonc`; none belongs in `vars`, this file, or CI output):
-
-| Name | Value |
-| --- | --- |
-| `APNS_KEY_ID` | The 10-character Key ID of the APNs auth key (`.p8`) in the Apple Developer account. |
-| `APNS_TEAM_ID` | The 10-character Team ID that owns the app. |
-| `APNS_PRIVATE_KEY` | The whole `.p8` file, PEM, e.g. `wrangler secret put APNS_PRIVATE_KEY < AuthKey_XXXXXXXXXX.p8`. Escaped `\n` newlines are accepted too. |
-| `APNS_BUNDLE_ID` | The iOS app's bundle id, which is the APNs topic. |
-| `APNS_ENVIRONMENTS` | Optional. `production` (default), `sandbox`, or `production,sandbox` to also accept development builds' tokens. |
-
-They are deliberately not in `secrets.required`: the Worker is complete
-without them, with phone push off, until the Apple key exists. Apply `migrations/0008` before
-deploying the Worker that uses it. For a local trial with `wrangler dev`,
-`.dev.vars` is read only for declared names, so add these names to
-`secrets.required` in a local, uncommitted copy of the config.
-
 ### Tunnel capacity and idle reclaim
 
 Cloudflare limits an account to 1,000 tunnels by default and a zone to a fixed
@@ -421,7 +343,7 @@ A failure in one account is logged and never stops the others:
    - `inactive` (never ran), with no activation time, created at least two
      days ago; or
    - `down` with its last connection ended at least
-     `OMB_TUNNEL_OFFLINE_RECLAIM_DAYS` (default 21, minimum 3) days ago and no
+     `HEZUO_TUNNEL_OFFLINE_RECLAIM_DAYS` (default 21, minimum 3) days ago and no
      later activation.
 
    `healthy` and `degraded` tunnels, any reported connection, an unknown
@@ -455,11 +377,11 @@ A failure in one account is logged and never stops the others:
    emits `"alert": "managed_endpoint_pool_capacity"`: once an account fills it
    reports `full` for good, so page on the pool alert instead.
 
-`OMB_TUNNEL_RECLAIM` is `observe` unless set to `on` (an unset or invalid value
+`HEZUO_TUNNEL_RECLAIM` is `observe` unless set to `on` (an unset or invalid value
 observes): it logs `idle`/`eligible` counts without marking anything. Deploy in
 `observe`, check one full scan cycle of real counts, then set it to `on`.
 
-`OMB_TUNNEL_LIMIT` and `OMB_DNS_RECORD_LIMIT` (default 1000 each) are the
+`HEZUO_TUNNEL_LIMIT` and `HEZUO_DNS_RECORD_LIMIT` (default 1000 each) are the
 primary account's tunnel quota and its zone's DNS record quota; extra accounts
 carry their own. The limits drive the alerts and `/healthz`, rank accounts for
 new endpoints, and decide whether a tunnel-creation `429` is the quota. They
@@ -468,8 +390,8 @@ to Cloudflare's real quotas and raise them when Cloudflare raises a quota (a
 limit below the real quota turns a genuine rate limit at that count into a
 ten-minute capacity gate for that account and, with several accounts, makes
 the account look full, so new endpoints go elsewhere while it still has
-room). `wrangler.jsonc` sets `OMB_DNS_RECORD_LIMIT` to 3500 because the
-`openmausbot.com` zone is on Pro.
+room). Configure `HEZUO_DNS_RECORD_LIMIT` for the actual project's zone plan
+and quota; the checked-in value is not evidence of that zone's subscription.
 
 `GET /healthz` keeps `ok` and `service` unchanged (desktops gate hosted sign-in
 on them; a full quota must not hide sign-in or recovery) and adds a
@@ -504,7 +426,7 @@ ID):
   "reclaim": { "mode": "on", "pending": 12 },
   "accounts": [
     {
-      "hostSuffix": "openmausbot.com",
+      "hostSuffix": "gateway.example.test",
       "newEndpoints": true,
       "status": "full",
       "checkedAt": 1790000060000,
@@ -514,7 +436,7 @@ ID):
       "reclaimPending": 12
     },
     {
-      "hostSuffix": "mausbot.si",
+      "hostSuffix": "secondary.example.test",
       "newEndpoints": true,
       "status": "ok",
       "checkedAt": 1790000000000,
@@ -544,8 +466,8 @@ trail D1 by that long; allocation gating always reads D1.
 ### Several Cloudflare accounts
 
 The account configured by `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_ZONE_ID`,
-`COMPANION_HOST_SUFFIX`, the `CLOUDFLARE_API_TOKEN` secret, `OMB_TUNNEL_LIMIT`,
-and `OMB_DNS_RECORD_LIMIT` is the primary. Without `CLOUDFLARE_ENDPOINT_ACCOUNTS`
+`COMPANION_HOST_SUFFIX`, the `CLOUDFLARE_API_TOKEN` secret, `HEZUO_TUNNEL_LIMIT`,
+and `HEZUO_DNS_RECORD_LIMIT` is the primary. Without `CLOUDFLARE_ENDPOINT_ACCOUNTS`
 it is the only account, and endpoints behave exactly as described above.
 
 `CLOUDFLARE_ENDPOINT_ACCOUNTS` adds up to three more accounts. It is a JSON
@@ -558,9 +480,9 @@ repository:
 [
   {
     "accountId": "<32-hex Cloudflare account ID>",
-    "zoneId": "<32-hex zone ID of mausbot.si in that account>",
-    "companionHostSuffix": "mausbot.si",
-    "apiTokenSecret": "CLOUDFLARE_API_TOKEN_MAUSBOT_SI",
+    "zoneId": "<32-hex zone ID of your secondary project domain>",
+    "companionHostSuffix": "secondary.example.test",
+    "apiTokenSecret": "CLOUDFLARE_API_TOKEN_SECONDARY",
     "tunnelLimit": 1000,
     "dnsRecordLimit": 200,
     "minAppVersion": "0.1.104"
@@ -660,22 +582,19 @@ Cloudflare. Every such refusal, with one account too, logs
 `"alert": "managed_endpoint_account_refused"` with the account's `hostSuffix`
 and `errorCode`; only an operator can fix the token.
 
-**Why `minAppVersion`.** Desktop releases up to 0.1.103 accept only
-`openmausbot.com` names for **Remote computer → Desktop companion** pairing
-(phones, pairing links, and Tailscale have no domain rule). The desktop app
-accepts `mausbot.si` from the release that ships this change, and from the
-same release it reports its version with every endpoint request; older apps
-are judged by the version they registered with. Set `minAppVersion` to that
-release so a computer on an older release keeps an address every desktop can
-pair with. Leaving it out brings relief sooner, because computers on older
-releases get an address in the new account at once; desktop-companion
-pairing from an older desktop to those computers then fails (phones and
-Tailscale still work).
+**Why `minAppVersion`.** Set this to the first release verified to pair with
+the configured project domain. Endpoint requests report the app version;
+older clients are judged by the version registered on their installation.
+The current desktop validates managed companion hostnames against its explicitly
+configured `HEZUO_MANAGED_COMPANION_ORIGIN`, not a built-in legacy domain allow-list.
+Coordinate that managed-companion origin with the configured suffix and test
+pairing before allowing allocations. A minimum version alone does not configure
+DNS, client origins, or support for arbitrary additional suffixes.
 
 **Adding an account.**
 
-1. Ship an app release whose desktop-companion allow-list
-   (`desktop/electron/desktop-companion-client.mjs`) includes the new domain.
+1. Ship and verify a client release whose explicit managed-companion origin
+   accepts the intended suffix; do not assume a built-in domain list.
 2. Apply migration `0007` to the production database before deploying a
    Worker built from this code (an older Worker keeps working against it),
    and deploy with only the primary account first. `/healthz` is unchanged;
@@ -692,10 +611,10 @@ Tailscale still work).
    Cloudflare Tunnel → Edit and Zone → DNS → Edit. Before relying on it, you
    can prove it may write: with the token, create a tunnel
    (`POST accounts/<account id>/cfd_tunnel` with
-   `{"name": "omb-token-check", "config_src": "cloudflare"}`) and a TXT record
+   `{"name": "hezuo-token-check", "config_src": "cloudflare"}`) and a TXT record
    in the zone, then delete both.
-5. `wrangler secret put CLOUDFLARE_API_TOKEN_MAUSBOT_SI` (or the name you
-   chose). Never put a token in `vars`, `.dev.vars.example`, logs, or CI output.
+5. `wrangler secret put CLOUDFLARE_API_TOKEN_SECONDARY` (or the configured name).
+   Never put a token in `vars`, `.dev.vars.example`, logs, or CI output.
 6. Set `CLOUDFLARE_ENDPOINT_ACCOUNTS` with `dnsRecordLimit` equal to the
    zone's real quota and `minAppVersion` as above. Add the token's secret name
    (and `CLOUDFLARE_ENDPOINT_ACCOUNTS`, when it is a secret) to
@@ -718,7 +637,7 @@ Tailscale still work).
 **Raising a zone's record quota.** After moving a zone to a plan with more
 DNS records (Free zones added since September 2024 allow 200, Pro 3,500),
 confirm the new quota with `GET zones/<zone id>/dns_records/usage`
-(`record_quota`), set the account's limit to it (`OMB_DNS_RECORD_LIMIT` for
+(`record_quota`), set the account's limit to it (`HEZUO_DNS_RECORD_LIMIT` for
 the primary, the entry's `dnsRecordLimit` in `CLOUDFLARE_ENDPOINT_ACCOUNTS`
 otherwise; with 3,500 records the account's 1,000 tunnels bind first), and
 deploy. Until that deploy the account looks full at its old limit and gets
@@ -727,48 +646,8 @@ no new endpoint while another account has room.
 Each account adds two Cloudflare reads to every cron run (a tunnel page and a
 DNS count), and each move two lookups in the old account. Tokens created by
 the same Cloudflare user share its 1,200 requests per five minutes. On
-Workers Free, four accounts with `OMB_CLEANUP_SWEEP_LIMIT` 4 use the whole
+Workers Free, four accounts with `HEZUO_CLEANUP_SWEEP_LIMIT` 4 use the whole
 50-subrequest budget, hence at most three extra accounts.
-
-### HighLevel OAuth relay
-
-Hezuo's native HighLevel (GoHighLevel, and white-labels such as Growably)
-integration signs a person in through a Marketplace app registered to us. The
-app's client secret lives only in this Worker; the harness (desktop or a Cloud
-home) never sees it. Routes, none of which need an installation credential: the
-random `state` and the tokens themselves are the secrets, and each route is
-rate-limited per caller address.
-
-| Route | Does |
-| --- | --- |
-| `POST /v1/highlevel/start` | Mints a 32-byte `state`, stores only `HKDF(state, "lookup")`, returns the white-label authorization URL (`marketplace.leadconnectorhq.com/v2/oauth/chooselocation`) with our client id, redirect URL and scopes. |
-| `GET /v1/highlevel/callback?code&state` | HighLevel sends the person's browser here. Exchanges the code (`POST services.leadconnectorhq.com/oauth/token`, `user_type=Location`), seals the token payload with AES-GCM under `HKDF(state, "wrap")`, shows a plain "Connected" page. Never echoes query parameters. |
-| `POST /v1/highlevel/claim {state}` | The harness collects the payload once (404 before the callback, 410 after); the row is emptied. |
-| `POST /v1/highlevel/refresh {refreshToken}` | Refreshes with the client secret; HighLevel's refusal is `401 highlevel_refresh_rejected`. |
-
-Rows live at most ten minutes (`highlevel_flows`, swept by the cron). Without the
-raw state a row opens nothing, and no plaintext token is ever written to D1.
-Logs carry counts and error codes, never codes or tokens.
-
-Setup, once:
-
-1. Register the Marketplace app (private, sub-account, installable by agency and
-   sub-account). Redirect URL: `https://accounts.openmausbot.com/v1/highlevel/callback`.
-   Scopes: `contacts.readonly contacts.write opportunities.readonly opportunities.write conversations.readonly locations.readonly calendars.readonly users.readonly`.
-2. Put the client id in `vars.HIGHLEVEL_CLIENT_ID` (it is public: it appears in the
-   authorization URL). Keep `HIGHLEVEL_REDIRECT_URL` and `HIGHLEVEL_SCOPES` in step
-   with the app.
-3. `wrangler d1 migrations apply DB --config wrangler.jsonc` (0009 and 0010).
-   On a running Worker, apply 0010 before deploying a Worker built from this
-   code: its callback marks the flow in `callback_at`. An older Worker
-   ignores the column.
-4. `wrangler secret put HIGHLEVEL_CLIENT_SECRET --config wrangler.jsonc`. It is
-   deliberately not in `secrets.required`: until it exists the routes answer
-   `503 highlevel_unavailable`.
-5. `wrangler deploy --config wrangler.jsonc`.
-
-A private app stops accepting installs past five external agencies; publish it
-(HighLevel review) before that.
 
 ## Local checks
 
@@ -787,7 +666,7 @@ start Wrangler:
 
 ```sh
 pnpm --filter @hezuo/control-plane exec wrangler d1 migrations apply DB --local --config wrangler.jsonc
-pnpm --filter @hezuo/control-plane exec wrangler dev --config wrangler.jsonc
+pnpm --filter @hezuo/control-plane exec wrangler dev --config wrangler.jsonc --var BETTER_AUTH_URL:https://auth.hezuo.test
 ```
 
 Do not commit `.dev.vars`. Because `wrangler.jsonc` declares
@@ -849,11 +728,6 @@ companion on port `8810` also does not prove managed HTTPS is ready.
    unnecessary credential rotations and their one-minute cooldown. Endpoint
    retries remain limited to 20 per installation per hour.
 
-While provisioning is unavailable, use **Advanced & troubleshooting → Pair on
-this Wi-Fi** on a trusted reachable LAN, or the separate **Tailscale pairing**
-option. These do not depend on managed endpoint provisioning. Do not change
-phone VPN settings to diagnose a failure that happens before phone pairing.
-
 The isolated HTTP recovery fixture exercises healthy service discovery,
 failed endpoint setup, repeated retry, app restoration, and eventual recovery:
 
@@ -871,8 +745,12 @@ The checked-in Wrangler file is intentionally non-deployable production
 scaffolding. No remote resource was created or changed while preparing it.
 Before a production deployment, an operator must:
 
-1. Choose and route an HTTPS hostname, then replace `BETTER_AUTH_URL`. The
-   Worker has `workers_dev` disabled and no production route in this PR.
+1. Choose and route an HTTPS hostname you own, then explicitly set
+   `BETTER_AUTH_URL` to that exact HTTPS origin. The checked-in configuration
+   provides no default; the Worker has `workers_dev` disabled and no production
+   route. The product config generator sets `BETTER_AUTH_URL` from the
+   operator's `HEZUO_PRODUCT_SERVICE_URL` unless an explicit operator-owned
+   `BETTER_AUTH_URL` is supplied.
 2. Generate a strong production `BETTER_AUTH_SECRET` and add it with Wrangler's
    interactive secret command. Add `CLOUDFLARE_API_TOKEN` the same way. The
    checked-in `secrets.required` names validate local configuration and generate
@@ -897,11 +775,8 @@ Before a production deployment, an operator must:
    and added later (see **Several Cloudflare accounts**).
 7. Replace `ALLOWED_ORIGINS` with a comma-separated allow-list of exact HTTPS
    application origins. Wildcards are deliberately unsupported.
-8. Optional, for closed-app phone alerts: apply `migrations/0008`, then set
-   the APNs secrets listed under **Phone push relay**. Without them the push
-   routes answer `503 push_unavailable` and nothing else changes.
-9. Deploy the Worker and verify that `GET <BETTER_AUTH_URL>/healthz` returns
-   `"ok": true` and `"service": "openmausbot-control-plane"` over HTTPS
+8. Deploy the Worker and verify that `GET <BETTER_AUTH_URL>/healthz` returns
+   `"ok": true` and `"service": "hezuobot-control-plane"` over HTTPS
    before shipping the desktop build. Electron probes this endpoint and
    keeps new hosted onboarding hidden until it is healthy; an already signed-in
    user remains visible so cleanup and recovery are not stranded.

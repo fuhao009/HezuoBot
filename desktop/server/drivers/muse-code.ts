@@ -11,7 +11,7 @@ import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { Connection, MspError, type DuplexTransport } from "@muse-code/sdk";
 import { z } from "zod";
-import { instanceEnvNames } from "../bot-box/env.ts";
+import { instanceEnvNames } from "../execution-sandbox/env.ts";
 import { PROVIDER_CREDENTIAL_ENV, stripControlPlaneEnv, WORKSPACE_CREDENTIAL_ENV } from "../config.ts";
 import type {
   ModelCatalog, ProviderDriver, ProviderInstance, ProviderSnapshot, RequestOutcome, RuntimeEvent,
@@ -332,7 +332,7 @@ export const MuseCodeDriver: ProviderDriver<MuseConfig> = {
     };
 
     const refreshModels = async () => {
-      const cwd = mkdtempSync(join(tmpdir(), "omb-muse-models-"));
+      const cwd = mkdtempSync(join(tmpdir(), "hezuo-muse-models-"));
       let host: Host | undefined;
       try {
         host = await startHost(["serve", "--disable-shell", "--disable-write", "--no-session-log"], cwd, "models", false, "hezuo");
@@ -652,7 +652,7 @@ export const MuseCodeDriver: ProviderDriver<MuseConfig> = {
         composioMcp: true,
         browserMcp: true,
         dataMcp: true,
-        highlevelMcp: true, deviceMcp: true,
+        deviceMcp: true,
         images: true,
         nativeImageInput: true,
         effortLevels: EFFORT_LEVELS,

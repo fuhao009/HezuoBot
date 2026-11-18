@@ -1,8 +1,8 @@
 # Ubuntu Desktop
 
 Hezuo has an Ubuntu 24.04 LTS x86_64 desktop beta. The Electron package embeds the harness server, so
-installed builds do not require Node, pnpm, Swift, or a terminal at runtime. For giving a bot the same kind
-of Linux desktop on your own server instead of this machine, see [byo-vps.md](byo-vps.md).
+installed builds do not require Node, pnpm, Swift, or a terminal at runtime.
+The former bring-your-own-VPS guide has been retired; this desktop guide does not establish support for a remote server desktop.
 
 ## What works
 
@@ -22,23 +22,16 @@ The local preview does **not** give the bot control of this computer by itself. 
 the global **Enable local control** choice and assigning a bot to **This computer**; every action still enters the
 approval flow. On Wayland, local control is disabled and legacy opt-ins are cleared automatically. Automatic Wayland
 helper installation, Linux dictation, and ARM64 remain unavailable and fail closed; follow their
-progress in [issue #29](https://github.com/milind-soni/OpenMausBot/issues/29) and the safety hold in
-[issue #345](https://github.com/milind-soni/OpenMausBot/issues/345). Bundled
-CUA supply-chain work is tracked in [issue #113](https://github.com/milind-soni/OpenMausBot/issues/113). Xorg is tracked in
-[issue #79](https://github.com/milind-soni/OpenMausBot/issues/79), and guarded GNOME/Wayland support in
-[issue #109](https://github.com/milind-soni/OpenMausBot/issues/109).
+progress in issue #29 and the safety hold in
+issue #345. Bundled
+CUA supply-chain work is tracked in issue #113. Xorg is tracked in
+issue #79, and guarded GNOME/Wayland support in
+issue #109.
 
 ## Download packages
 
-The upstream OpenMausBot release provides these Ubuntu 24.04 x86_64 packages
-(their filenames retain upstream branding; Hezuo builds use Hezuo filenames):
-
-- [Debian package (`OpenMausBot-amd64.deb`)](https://github.com/milind-soni/OpenMausBot/releases/latest/download/OpenMausBot-amd64.deb) — recommended; APT installs its desktop dependencies and configures the bundled bot browser's sandbox.
-- [Portable AppImage (`OpenMausBot.AppImage`)](https://github.com/milind-soni/OpenMausBot/releases/latest/download/OpenMausBot.AppImage) — does not install system files.
-- [SHA-256 checksums](https://github.com/milind-soni/OpenMausBot/releases/latest/download/SHA256SUMS-ubuntu-x64.txt)
-
-Versioned packages and previous releases remain available on the
-[releases page](https://github.com/milind-soni/OpenMausBot/releases).
+Obtain signed packages and matching checksums from the operator's approved
+distribution channel. No Hezuo download location is configured in this document.
 
 ## Build packages
 
@@ -49,8 +42,7 @@ Requirements for building from source:
 - pnpm 10.33.0 (Corepack can install the version declared by the project)
 
 ```sh
-git clone https://github.com/milind-soni/OpenMausBot.git hezuo
-cd hezuo
+# Run from your existing Hezuo checkout.
 corepack enable
 pnpm install --frozen-lockfile
 pnpm package:linux
@@ -111,7 +103,7 @@ The app checks for updates in the background and downloads them by itself. Nothi
   root-only folder and checked against the checksum in the update feed first; a file that does not match is
   refused and nothing is installed. Closing the prompt leaves the update ready to try again. If the session cannot
   show a prompt (SSH, no desktop, no `pkexec`), the app falls back to copying the `sudo apt-get install` command
-  and opening a terminal, and says why. Set `OMB_UPDATE_INSTALL=terminal` to always use the terminal.
+  and opening a terminal, and says why. Set `HEZUO_UPDATE_INSTALL=terminal` to always use the terminal.
 - **AppImage.** The update replaces the AppImage when you restart; no password is needed.
 - **rpm and pacman packages** still use the terminal hand-off.
 
@@ -166,7 +158,7 @@ It also probes the login shell in the background. If a CLI still is not detected
 path before launching the app from a terminal and verify it there:
 
 ```sh
-OMB_EXTRA_PATH=/your/custom/bin ./release/Hezuo-*-x86_64.AppImage
+HEZUO_EXTRA_PATH=/your/custom/bin ./release/Hezuo-*-x86_64.AppImage
 ```
 
 Restart Hezuo after installing or signing in to a CLI.
@@ -200,8 +192,8 @@ to **This computer**. No driver download, terminal command, `chmod`, or daemon s
 starts with `--no-overlay`, so Cua's decorative full-screen X11 cursor surface is never created. Hezuo also
 uses Electron software rendering when the NVIDIA driver is loaded, to avoid the reproduced NVIDIA/libGLES
 GPU-process failure that could leave an invisible focused app window receiving input. Other GPUs keep hardware
-acceleration, because software rendering costs about a CPU core while the window animates. Set `OMB_LINUX_GPU=off`
-to force software rendering or `OMB_LINUX_GPU=on` to force the GPU.
+acceleration, because software rendering costs about a CPU core while the window animates. Set `HEZUO_LINUX_GPU=off`
+to force software rendering or `HEZUO_LINUX_GPU=on` to force the GPU.
 
 Cua actions use a private logical cursor. With the decorative overlay disabled, `move_cursor` does not move the
 user's physical pointer; approved click and typing actions still target the requested window, while the user's own
@@ -267,7 +259,7 @@ contract without activating it in a packaged app. Only a real-seat acceptance ma
 ### An agent CLI is missing
 
 Run the CLI directly in a terminal, finish its sign-in flow, then restart Hezuo. If it lives outside the
-common directories above, use `OMB_EXTRA_PATH` while testing and report the install location so it can be
+common directories above, use `HEZUO_EXTRA_PATH` while testing and report the install location so it can be
 considered for automatic discovery.
 
 ### A bot needs computer tools

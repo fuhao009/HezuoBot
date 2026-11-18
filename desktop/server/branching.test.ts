@@ -60,7 +60,7 @@ posixOnly("conversation branching e2e (fake ACP fleet)", () => {
 
   beforeAll(async () => {
     chmodSync(FAKE_CLI, 0o755);
-    home = mkdtempSync(join(tmpdir(), "omb-branch-test-"));
+    home = mkdtempSync(join(tmpdir(), "hezuo-branch-test-"));
     mkdirSync(join(home, ".hezuo"), { recursive: true });
     writeFileSync(
       join(home, ".hezuo", "config.json"),
@@ -82,7 +82,7 @@ posixOnly("conversation branching e2e (fake ACP fleet)", () => {
     const env: NodeJS.ProcessEnv = {
       HOME: home,
       USERPROFILE: home,
-      OMB_PORT: String(PORT),
+      HEZUO_PORT: String(PORT),
     };
     if (process.env.PATH) env.PATH = process.env.PATH;
     child = spawn(process.execPath, [join(SERVER_DIR, "index.ts")], {

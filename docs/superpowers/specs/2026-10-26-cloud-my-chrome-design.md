@@ -1,6 +1,6 @@
-# My Chrome on My Cloud
+# My Chrome on My Cloud — Hezuo
 
-**Asked for (Omkar, 2026-10-26):** on My Cloud the Browser profiles dialog greys out My Chrome. Bots should have both
+**Asked for (maintainer, 2026-10-26):** on My Cloud the Browser profiles dialog greys out My Chrome. Bots should have both
 options anywhere: their own browser, or the person's Chrome on their Mac or PC, whenever that computer is online. A
 Cloud bot may use the Mac while it is live.
 
@@ -57,7 +57,6 @@ agent-browser (Cloud) ──ws──▶ Cloud door 127.0.0.1:<port>/devtools/bro
 
 ## Out of scope
 
-- Phones (they show no browser profiles), Team Clouds, `browserEngine.attachCdpUrl` behaviour (unchanged).
 - Choosing among several lending computers: the newest online one that lends Chrome is used.
 - Asking Chrome for permission on the person's behalf: Chrome's own Allow prompt stays the person's.
 

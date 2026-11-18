@@ -48,15 +48,15 @@ const holdAsk = updates => {
 test("the box's words and timings are fixed", () => {
   assert.deepEqual(TALK_TIMING, { replyHideMs: 12_000, noticeHideMs: 4_000, stillWorkingMs: 120_000, hoverRecheckMs: 500, maxListenMs: 60_000 });
   assert.deepEqual(TALK_TEXT, {
-    busy: "Voice is in use in Hezuo",
-    serverDown: "Open Hezuo to talk",
-    starting: "Hezuo is still starting. Try again in a moment.",
-    noHezuo: "Set up Hezuo first, then try again.",
-    moved: "Hezuo lives on My Cloud now — talk to it there",
+    busy: "Voice is in use in HezuoBot",
+    serverDown: "Open HezuoBot to talk",
+    starting: "HezuoBot is still starting. Try again in a moment.",
+    noHezuo: "Set up HezuoBot first, then try again.",
+    moved: "HezuoBot lives on My Cloud now — talk to it there",
     permission: "Talking needs Microphone + Speech Recognition access — System Settings → Privacy & Security.",
     dictationOff: "Turn on Dictation in System Settings → Keyboard, then try again.",
     unavailable: "Talking couldn't start. Try again.",
-    failed: "Hezuo couldn't take that · Open chat",
+    failed: "HezuoBot couldn't take that · Open chat",
   });
   assert.ok(Object.isFrozen(TALK_TIMING));
   assert.ok(Object.isFrozen(TALK_TEXT));
@@ -135,7 +135,7 @@ test("voice in use refuses without listening", () => {
   const h = harness({ busy: true }); h.session.press();
   assert.deepEqual(h.starts, []);
   assert.equal(h.prepares, 0);
-  assert.deepEqual(h.views, [{ state: "error", text: "Voice is in use in Hezuo" }]);
+  assert.deepEqual(h.views, [{ state: "error", text: "Voice is in use in HezuoBot" }]);
   mock.timers.tick(3_999); assert.equal(h.closed, 0);
   mock.timers.tick(1); assert.equal(h.closed, 1);
 });
@@ -179,12 +179,12 @@ test("permission and setup problems say what to fix, in the composer's words: on
   }
 });
 
-test("a server that can't take asks says why and stops listening: down, still starting, no Hezuo, or moved to My Cloud", async () => {
+test("a server that can't take asks says why and stops listening: down, still starting, no HezuoBot, or moved to My Cloud", async () => {
   const notices = [
-    ["server-down", "Open Hezuo to talk"],
+    ["server-down", "Open HezuoBot to talk"],
     ["starting", TALK_TEXT.starting],
     ["no-hezuo", TALK_TEXT.noHezuo],
-    ["moved", "Hezuo lives on My Cloud now — talk to it there"],
+    ["moved", "HezuoBot lives on My Cloud now — talk to it there"],
   ];
   for (const [code, text] of notices) {
     const h = harness({ prepare: async () => { throw new TalkServerError(code); } });
@@ -199,7 +199,7 @@ test("a server that can't take asks says why and stops listening: down, still st
   }
 });
 
-test("a server that goes away as the words are sent says Open Hezuo to talk", async () => {
+test("a server that goes away as the words are sent says Open HezuoBot to talk", async () => {
   let fail;
   const late = harness({ prepare: () => new Promise((_, reject) => { fail = reject; }) });
   late.session.press(); say(late, "hello"); release(late); await flush();
@@ -317,7 +317,7 @@ test("replaced while listening closes the box and nothing is sent", async () => 
   assert.equal(h.starts.length, 2);
 });
 
-test("clicking the box opens the chat; before the chat is known it only brings Hezuo forward", async () => {
+test("clicking the box opens the chat; before the chat is known it only brings HezuoBot forward", async () => {
   const idle = harness(); idle.session.open();
   assert.deepEqual(idle.opened, []); assert.equal(idle.closed, 0);
 

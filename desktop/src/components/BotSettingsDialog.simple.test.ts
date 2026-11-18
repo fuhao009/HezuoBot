@@ -266,7 +266,7 @@ beforeEach(() => {
   fixture.places = {
     cloud: [true, true, "Cloud desktop"], vm: [true, true, "Private desktop"], local: [true, true, "Your screen"], browser: [true, true, "Web pages only"],
   };
-  (window as unknown as { ogb?: unknown }).ogb = undefined;
+  (window as unknown as { hezuo?: unknown }).hezuo = undefined;
 });
 
 describe("the bot panel in Simple mode", () => {
@@ -814,7 +814,7 @@ describe("the Library tab", () => {
     expect(rowValue(rendered, "folder")).toBe("Private");
     click(find(rendered, "data-panel-page", "folder"));
     expect(onOpen).toHaveBeenLastCalledWith("folder");
-    expect(rowValue(library(makeBot({ cwd: "/Users/omkar/Projects/site" })), "folder")).toBe("/Users/omkar/Projects/site");
+    expect(rowValue(library(makeBot({ cwd: "/Users/owen/Projects/site" })), "folder")).toBe("/Users/owen/Projects/site");
   });
 });
 
@@ -1078,8 +1078,8 @@ describe("the drill-in pages", () => {
   });
 
   it("keeps the bot's own private folder, or a folder chosen with the native picker, saved through the bot route", async () => {
-    const pickFolder = vi.fn(() => Promise.resolve("/Users/omkar/Projects/site"));
-    (window as unknown as { ogb: unknown }).ogb = { pickFolder };
+    const pickFolder = vi.fn(() => Promise.resolve("/Users/owen/Projects/site"));
+    (window as unknown as { hezuo: unknown }).hezuo = { pickFolder };
     const rendered = body("folder");
     expect(find(rendered, "data-panel-choice", "private").props.checked).toBe(true);
     expect(find(rendered, "data-panel-choice", "pick").props.checked).toBe(false);
@@ -1089,14 +1089,14 @@ describe("the drill-in pages", () => {
     await Promise.resolve();
     expect(pickFolder).toHaveBeenCalledWith(undefined);
     await Promise.resolve();
-    expect(fixture.api).toHaveBeenCalledWith("/api/bots/scout", { method: "PATCH", body: JSON.stringify({ cwd: "/Users/omkar/Projects/site" }) });
+    expect(fixture.api).toHaveBeenCalledWith("/api/bots/scout", { method: "PATCH", body: JSON.stringify({ cwd: "/Users/owen/Projects/site" }) });
 
     fresh();
-    const chosen = body("folder", makeBot({ cwd: "/Users/omkar/Projects/site" }));
+    const chosen = body("folder", makeBot({ cwd: "/Users/owen/Projects/site" }));
     expect(find(chosen, "data-panel-choice", "pick").props.checked).toBe(true);
-    expect(chosen.html).toContain("/Users/omkar/Projects/site");
+    expect(chosen.html).toContain("/Users/owen/Projects/site");
     click(find(chosen, "data-panel-action", "pick-folder"));
-    expect(pickFolder).toHaveBeenLastCalledWith("/Users/omkar/Projects/site");
+    expect(pickFolder).toHaveBeenLastCalledWith("/Users/owen/Projects/site");
     click(find(chosen, "data-panel-choice", "private"));
     expect(fixture.api).toHaveBeenLastCalledWith("/api/bots/scout", { method: "PATCH", body: JSON.stringify({ cwd: null }) });
   });
@@ -1131,26 +1131,24 @@ describe("the drill-in pages", () => {
 });
 
 describe("the bot settings dialog", () => {
-  it("opens on the Simple panel without the accordion, and hands it the deep-linked section", () => {
+  it("opens standalone modal settings without the removed panel shell", () => {
     const bot = makeBot();
     const simple = dialog(bot);
-    expect(simple.html).toContain('id="bot-panel"');
-    const shell = ofType(simple, BotPanel)!;
-    expect(shell.props.bot).toBe(bot);
-    expect(shell.props.linkedSection).toBeNull();
-    expect(simple.html).not.toContain("data-bot-settings-section");
+    expect(simple.html).toContain('aria-modal="true"');
+    expect(ofType(simple, BotPanel)).toBeUndefined();
+    expect(simple.html).toContain("data-bot-settings-section");
 
     fresh();
     fixture.storeState = { settingsOpen: true, botSettingsSection: "model", botSettingsExpandAccordion: true };
-    expect(ofType(dialog(bot), BotPanel)!.props.linkedSection).toBe("model");
+    expect(dialog(bot).html).toContain('data-bot-settings-section="model"');
   });
 
-  it("a stored section never moves the Simple panel", () => {
+  it("a stored section does not bring back the removed panel shell", () => {
     fixture.storeState = {
       settingsOpen: true, botSettingsSection: "model", botSettingsExpandAccordion: true,
       botSettingsSectionStored: true, botSettingsExpandRemembered: true,
     };
-    expect(ofType(dialog(makeBot()), BotPanel)!.props.linkedSection).toBeNull();
+    expect(ofType(dialog(makeBot()), BotPanel)).toBeUndefined();
   });
 
   it("leaves Advanced mode on the full accordion", () => {

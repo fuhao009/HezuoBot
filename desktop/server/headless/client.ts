@@ -1,4 +1,4 @@
-// Server: --url, --port, HEZUO_URL or OMB_PORT, else the desktop ports. A credential never travels while a server
+// Server: --url, --port, HEZUO_URL or HEZUO_PORT, else the desktop ports. A credential never travels while a server
 // is being looked for; it comes from HEZUO_TOKEN or --token-file only (a command line leaks).
 import { readFileSync } from "node:fs";
 
@@ -11,7 +11,7 @@ export type ToolHooks = Parameters<ToolCaller>[4];
 
 export interface ClientDeps {
   env: NodeJS.ProcessEnv;
-  /** control-omb: a verb that changes something never runs on a server it merely found. */
+  /** control-hezuo: a verb that changes something never runs on a server it merely found. */
   requireExplicitForMutations?: boolean;
   callTool?: ToolCaller;
   request?: Requester;
@@ -62,7 +62,7 @@ export function namedServer(flags: Flags, env: NodeJS.ProcessEnv): { url: string
   const port = flag(flags, "port")?.trim();
   if (port) return { port };
   if (env.HEZUO_URL?.trim()) return { url: env.HEZUO_URL.trim() };
-  return env.OMB_PORT?.trim() ? { port: env.OMB_PORT.trim() } : undefined;
+  return env.HEZUO_PORT?.trim() ? { port: env.HEZUO_PORT.trim() } : undefined;
 }
 
 export async function openClient(flags: Flags, deps: ClientDeps, mutating: boolean): Promise<HeadlessClient> {
@@ -82,11 +82,11 @@ export async function openClient(flags: Flags, deps: ClientDeps, mutating: boole
     baseUrl = `http://127.0.0.1:${port}`;
   } else {
     if (mutating && deps.requireExplicitForMutations) {
-      throw usageError("mutating commands require an explicit Hezuo instance", "start `control-omb launch`, then pass its URL with --url");
+      throw usageError("mutating commands require an explicit Hezuo instance", "start `control-hezuo launch`, then pass its URL with --url");
     }
     if (token) {
       throw usageError("a token needs a named server, so it is never sent while looking for one",
-        "pass --url (or --port), or set HEZUO_URL or OMB_PORT");
+        "pass --url (or --port), or set HEZUO_URL or HEZUO_PORT");
     }
     try {
       baseUrl = await mcp.probeBaseUrls(DISCOVERY_PORTS.map((port) => `http://127.0.0.1:${port}`));

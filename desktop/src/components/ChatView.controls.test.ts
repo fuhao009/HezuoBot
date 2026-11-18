@@ -70,12 +70,12 @@ const bot: Bot = {
 };
 
 describe("the header's right side", () => {
-  it("always exposes the explicit browser takeover in chat, independent of bot activity", () => {
+  it("never offers browser takeover just because a bot is active", () => {
     for (const advanced of [true, false]) {
       fixture.advanced = advanced;
       for (const busy of [true, false]) {
         const markup = renderToStaticMarkup(createElement(ChatView, { bot: { ...bot, busy } }));
-        expect(markup).toMatch(/data-browser-takeover[^>]*>Take over browser<\/button>/);
+        expect(markup).not.toContain("data-browser-takeover");
         expect(markup).not.toContain("data-browser-transport");
       }
     }
@@ -104,27 +104,27 @@ describe("the header's right side", () => {
     }
   });
 
-  it("keeps the computer button in the Advanced header", () => {
+  it("has no computer panel entry in the Advanced header", () => {
     fixture.advanced = true;
     const { controls } = header();
     const computer = controls.match(/<button[^>]*data-tour="computer"[^>]*>/)?.[0] ?? "";
-    expect(computer.split(" ")).toEqual(expect.arrayContaining(["rounded-full", "size-8"]));
+    expect(computer).toBe("");
   });
 
-  it("keeps the model, the computer and ⋯ in a remote client's Simple header, whose settings panel has no room for them", () => {
+  it("keeps remote model and conversation actions without a computer panel entry", () => {
     fixture.advanced = false;
-    window.ogb = { remoteClient: { active: true } } as NonNullable<Window["ogb"]>;
+    window.hezuo = { remoteClient: { active: true } } as NonNullable<Window["hezuo"]>;
     try {
       const { markup } = header();
       // The host checks the model against its own catalog, so a paired desktop can change it like the phone can.
       expect(markup).toContain("data-test-model-control");
       expect(fixture.model).toMatchObject({ bot: { id: "bot" }, threadId: "selected" });
-      expect(markup).toContain('data-tour="computer"');
+      expect(markup).not.toContain('data-tour="computer"');
       expect(markup).toContain('data-testid="chat-more"');
       const more = fixture.menus.find((menu) => menu.ariaLabel === "More")!;
       expect(more.items.map((item) => item.key)).toEqual(["find", "new-thread", "copy", "download"]);
     } finally {
-      delete window.ogb;
+      delete window.hezuo;
       fixture.advanced = true;
     }
   });
@@ -150,17 +150,14 @@ describe("the header's right side", () => {
     expect(controls).toContain('title="Stop this turn"');
   });
 
-  it("leaves Advanced mode's model, computer and ⋯ exactly as they were, the inspector unlocked", () => {
+  it("keeps Advanced model and conversation actions without panel entries", () => {
     fixture.advanced = true;
     const { markup } = header();
     expect(markup).toContain("data-test-model-control");
-    expect(markup).toContain('data-tour="computer"');
+    expect(markup).not.toContain('data-tour="computer"');
     expect(markup).toContain('data-testid="chat-more"');
     const more = fixture.menus.find((menu) => menu.ariaLabel === "More")!;
-    expect(more.items.map((item) => item.key)).toEqual(["find", "copy", "download", "activity", "inspector"]);
-    const inspector = more.items.find((item) => item.key === "inspector")!;
-    expect(inspector.disabled).toBeFalsy();
-    expect(inspector.heading).toBeUndefined();
+    expect(more.items.map((item) => item.key)).toEqual(["find", "copy", "download"]);
   });
 });
 
@@ -181,13 +178,13 @@ describe("the Simple header", () => {
       for (const gone of ["data-chathead-role", "data-background-activity", "data-chathead-back", 'data-testid="chat-more"']) {
         expect(simple, gone).not.toContain(gone);
       }
-      window.ogb = { remoteClient: { active: true } } as NonNullable<Window["ogb"]>;
+      window.hezuo = { remoteClient: { active: true } } as NonNullable<Window["hezuo"]>;
       try {
         const remote = renderToStaticMarkup(createElement(ChatView, { bot: busyElsewhere }));
         expect(remote).not.toContain("data-chathead-elsewhere");
         expect(remote).toContain("data-background-activity");
       } finally {
-        delete window.ogb;
+        delete window.hezuo;
       }
     } finally {
       fixture.advanced = true;
@@ -277,21 +274,19 @@ describe("header name", () => {
     fixture.advanced = true;
   });
 
-  it("marks the computer button live while a turn works in the browser, so a closed panel still shows it", () => {
+  it("does not expose a computer panel for browser activity or pinned browser work", () => {
     fixture.advanced = true;
     const working = (computer: Bot["computer"], busy: boolean) => renderToStaticMarkup(createElement(ChatView, {
       bot: { ...bot, computer, busy, tasks: (bot.tasks ?? []).map((task) => ({ ...task, busy })) },
     }));
     const button = (markup: string) => markup.match(/<button[^>]*data-tour="computer"[^>]*>[\s\S]*?<\/button>/)?.[0] ?? "";
-    expect(button(working("browser", true))).toContain('data-testid="computer-button-live"');
-    expect(button(working("browser", true))).toContain('aria-label="Bot&#x27;s screen, In use now"');
-    expect(button(working("browser", false))).toContain('aria-label="Bot&#x27;s screen"');
-    expect(button(working("browser", false))).not.toContain("computer-button-live");
-    expect(button(working("local", true))).not.toContain("computer-button-live");
+    expect(button(working("browser", true))).toBe("");
+    expect(button(working("browser", false))).toBe("");
+    expect(button(working("local", true))).toBe("");
     const pinned = renderToStaticMarkup(createElement(ChatView, {
       bot: { ...bot, computer: undefined, busy: true, tasks: (bot.tasks ?? []).map((task) => ({ ...task, busy: true, surface: "browser" as const })) },
     }));
-    expect(button(pinned)).toContain('data-testid="computer-button-live"');
+    expect(button(pinned)).toBe("");
   });
 
   it("centres the bot in the header's middle column, with the controls in the last", () => {
@@ -384,25 +379,25 @@ describe("thread control placement", () => {
   it("offers trusted modes in the composer without requiring a Full bot default", () => {
     const fullBot = { ...bot, busy: false, approvalMode: "full" as const };
     expect(renderToStaticMarkup(createElement(ChatView, { bot: fullBot }))).not.toContain("Use bot’s Full access for this thread");
-    window.ogb = { approvals: { setMode: vi.fn() } } as unknown as NonNullable<Window["ogb"]>;
+    window.hezuo = { approvals: { setMode: vi.fn() } } as unknown as NonNullable<Window["hezuo"]>;
     expect(renderToStaticMarkup(createElement(ChatView, { bot: fullBot }))).not.toContain("Use bot’s Full access for this thread");
     renderToStaticMarkup(createElement(ChatView, { bot }));
     expect(fixture.approval?.trustedModesAvailable).toBe(true);
     fixture.approval!.onSelect("custom");
     expect(fixture.dispatch).toHaveBeenLastCalledWith({ type: "updateTask", botId: "bot", threadId: "selected", patch: { approvalMode: "custom" } });
-    delete window.ogb;
+    delete window.hezuo;
   });
 
   it("applies Full access from the composer at once, with or without the desktop bridge", () => {
     for (const bridge of [false, true]) {
-      if (bridge) window.ogb = { approvals: { setMode: vi.fn() } } as unknown as NonNullable<Window["ogb"]>;
+      if (bridge) window.hezuo = { approvals: { setMode: vi.fn() } } as unknown as NonNullable<Window["hezuo"]>;
       fixture.dispatch.mockClear();
       const markup = renderToStaticMarkup(createElement(ChatView, { bot }));
       expect(fixture.approval?.trustedModesAvailable).toBe(bridge);
       fixture.approval!.onSelect("full");
       expect(fixture.dispatch).toHaveBeenCalledExactlyOnceWith({ type: "updateTask", botId: "bot", threadId: "selected", patch: { approvalMode: "full" } });
       expect(markup).not.toContain('role="alertdialog"');
-      delete window.ogb;
+      delete window.hezuo;
     }
     fixture.dispatch.mockClear();
     renderToStaticMarkup(createElement(ChatView, { bot }));
@@ -566,7 +561,7 @@ describe("thread control placement", () => {
   it("offers the matching macOS Settings and relaunch actions only for a named CUA permission failure", () => {
     fixture.platform = "darwin";
     fixture.localMessage = "Screen Recording required";
-    window.ogb = { platform: "darwin", permOpenSettings: vi.fn(), relaunch: vi.fn() } as unknown as NonNullable<Window["ogb"]>;
+    window.hezuo = { platform: "darwin", permOpenSettings: vi.fn(), relaunch: vi.fn() } as unknown as NonNullable<Window["hezuo"]>;
     const screen = renderToStaticMarkup(createElement(ErrorRow, {
       message: "Hezuo can't use this computer yet — embedded host failed: Screen Recording required. Relaunch Hezuo after granting any missing macOS permission.",
     }));
@@ -588,7 +583,7 @@ describe("thread control placement", () => {
     fixture.localReasonCode = "cua-driver-unavailable";
     fixture.platform = "other";
     fixture.localMessage = "";
-    delete window.ogb;
+    delete window.hezuo;
   });
   it.each([
     "شغّل الاختبارات\nThen run typecheck\nوبعدها ارفع الفرع",
@@ -644,7 +639,7 @@ describe("thread control placement", () => {
   });
 
   it("offers remote clients the model picker but keeps approval changes on the host", () => {
-    window.ogb = { remoteClient: { active: true } } as NonNullable<Window["ogb"]>;
+    window.hezuo = { remoteClient: { active: true } } as NonNullable<Window["hezuo"]>;
     try {
       fixture.model = null;
       const markup = renderToStaticMarkup(createElement(ChatView, { bot }));
@@ -652,7 +647,7 @@ describe("thread control placement", () => {
       expect(fixture.model).toMatchObject({ bot: { id: "bot" }, threadId: "selected" });
       expect(markup).not.toContain("data-test-approval-control");
     } finally {
-      delete window.ogb;
+      delete window.hezuo;
     }
   });
 

@@ -132,13 +132,13 @@ export default function Page() { const theme = useTheme(); return <div><p id="th
     expect(fakeEcharts.made[0]).toMatchObject({ theme: "dark", options: [{ backgroundColor: "transparent", series: [{ type: "bar", data: [1, 2] }] }] });
   });
 
-  it("loads the old module name only as a persisted JSX read adapter", async () => {
-    const { problems, loads, rendered } = await start('import { useTheme } from "mausbot"; export default function Page() { return <p>{useTheme()}</p>; }');
+  it("loads the canonical helper module without fetching it externally", async () => {
+    const { problems, loads, rendered } = await start('import { useTheme } from "hezuo"; export default function Page() { return <p>{useTheme()}</p>; }');
     expect(problems).toEqual([]);
     expect(loads).toContain("echarts");
-    expect(loads).not.toContain("mausbot");
+    expect(loads).not.toContain("hezuo");
     expect(rendered.querySelector("p")?.textContent).toMatch(/light|dark/);
-    expect(JSX_PAGE_MODULES).not.toContain("mausbot");
+    expect(JSX_PAGE_MODULES).toContain("hezuo");
   });
 
   it("runs a published page's transpiled code without loading the compiler", async () => {

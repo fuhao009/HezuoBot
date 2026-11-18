@@ -93,6 +93,27 @@ async function mintVerificationCode(email: string, target: Env = mailEnv()) {
 }
 
 describe("password accounts", () => {
+  it("allows repeated password sign-ins from the same IP while retaining sign-up limits", async () => {
+    const target = bareEnv();
+    const email = "unlimited-password@example.com";
+    const ip = "198.51.100.209";
+    expect((await signUp(email, PASSWORD, target)).status).toBe(200);
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      const response = await call("/api/auth/sign-in/email", {
+        method: "POST", env: target, ip, body: { email, password: PASSWORD },
+      });
+      expect(response.status, `password sign-in ${attempt + 1}`).toBe(200);
+      expect(response.headers.get("set-auth-token")).toBeTruthy();
+    }
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      const response = await call("/api/auth/sign-up/email", {
+        method: "POST", env: target, ip,
+        body: { email: `limited-signup-${attempt}@example.com`, password: PASSWORD, name: "Fixture" },
+      });
+      expect(response.status, `sign-up ${attempt + 1}`).toBe(attempt < 5 ? 200 : 429);
+    }
+  });
+
   it("publishes the sign-in ways without mail and needs none to sign up", async () => {
     const bare = bareEnv();
     const methods = await call("/v1/auth/methods", { env: bare });

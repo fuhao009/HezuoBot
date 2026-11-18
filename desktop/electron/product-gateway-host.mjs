@@ -1,4 +1,4 @@
-// Registers this desktop as an installation on the local Hezuo account
+// Registers this desktop as an installation on the local HezuoBot account
 // gateway and keeps a companion relay open so a phone signed into the same
 // account can use the app without a pairing code, Cloudflare tunnel, or
 // Tailscale name.

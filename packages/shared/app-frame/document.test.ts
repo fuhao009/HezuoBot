@@ -43,11 +43,10 @@ describe("buildSrcdoc", () => {
     expect(buildSrcdoc({ html: "<p>x</p>", csp: CSP })).not.toContain("hezuo");
   });
 
-  it("adapts only persisted bot HTML that uses the old SDK global", () => {
-    const html = "<script>mausbot.send('hello')</script>";
-    expect(buildSrcdoc({ html, csp: CSP, botHelper: true })).toContain('Object.defineProperty(window,"mausbot",{value:window.hezuo})');
-    expect(buildSrcdoc({ html, csp: CSP })).not.toContain('Object.defineProperty(window,"mausbot"');
-    expect(buildSrcdoc({ html: "<script>hezuo.send('hello')</script>", csp: CSP, botHelper: true })).not.toContain('Object.defineProperty(window,"mausbot"');
+  it("injects the canonical helper without adapting page content", () => {
+    const html = "<script>hezuo.send('hello')</script>";
+    expect(buildSrcdoc({ html, csp: CSP, botHelper: true })).toBe(`${head}<style>${APP_THEME_STYLE}</style><script>${APP_HELPER_SOURCE}</script><script>${APP_POINT_SOURCE}</script>${html}`);
+    expect(buildSrcdoc({ html, csp: CSP })).toBe(`${head}${html}`);
   });
 
   it("keeps the helper free of anything that would end its script element", () => {

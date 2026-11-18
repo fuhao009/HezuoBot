@@ -24,7 +24,7 @@ function requireFrom(base, specifier) {
 }
 
 /** The Electron executable: `--app`, `ELECTRON_OVERRIDE_DIST_PATH`,
- * `OMB_VERIFY_ELECTRON`, the local install, else null. Never installs one. */
+ * `HEZUO_VERIFY_ELECTRON`, the local install, else null. Never installs one. */
 export function electronBinary(environment = process.env) {
   const candidates = [];
   if (environment.ELECTRON_OVERRIDE_DIST_PATH) {
@@ -32,7 +32,7 @@ export function electronBinary(environment = process.env) {
       candidates.push(join(environment.ELECTRON_OVERRIDE_DIST_PATH, name));
     }
   }
-  if (environment.OMB_VERIFY_ELECTRON) candidates.push(environment.OMB_VERIFY_ELECTRON);
+  if (environment.HEZUO_VERIFY_ELECTRON) candidates.push(environment.HEZUO_VERIFY_ELECTRON);
   try {
     const manifest = requireFrom(ROOT, "desktop/electron/package.json");
     const directory = dirname(manifest);

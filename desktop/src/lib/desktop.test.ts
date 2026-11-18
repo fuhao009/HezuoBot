@@ -41,7 +41,7 @@ describe("desktop capability cache", () => {
       resolveInitial = resolve;
     });
     vi.stubGlobal("window", {
-      ogb: {
+      hezuo: {
         platform: "linux",
         getCapabilities: () => initial,
       },
@@ -62,9 +62,9 @@ describe("the bridge that resets a switch's approval to Ask", () => {
   it("is the desktop's own bridge, except on a paired desktop, where the host takes the switch", async () => {
     const approvals = { setMode: vi.fn() };
     const { askResetBridge } = await import("./desktop");
-    vi.stubGlobal("window", { ogb: { approvals } });
+    vi.stubGlobal("window", { hezuo: { approvals } });
     expect(askResetBridge()).toBe(approvals);
-    vi.stubGlobal("window", { ogb: { approvals, remoteClient: { active: true } } });
+    vi.stubGlobal("window", { hezuo: { approvals, remoteClient: { active: true } } });
     expect(askResetBridge()).toBeUndefined();
     vi.stubGlobal("window", {});
     expect(askResetBridge()).toBeUndefined();

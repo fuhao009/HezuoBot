@@ -1,12 +1,12 @@
 import type { SignInPlace } from "../../../packages/shared/sign-in-request.ts";
-import { PASS, type RouteContext, type RouteHandler } from "./table.ts";
+import { PASS, type RouteContext, type InternalRouteHandler } from "./table.ts";
 
 /** Only dispatch inside the internal capability gate, with its guarded body
  * reader. The global route table must never register this endpoint. */
 export function createInternalSignInRoutes(deps: {
   readBody(): ReturnType<RouteContext["readBody"]>;
   request(site: unknown, reason: unknown): { messageId: string; site: string; place: SignInPlace } | { status: number; error: string };
-}): RouteHandler {
+}): InternalRouteHandler {
   return async ({ res, path, method, json }) => {
     if (method !== "POST" || path !== "/api/internal/request-sign-in") return PASS;
     const body = await deps.readBody();

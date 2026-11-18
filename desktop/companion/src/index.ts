@@ -26,7 +26,6 @@ import { notifyDeviceRevoked } from "./harness-notice.ts";
 import { createProxyHandler } from "./proxy.ts";
 import { companionOriginSocket, listenCompanionOrigin } from "./origin.ts";
 import { gzipTunnelReplies } from "./tunnel-gzip.ts";
-import { normalizedPhoneSecretPublicKey } from "./phone-secret-key.ts";
 import { machineNameFromConfig } from "./machine-name.ts";
 
 // Only Electron supplies this port; Electron children fail closed until initialized.
@@ -56,16 +55,13 @@ const num = (value: string | undefined, fallback: number): number => {
   return Number.isInteger(parsed) && parsed > 0 && parsed < 65536 ? parsed : fallback;
 };
 
-const HARNESS_PORT = num(process.env.OMB_PORT, 8799);
-const WEBHOOK_PORT = num(process.env.OMB_WEBHOOK_PORT, HARNESS_PORT + 1);
-const COMPANION_PORT = num(process.env.OMB_COMPANION_PORT, 8810);
-const CONTROL_PORT = num(process.env.OMB_CONTROL_PORT, 8811);
+const HARNESS_PORT = num(process.env.HEZUO_PORT, 8799);
+const WEBHOOK_PORT = num(process.env.HEZUO_WEBHOOK_PORT, HARNESS_PORT + 1);
+const COMPANION_PORT = num(process.env.HEZUO_COMPANION_PORT, 8810);
+const CONTROL_PORT = num(process.env.HEZUO_CONTROL_PORT, 8811);
 const SERVICE_TYPE = "_hezuo._tcp";
-let hostedUrl = hostedCompanionUrl(process.env.OMB_COMPANION_HOSTED_URL);
-const PRIVATE_ORIGIN = companionOriginSocket(process.env.OMB_COMPANION_INTERNAL_ORIGIN);
-const SECRET_PUBLIC_KEY = normalizedPhoneSecretPublicKey(
-  process.env.OMB_PHONE_SECRET_PUBLIC_KEY ?? "",
-);
+let hostedUrl = hostedCompanionUrl(process.env.HEZUO_COMPANION_HOSTED_URL);
+const PRIVATE_ORIGIN = companionOriginSocket(process.env.HEZUO_COMPANION_INTERNAL_ORIGIN);
 
 /** Checked up front: the collision is a race, and the loser's error surfaces
  * nowhere near here. */
@@ -79,12 +75,12 @@ const conflict = (name: string, port: number): string | null => {
   return owner ? `${name} is set to port ${port}, which is ${owner}` : null;
 };
 
-/** OMB_COMPANION_NAME wins; otherwise the name set in Settings or the owner's profile name, re-read every 30
+/** HEZUO_COMPANION_NAME wins; otherwise the name set in Settings or the owner's profile name, re-read every 30
  * seconds so a rename, or a harness that answered late, reaches the phone. Failures keep the last name. */
-const fixedName = process.env.OMB_COMPANION_NAME?.trim() || "";
+const fixedName = process.env.HEZUO_COMPANION_NAME?.trim() || "";
 let cachedName = fixedName;
 
-const machineName = (): string => cachedName || "Hezuo";
+const machineName = (): string => cachedName || "HezuoBot";
 
 /** True when the name changed. */
 async function refreshMachineName(): Promise<boolean> {
@@ -130,7 +126,7 @@ const service = (): ServiceInfo => ({
 
 const connectedDevices = createConnectedDeviceTracker();
 const accountAuth = createAccountAuthenticator({
-  trust: () => readProductAccountTrust(process.env.OMB_PRODUCT_ACCOUNT_TRUST),
+  trust: () => readProductAccountTrust(process.env.HEZUO_PRODUCT_ACCOUNT_TRUST),
 });
 
 const proxy = createProxyHandler({
@@ -140,7 +136,7 @@ const proxy = createProxyHandler({
     authenticate: async (token) => {
       const paired = devices.authenticate(token);
       if (paired) return paired;
-      const trustFile = process.env.OMB_PRODUCT_ACCOUNT_TRUST;
+      const trustFile = process.env.HEZUO_PRODUCT_ACCOUNT_TRUST;
       if (!trustFile) return null;
       return accountAuth(token);
     },
@@ -162,7 +158,6 @@ const control = createControlServer({
   devices,
   controlToken: () => controlToken,
   companionPort: COMPANION_PORT,
-  secretPublicKey: () => SECRET_PUBLIC_KEY,
   hostedUrl: () => hostedUrl,
   setHostedUrl: (next) => {
     hostedUrl = next;
@@ -187,7 +182,7 @@ const listen = (server: ReturnType<typeof createServer>, port: number, host: str
     const onError = (error: NodeJS.ErrnoException) => {
       server.removeListener("listening", onListening);
       const hint = ` — another copy of the companion may already be running; ${
-        port === COMPANION_PORT ? "OMB_COMPANION_PORT" : "OMB_CONTROL_PORT"
+        port === COMPANION_PORT ? "HEZUO_COMPANION_PORT" : "HEZUO_CONTROL_PORT"
       } chooses a different one`;
       reject(
         error.code === "EADDRINUSE"
@@ -211,13 +206,13 @@ const listen = (server: ReturnType<typeof createServer>, port: number, host: str
 
 async function main(): Promise<void> {
   const clash =
-    conflict("OMB_COMPANION_PORT", COMPANION_PORT) ?? conflict("OMB_CONTROL_PORT", CONTROL_PORT);
+    conflict("HEZUO_COMPANION_PORT", COMPANION_PORT) ?? conflict("HEZUO_CONTROL_PORT", CONTROL_PORT);
   if (clash) throw new Error(`${clash}. Pick another port.`);
 
   // 127.0.0.1 and 0.0.0.0 on one port collide; name it rather than EADDRINUSE.
   if (COMPANION_PORT === CONTROL_PORT) {
     throw new Error(
-      `OMB_COMPANION_PORT and OMB_CONTROL_PORT are both port ${COMPANION_PORT}, and they cannot share one: ` +
+      `HEZUO_COMPANION_PORT and HEZUO_CONTROL_PORT are both port ${COMPANION_PORT}, and they cannot share one: ` +
         `the first is open to your network and the second must never be. Pick another port.`,
     );
   }

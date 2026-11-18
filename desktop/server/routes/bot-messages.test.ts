@@ -52,8 +52,8 @@ async function fixture() {
     started: Array<{ text: string; opts: StartOpts }>;
     relayed: Array<Parameters<BotMessageRouteDeps["relayedReaction"]>>;
     serverPresses: Array<{ threadId: string; messageId: string; type: string }>; serverAnswer: "handled" | "refused" | null; records: string | null;
-    fromPhone: boolean; phoneSends: string[];
-  } = { accepted: [], hold: null, refuse: null, busy: false, prompts: [], started: [], relayed: [], serverPresses: [], serverAnswer: null, records: null, fromPhone: false, phoneSends: [] };
+    companionDevice: string | undefined;
+  } = { accepted: [], hold: null, refuse: null, busy: false, prompts: [], started: [], relayed: [], serverPresses: [], serverAnswer: null, records: null, companionDevice: undefined };
   const startTurn: BotMessageRouteDeps["startTurn"] = async (botId, text, opts = {}) => {
     state.started.push({ text, opts });
     state.prompts.push(promptWithReply(text, opts.replyTo));
@@ -96,13 +96,11 @@ async function fixture() {
     store,
     routines: () => null,
     desktopManaged: true,
-    cloudHome: false,
     DirectSendRefused,
     acceptDirectSend: accept,
     directSendRefusal: (botId: string, thread: string) => (store.taskByThread(botId, thread) ? null : { status: 409, body: { error: "the bot switched tasks before it could receive the message" } }),
     usageTriggerFor: () => ({ kind: "user" }),
     messageSender: () => undefined,
-    cloudGuestSendRefusal: () => null,
     resolveReplyTarget: replyTarget,
     requestedTaskBot: (botId: string, rawThreadId: unknown) => store.projectBotForTask(botId, String(rawThreadId))!,
     startTurn,
@@ -110,14 +108,10 @@ async function fixture() {
     botAtThreadCapacity: () => false,
     parksBehindCoordination: () => false,
     activeGroupTurnForBot: () => null,
-    cloudThreadRefusal: () => null,
-    phoneSecretSubmissions: { hasThread: () => false },
     turnSelection: () => undefined,
     registry: { get: () => ({ instanceId: "claude", driverKind: "claudeAgent" }) },
     policyModelRefusal: () => undefined,
     relayedReaction: (...args: Parameters<BotMessageRouteDeps["relayedReaction"]>) => { state.relayed.push(args); },
-    fromPhone: () => state.fromPhone,
-    notePhoneSend: (sendId: string) => { state.phoneSends.push(sendId); },
     pressRecords: () => state.records,
     serverPress: (_bot: unknown, thread: string, messageId: string, action: { type: string }) => {
       state.serverPresses.push({ threadId: thread, messageId, type: action.type });
@@ -128,7 +122,7 @@ async function fixture() {
   const server = createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", "http://localhost");
     try {
-      const auth = { kind: "loopback", scopes: ["admin"] } as RequestAuth;
+      const auth: RequestAuth = { kind: "loopback", scopes: ["admin"], ...(state.companionDevice ? { companionDevice: state.companionDevice } : {}) };
       const handled = await dispatchRoutes(routes, { req, res, url, path: url.pathname, method: req.method ?? "GET", auth, json, readBody });
       if (!handled) json(res, 404, { from: "inline routes" });
     } catch (error) {
@@ -489,30 +483,35 @@ describe("POST /api/bots/:id/messages/guarded with a reaction another app relaye
   });
 });
 
-describe("POST /api/bots/:id/messages from a registered phone", () => {
-  it("notes a phone's send by its id on the plain and guarded routes, and gives one without an id its own", async () => {
+describe("POST /api/bots/:id/messages from a companion device", () => {
+  it("preserves supplied send ids on the plain and guarded routes, and leaves an omitted id unset", async () => {
     const { store, bot, threadId, state, post } = await fixture();
     store.patchBot(bot.id, { approvalMode: "ask", autoApprove: false });
-    state.fromPhone = true;
-    expect((await post({ threadId, sendId: SEND, text: "Remind me at five" })).status).toBe(202);
+    state.companionDevice = "phone-1";
+    const plain = await post({ threadId, sendId: SEND, text: "Remind me at five" });
+    expect(plain.status).toBe(202);
+    expect(plain.body.message.sendId).toBe(SEND);
     const guarded = await post({ threadId, sendId: OTHER_SEND, text: "And at six", expectedActiveLeafId: store.activeLeaf(threadId), expectedApprovalMode: "ask" }, "/guarded");
     expect(guarded.status, JSON.stringify(guarded.body)).toBe(202);
-    const minted = await post({ threadId, text: "And at seven" });
-    expect(minted.status).toBe(202);
-
-    const mintedId = state.accepted[2]!.sendId;
-    expect(mintedId).toMatch(/^[A-Za-z0-9_-]{16,80}$/);
-    expect(minted.body.message.sendId).toBe(mintedId);
-    expect(state.phoneSends).toEqual([SEND, OTHER_SEND, mintedId]);
+    expect(guarded.body.message.sendId).toBe(OTHER_SEND);
+    const withoutId = await post({ threadId, text: "And at seven" });
+    expect(withoutId.status).toBe(202);
+    expect(withoutId.body.message.sendId).toBeUndefined();
+    expect(state.accepted.map((input) => input.sendId)).toEqual([SEND, OTHER_SEND, undefined]);
   });
 
-  it("notes nothing from the computer, with or without an id, and nothing for a send refused before acceptance", async () => {
-    const { threadId, state, post } = await fixture();
+  it("does not let a companion device send to another conversation or bypass the guarded leaf check", async () => {
+    const { store, bot, threadId, state, post } = await fixture();
+    store.patchBot(bot.id, { approvalMode: "ask", autoApprove: false });
     expect((await post({ threadId, sendId: SEND, text: "Remind me at five" })).status).toBe(202);
     expect((await post({ threadId, text: "And at six" })).status).toBe(202);
     expect(state.accepted.map((input) => input.sendId)).toEqual([SEND, undefined]);
-    state.fromPhone = true;
+    state.companionDevice = "phone-1";
     expect((await post({ threadId: "someone-elses-thread", sendId: OTHER_SEND, text: "Hi" })).status).toBe(409);
-    expect(state.phoneSends).toEqual([]);
+    const refused = await post({ threadId, sendId: OTHER_SEND, text: "And at seven", expectedActiveLeafId: null, expectedApprovalMode: "ask" }, "/guarded");
+    expect(refused.status).toBe(409);
+    expect(state.accepted.map((input) => input.sendId)).toEqual([SEND, undefined, OTHER_SEND]);
+    expect(state.started).toEqual([]);
+    expect(store.messagesFor(threadId).some((message) => message.sendId === OTHER_SEND)).toBe(false);
   });
 });

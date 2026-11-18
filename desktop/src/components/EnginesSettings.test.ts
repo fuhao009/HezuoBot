@@ -220,14 +220,14 @@ describe("Settings → Engines → setup cards", () => {
       instanceId: "claude", displayName: "Claude", driverKind: "claudeAgent", cliDefault: "claude",
       snapshot: {
         state: "available", authenticated: true,
-        warning: { title: "Bots inherit this machine's Claude Code setup", message: "OMB_CLAUDE_INHERIT_USER_CONFIG=1 is set." },
+        warning: { title: "Bots inherit this machine's Claude Code setup", message: "HEZUO_CLAUDE_INHERIT_USER_CONFIG=1 is set." },
       },
       models: { default: "model", options: [] },
     }];
     const html = renderToStaticMarkup(createElement(EnginesSettings));
     expect(html).toContain("data-engine-warning-notice");
     expect(html).toContain("Bots inherit this machine&#x27;s Claude Code setup");
-    expect(html).toContain("OMB_CLAUDE_INHERIT_USER_CONFIG=1 is set.");
+    expect(html).toContain("HEZUO_CLAUDE_INHERIT_USER_CONFIG=1 is set.");
     expect(html).not.toContain("data-engine-update-notice");
     delete fixture.instances[0].snapshot.warning;
     expect(renderToStaticMarkup(createElement(EnginesSettings))).not.toContain("data-engine-warning-notice");
@@ -275,7 +275,7 @@ describe("Settings → Engines → setup cards", () => {
     expect(saved).toContain("data-key-replace");
     expect(saved).not.toContain("OpenAI needs an API key");
 
-    vi.stubGlobal("window", { ogb: { remoteClient: { active: true } } });
+    vi.stubGlobal("window", { hezuo: { remoteClient: { active: true } } });
     const remote = renderToStaticMarkup(createElement(EnginesSettings));
     expect(remote).not.toContain("data-key-row");
 

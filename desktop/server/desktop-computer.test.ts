@@ -8,11 +8,11 @@ import { createDesktopComputer, DESKTOP_COMPUTER_GRANT, thisComputerNotReady } f
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 const READY = { mode: "embedded", status: "ready", socketPath: "/fixture/cua.sock", mcpCommand: "/fixture/cua-driver", mcpArgs: ["mcp"], mcpEnv: {} };
-const saved = { userData: process.env.OMB_USER_DATA, parent: process.env.OMB_DESKTOP_PARENT, home: process.env.HOME };
+const saved = { userData: process.env.HEZUO_USER_DATA, parent: process.env.HEZUO_DESKTOP_PARENT, home: process.env.HOME };
 const folders: string[] = [];
 
 afterEach(() => {
-  for (const [key, value] of [["OMB_USER_DATA", saved.userData], ["OMB_DESKTOP_PARENT", saved.parent], ["HOME", saved.home]] as const) {
+  for (const [key, value] of [["HEZUO_USER_DATA", saved.userData], ["HEZUO_DESKTOP_PARENT", saved.parent], ["HOME", saved.home]] as const) {
     if (value === undefined) delete process.env[key];
     else process.env[key] = value;
   }
@@ -21,13 +21,13 @@ afterEach(() => {
 
 describe("this computer, only for the desktop app's own server", () => {
   it("finds nothing on a server the app did not launch, though the app's record, its folder and the desktop flag are all there", () => {
-    const home = mkdtempSync(join(tmpdir(), "omb-desktop-computer-"));
+    const home = mkdtempSync(join(tmpdir(), "hezuo-desktop-computer-"));
     folders.push(home);
     for (const folder of [join(home, "user-data"), join(home, "Library", "Application Support", "Hezuo")]) {
       mkdirSync(folder, { recursive: true, mode: 0o700 });
       writeFileSync(join(folder, "cua-connection.json"), JSON.stringify(READY), { mode: 0o600 });
     }
-    Object.assign(process.env, { OMB_USER_DATA: join(home, "user-data"), OMB_DESKTOP_PARENT: "1", HOME: home });
+    Object.assign(process.env, { HEZUO_USER_DATA: join(home, "user-data"), HEZUO_DESKTOP_PARENT: "1", HOME: home });
     for (const platform of ["darwin", "win32", "linux"] as const) {
       const desktop = createDesktopComputer({ platform });
       expect(desktop.connection(), platform).toBeNull();
@@ -89,12 +89,12 @@ describe("this computer, only for the desktop app's own server", () => {
     walk(join(ROOT, "desktop", "server"));
     const uses = (needle: string) => sources.filter((path) => readFileSync(path, "utf8").includes(needle))
       .map((path) => relative(ROOT, path).split(sep).join("/"));
-    expect(uses("desktopComputer.receive(")).toEqual(["server/index.ts"]);
-    const index = readFileSync(join(ROOT, "server/index.ts"), "utf8");
+    expect(uses("desktopComputer.receive(")).toEqual(["desktop/server/index.ts"]);
+    const index = readFileSync(join(ROOT, "desktop/server/index.ts"), "utf8");
     const listener = index.slice(index.indexOf("utilityParentPort?.on(\"message\""), index.indexOf("const quickFallback"));
     expect(listener).toContain("desktopComputer.receive(message)");
     expect(index.split("desktopComputer.receive(").length - 1).toBe(1);
-    expect(uses("readCuaConnection(")).toEqual(["server/local-computer.ts"]);
-    expect(uses("cua-connection.json")).toEqual(["server/local-computer.ts"]);
+    expect(uses("readCuaConnection(")).toEqual(["desktop/server/local-computer.ts"]);
+    expect(uses("cua-connection.json")).toEqual(["desktop/server/local-computer.ts"]);
   });
 });

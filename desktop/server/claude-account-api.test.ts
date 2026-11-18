@@ -57,7 +57,7 @@ async function idle(id: string) {
 }
 
 beforeAll(async () => {
-  home = mkdtempSync(join(tmpdir(), "omb-claude-account-api-"));
+  home = mkdtempSync(join(tmpdir(), "hezuo-claude-account-api-"));
   dataDir = join(home, ".hezuo");
   mkdirSync(dataDir, { recursive: true });
   cli = join(home, "fixture-claude.mjs");
@@ -107,8 +107,8 @@ await import(${JSON.stringify(pathToFileURL(join(SERVER_DIR, "testing", "fake-cl
       PATH: process.env.PATH,
       ...(process.env.PATHEXT ? { PATHEXT: process.env.PATHEXT } : {}),
       ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}),
-      HOME: home, USERPROFILE: home, OMB_DATA_DIR: dataDir,
-      OMB_PORT: String(port), OMB_WEBHOOK_PORT: String(port + 1), OMB_SSE_HEARTBEAT_MS: "50",
+      HOME: home, USERPROFILE: home, HEZUO_DATA_DIR: dataDir,
+      HEZUO_PORT: String(port), HEZUO_WEBHOOK_PORT: String(port + 1), HEZUO_SSE_HEARTBEAT_MS: "50",
     },
     stdio: ["ignore", "pipe", "pipe"],
   });

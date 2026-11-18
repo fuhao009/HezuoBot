@@ -166,15 +166,15 @@ function replyObject(text: string): unknown {
 
 /** A reply or file that says it is a Grok Bot export (it may still be malformed). */
 export function isGrokExport(value: unknown): boolean {
-  if (typeof value === "string") return value.includes(GROK_EXPORT_FORMAT) || value.includes("openmaus.grok/1") || value.includes(GROK_BUNDLE_FORMAT);
-  return isRecord(value) && (value.format === GROK_EXPORT_FORMAT || value.format === "openmaus.grok/1" || value.format === GROK_BUNDLE_FORMAT);
+  if (typeof value === "string") return value.includes(GROK_EXPORT_FORMAT) || value.includes(GROK_BUNDLE_FORMAT);
+  return isRecord(value) && (value.format === GROK_EXPORT_FORMAT || value.format === GROK_BUNDLE_FORMAT);
 }
 
 /** Forgiving reader for hezuo.grok/1 and grokbot-bundle/v1: text (fenced or not) or an object. */
 export function parseGrokExport(input: unknown): GrokExport {
   const root = typeof input === "string" ? replyObject(input.replace(/^\uFEFF/, "")) : input;
   if (!isRecord(root)) throw new GrokImportError("That is not a Grok Bot export.");
-  const format = root.format === "openmaus.grok/1" ? GROK_EXPORT_FORMAT : root.format;
+  const format = root.format;
   const bundle = format === GROK_BUNDLE_FORMAT;
   if (format !== undefined && format !== GROK_EXPORT_FORMAT && !bundle) throw new GrokImportError("That is not a Grok Bot export.");
   const persona = isRecord(root.persona) ? root.persona : {};

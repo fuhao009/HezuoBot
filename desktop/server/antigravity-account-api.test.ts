@@ -6,11 +6,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
-import { verificationServerEnvironment } from "../../scripts/control-omb.ts";
+import { verificationServerEnvironment } from "../../scripts/control-hezuo.ts";
 import { removeTempDir, waitForExit } from "./testing/cleanup.ts";
 import { freePortBlock } from "./testing/ports.ts";
 
-const ROOT = fileURLToPath(new URL("../..", import.meta.url));
+const ROOT = fileURLToPath(new URL("../../", import.meta.url));
 let child: ChildProcess | undefined;
 let home: string, base: string, cli: string, logPath: string;
 const evidence: unknown[] = [];
@@ -24,7 +24,7 @@ async function api(method: string, path: string, body?: unknown, headers: Record
 async function launch(port: number) {
   const log = openSync(logPath, "a", 0o600);
   try {
-    child = spawn(process.execPath, ["--experimental-strip-types", join(ROOT, "server/index.ts")], {
+    child = spawn(process.execPath, ["--experimental-strip-types", join(ROOT, "desktop/server/index.ts")], {
       cwd: ROOT, env: verificationServerEnvironment({}, home, port), stdio: ["ignore", log, log],
     });
   } finally { closeSync(log); }
@@ -34,22 +34,22 @@ async function launch(port: number) {
   }, { timeout: 20_000, interval: 100 });
 }
 beforeAll(async () => {
-  home = mkdtempSync(join(tmpdir(), "omb-google-accounts-"));
+  home = mkdtempSync(join(tmpdir(), "hezuo-google-accounts-"));
   mkdirSync(join(home, "tmp"));
   const port = await freePortBlock([0, 1]); base = `http://127.0.0.1:${port}`;
-  logPath = join(tmpdir(), `omb-google-accounts-${port}-${process.pid}.log`);
+  logPath = join(tmpdir(), `hezuo-google-accounts-${port}-${process.pid}.log`);
   cli = join(home, "fake-antigravity.mjs");
   writeFileSync(cli, `#!/usr/bin/env node
 process.env.FAKE_ACP_AUTH_METHOD = "oauth-personal";
 process.env.FAKE_ACP_MODELS = "gemini-fixture";
 process.env.FAKE_ACP_AGENT_NAME = "Google Antigravity";
-await import(${JSON.stringify(pathToFileURL(join(ROOT, "server/testing/fake-acp-cli.ts")).href)});
+await import(${JSON.stringify(pathToFileURL(join(ROOT, "desktop/server/testing/fake-acp-cli.ts")).href)});
 `, { mode: 0o755 });
   copyFileSync(cli, join(home, process.platform === "win32" ? "localharness_external.exe" : "localharness_external"));
   mkdirSync(join(tokenPath("google-original"), ".."), { recursive: true });
   writeFileSync(tokenPath("google-original"), "{}");
   writeFileSync(join(home, "config.json"), JSON.stringify({ instances: {
-    fixture: { driver: "claudeAgent", config: { cli: join(ROOT, "server/testing/fake-claude-cli.ts") } },
+    fixture: { driver: "claudeAgent", config: { cli: join(ROOT, "desktop/server/testing/fake-claude-cli.ts") } },
     "google-original": { driver: "antigravityAgent", displayName: "Original Google", config: { cli, fullAuto: true }, environment: { GOOGLE_API_KEY: "synthetic-do-not-copy" } },
   } }));
   await launch(port);

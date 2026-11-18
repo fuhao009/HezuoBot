@@ -23,7 +23,7 @@ afterEach(() => {
 });
 
 function fixture() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "omb-appimage-bundle-test-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "hezuo-appimage-bundle-test-"));
   temporaryDirectories.push(root);
   const resourcesPath = path.join(root, "resources");
   const source = path.join(resourcesPath, "cua-linux-x64");

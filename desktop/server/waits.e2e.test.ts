@@ -1,20 +1,26 @@
+import { randomBytes } from "node:crypto";
 import { mkdtempSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, it } from "vitest";
 
-import { launchVerificationServer, runControlOmb } from "../../scripts/control-omb.ts";
+import { launchVerificationServer, runControlHezuo } from "../../scripts/control-hezuo.ts";
 import { WAIT_MESSAGES } from "./routes/waits.ts";
 import { removeTempDir } from "./testing/cleanup.ts";
 
 async function scout(name: string) {
-  const folder = mkdtempSync(join(tmpdir(), `omb-waits-${name}-`));
+  const folder = mkdtempSync(join(tmpdir(), `hezuo-waits-${name}-`));
   const gate = join(folder, "finish");
-  const fixture = await launchVerificationServer({ FAKE_CLAUDE_MODE: "slow", FAKE_CLAUDE_SLOW_FINISH_GATE: gate });
+  const owner = randomBytes(32).toString("base64url");
+  const fixture = await launchVerificationServer({ HEZUO_TEST_DESKTOP_OWNER_TOKEN: owner,
+    FAKE_CLAUDE_MODE: "slow", FAKE_CLAUDE_SLOW_FINISH_GATE: gate });
   const evidence: unknown[] = [];
+  let ownerSession: string | undefined;
   const api = async (method: string, path: string, body?: unknown, expected = 200, token?: string) => {
     const response = await fetch(fixture.info.url + path, {
-      method, headers: { "content-type": "application/json", origin: fixture.info.url, ...(token ? { authorization: `Bearer ${token}` } : {}) },
+      method, headers: { "content-type": "application/json", origin: fixture.info.url,
+        "x-hezuo-desktop-owner": owner,
+        ...((token ?? ownerSession) ? { authorization: `Bearer ${token ?? ownerSession}` } : {}) },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
     const result = await response.json() as any;
@@ -22,6 +28,11 @@ async function scout(name: string) {
     expect(response.status, JSON.stringify(result)).toBe(expected);
     return result;
   };
+  // Desktop mutation authorization alone does not prove who authored a turn.
+  const pairing = await api("POST", "/api/auth/pairing", { label: "Wait owner fixture", scopes: ["admin", "client"] });
+  const paired = await api("POST", "/api/auth/pair", { code: pairing.code });
+  if (typeof paired.token !== "string") throw new Error("Owner pairing did not return a session token");
+  ownerSession = paired.token;
   const dump = () => JSON.parse(readFileSync(fixture.fixtureDumpPath, "utf8"));
   const turnPrompt = (): string => {
     try {
@@ -32,7 +43,7 @@ async function scout(name: string) {
   const turnToken = async () => {
     let token = "";
     await expect.poll(() => {
-      try { token = dump().mcpConfig.mcpServers.agents.env.OMB_COMMS_TOKEN; } catch { return false; }
+      try { token = dump().mcpConfig.mcpServers.agents.env.HEZUO_COMMS_TOKEN; } catch { return false; }
       return Boolean(token);
     }, { timeout: 15_000 }).toBe(true);
     return token;
@@ -46,7 +57,18 @@ async function scout(name: string) {
   const busy = async () => (await api("GET", "/api/bots?messages=0")).bots.find((candidate: any) => candidate.id === bot.id).busy;
   const settledTurn = () => expect.poll(busy, { timeout: 15_000 }).toBe(false);
   const transcript = async (): Promise<any[]> => (await api("GET", `/api/threads/${bot.threadId}/messages?limit=100`)).messages;
-  const send = (text: string) => runControlOmb(["send", "--bot", bot.id, "--task", bot.threadId, "--text", text, "--url", fixture.info.url]);
+  const send = (text: string) => runControlHezuo(["send", "--bot", bot.id, "--task", bot.threadId, "--text", text, "--url", fixture.info.url], {
+    request: async (path, options = {}, baseUrl) => {
+      const headers = new Headers(options.headers);
+      headers.set("x-hezuo-desktop-owner", owner);
+      headers.set("authorization", `Bearer ${ownerSession}`);
+      headers.set("origin", fixture.info.url);
+      const response = await fetch((baseUrl ?? fixture.info.url) + path, { ...options, headers });
+      const result: unknown = await response.json();
+      if (!response.ok) throw new Error(`Owner fixture request failed (${response.status}): ${JSON.stringify(result)}`);
+      return result;
+    },
+  });
   return { folder, gate, api, bot, busy, settledTurn, transcript, send, turnPrompt, turnToken, close };
 }
 

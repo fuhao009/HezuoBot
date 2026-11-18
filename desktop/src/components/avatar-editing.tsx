@@ -39,6 +39,7 @@ export function AvatarFraming({
   disabled: boolean;
   onPatch: (patch: AvatarPatch) => void;
 }) {
+  const { draft } = useBotEditor();
   const zoom = clampAvatarZoom(bot.avatarZoom ?? AVATAR_ZOOM_MIN);
   const focusX = clampAvatarFocus(bot.avatarFocusX ?? AVATAR_FOCUS_CENTER);
   const focusY = clampAvatarFocus(bot.avatarFocusY ?? AVATAR_FOCUS_CENTER);
@@ -77,7 +78,13 @@ export function AvatarFraming({
         onPointerCancel={endDrag}
         onWheel={onWheel}
       >
-        <BotAvatar bot={bot} size={FRAME_SIZE} animated={false} label={`${bot.name} avatar preview`} />
+        <BotAvatar
+          bot={bot}
+          temporaryPreviewUrl={draft ? bot.avatarUrl ?? undefined : undefined}
+          size={FRAME_SIZE}
+          animated={false}
+          label={`${bot.name} avatar preview`}
+        />
       </div>
       <div className="mb-1.5 mt-4 flex items-baseline justify-between">
         <span className="text-[12px] font-medium uppercase tracking-[0.08em] text-ink-secondary">Zoom</span>

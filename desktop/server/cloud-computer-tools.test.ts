@@ -28,8 +28,8 @@ beforeAll(async () => {
   await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
   const address = server.address();
   if (!address || typeof address === "string") throw new Error("fixture did not bind");
-  vi.stubEnv("OMB_BOAT_API", `http://127.0.0.1:${address.port}`);
-  vi.stubEnv("OMB_CLOUD_BOAT_TOKEN", undefined);
+  vi.stubEnv("HEZUO_BOAT_API", `http://127.0.0.1:${address.port}`);
+  vi.stubEnv("HEZUO_CLOUD_BOAT_TOKEN", undefined);
   tools = await import("./cloud-computer-tools.ts");
 });
 beforeEach(() => { calls.length = 0; holdCommand = false; commandStarted = undefined; });
@@ -83,9 +83,9 @@ describe("cloud computer tools", () => {
   it("returns native-size screenshots as MCP images", async () => {
     const result = await rpc({ method: "tools/call", params: { name: "screenshot", arguments: {} } }).done;
     expect(result).toEqual({ content: [{ type: "image", mimeType: "image/jpeg", data: Buffer.from(jpeg, "base64").toString("base64") }] });
-    expect(calls[0].body.command).toContain("ogb-panel.jpg.model.jpg");
+    expect(calls[0].body.command).toContain("hezuo-panel.jpg.model.jpg");
     expect(calls[0].body.command).not.toContain("-resize");
-    expect(calls[1].path).toContain("ogb-panel.jpg.model.jpg");
+    expect(calls[1].path).toContain("hezuo-panel.jpg.model.jpg");
   });
 
   it.each([

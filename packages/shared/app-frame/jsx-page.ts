@@ -183,8 +183,7 @@ export const JSX_RUNTIME_SOURCE = `(function (env) {
   };
   var run = function () {
     return compile().then(function (code) {
-      // Pre-Hezuo saved JSX imports retain their module name at this read boundary only.
-      var names = wanted(code).map(function (name) { return name === "mausbot" ? "hezuo" : name; });
+      var names = wanted(code);
       var refused = names.filter(function (name) { return MODULES.indexOf(name) === -1; });
       if (refused.length) {
         throw fail("import", "It imports " + refused.join(", ") + ". A page can import only " + MODULES.join(", ") + ".");
@@ -204,7 +203,6 @@ export const JSX_RUNTIME_SOURCE = `(function (env) {
       Object.keys(ready.loaded).forEach(function (name) { modules[name] = wrap(ready.loaded[name]); });
       modules.hezuo = shellModule(React, ready.loaded.echarts);
       var require = function (name) {
-        if (name === "mausbot") name = "hezuo";
         if (!Object.prototype.hasOwnProperty.call(modules, name)) throw fail("import", "It imports " + name + ", which isn't loaded.");
         return modules[name];
       };

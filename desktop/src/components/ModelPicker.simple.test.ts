@@ -989,7 +989,7 @@ describe("every capability of the picker stays reachable", () => {
     fixture.advanced = advanced;
     fixture.instances = rich();
     const forBot = followed();
-    window.ogb = { remoteClient: { active: true } } as NonNullable<Window["ogb"]>;
+    window.hezuo = { remoteClient: { active: true } } as NonNullable<Window["hezuo"]>;
     try {
       const html = menu(open(forBot).html);
       expect(html).toContain("Sonnet 5.5");
@@ -1003,7 +1003,7 @@ describe("every capability of the picker stays reachable", () => {
         expect(band).not.toContain('role="separator"');
       }
     } finally {
-      delete window.ogb;
+      delete window.hezuo;
     }
   });
 

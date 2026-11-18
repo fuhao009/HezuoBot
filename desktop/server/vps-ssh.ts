@@ -16,7 +16,7 @@ function controlDirectory(sshDir: string): string {
   const uid = process.getuid!();
   const id = createHash("sha256").update(resolve(sshDir)).digest("hex").slice(0, 12);
   // /tmp, not tmpdir(): macOS TMPDIR is often too long for a control socket. Validated first so a symlink or another user's dir cannot redirect it.
-  const dir = `/tmp/omb-ssh-${uid}-${id}`;
+  const dir = `/tmp/hezuo-ssh-${uid}-${id}`;
   try { mkdirSync(dir, { mode: 0o700 }); }
   catch (error) { if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error; }
   const stat = lstatSync(dir);

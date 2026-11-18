@@ -331,7 +331,7 @@ describe("cloud computer power", () => {
       ],
     }));
     await power.armRunning();
-    expect(fake.listManagedBoats).toHaveBeenCalledWith(expect.anything(), [], { adoptLegacy: false });
+    expect(fake.listManagedBoats).toHaveBeenCalledWith(expect.anything(), [], { reconcileRecords: false });
     await vi.advanceTimersByTimeAsync(10 * MINUTE - 1);
     expect(sleeps()).toEqual([]);
     await vi.advanceTimersByTimeAsync(1);

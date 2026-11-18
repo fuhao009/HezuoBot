@@ -15,12 +15,6 @@ remote client.
 
 ## Three layers
 
-1. **Welcome flow** (`desktop/src/components/onboarding/WelcomeFlow.tsx`). One
-   card that morphs between beats with the View Transitions API, with the
-   mascot as a single guide. Beats, in order: hello, reel, engines,
-   permissions (only when dictation is available), phone, meet your bot.
-   The order is pure logic in `desktop/src/lib/onboarding.ts` (`beatsFor`,
-   `nextBeat`, `previousBeat`) and unit-tested.
 2. **Feature reel** (`desktop/src/components/onboarding/reel/`). Six scenes drawn
    in code, each a small timeline that reports mascot cues and its own end:
    agents, hands, apps, channels, automations, terminal. Drawing them
@@ -96,14 +90,13 @@ sweep, and beats swap without the view transition.
   `guided-tour.test.ts`, `first-conversation.test.ts`, and the config merge
   in `desktop/server/config.test.ts`.
 - The tour was walked end to end in headless Chrome against the isolated
-  fixture (`node --experimental-strip-types scripts/control-omb.ts launch`)
+  fixture (`node --experimental-strip-types scripts/control-hezuo.ts launch`)
   with a screenshot per step. Note that the record is per workspace, so a
   second client on the same server runs the same tour and skips steps it
   cannot see; test from one window.
 
 ## Out of scope
 
-- Phone and native clients: they see nothing from this branch.
 - A skin picker inside the welcome flow.
 - Per-user onboarding state (prepared for `feat/rbac-users`, moved there).
 - The CLI setup wizard in `desktop/server/cli-setup.ts`.

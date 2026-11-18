@@ -12,7 +12,7 @@ function preload({ origin = LOCAL, managed = true, invoked = [] } = {}) {
   let bridge;
   const stateListeners = new Map();
   vm.runInNewContext(PRELOAD, {
-    process: { platform: "darwin", argv: [`--omb-local-origin=${LOCAL}`, ...(managed ? ["--omb-product-managed=1"] : []), "--omb-app-version=0.1.140"] },
+    process: { platform: "darwin", argv: [`--hezuo-local-origin=${LOCAL}`, ...(managed ? ["--hezuo-product-managed=1"] : []), "--hezuo-app-version=0.1.140"] },
     location: { origin }, navigator: { userActivation: { isActive: false } }, TextEncoder,
     localStorage: { getItem: () => null },
     require: () => ({

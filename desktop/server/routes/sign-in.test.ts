@@ -86,16 +86,20 @@ function internalDispatch(factory: string): { call: ts.CallExpression; before: s
   const text = readFileSync(new URL("../index.ts", import.meta.url), "utf8");
   const source = ts.createSourceFile("index.ts", text, ts.ScriptTarget.Latest, true);
   const calls: ts.CallExpression[] = [];
+  const entries: ts.IfStatement[] = [];
   function visit(node: ts.Node) {
     if (ts.isCallExpression(node) && node.expression.getText(source) === factory) calls.push(node);
+    if (ts.isIfStatement(node) && node.expression.getText(source) === 'path.startsWith("/api/internal/")') entries.push(node);
     ts.forEachChild(node, visit);
   }
   visit(source);
   expect(calls).toHaveLength(1);
+  expect(entries).toHaveLength(1);
+  expect(entries[0]!.thenStatement.getText(source)).toMatch(/^return\s+await\s+dispatchInternalRequest\(\);?$/);
   const call = calls[0]!;
   let enclosing: ts.Node | undefined = call.parent;
-  while (enclosing && !(ts.isIfStatement(enclosing) && enclosing.expression.getText(source) === 'path.startsWith("/api/internal/")')) enclosing = enclosing.parent;
-  expect(enclosing, `${factory} must not move into the global route table`).toBeDefined();
+  while (enclosing && !(ts.isFunctionDeclaration(enclosing) && enclosing.name?.text === "dispatchInternalRequest")) enclosing = enclosing.parent;
+  expect(enclosing, `${factory} must stay inside the internal capability-gated dispatcher`).toBeDefined();
   return { call, before: text.slice(enclosing!.getStart(source), call.getStart(source)), source };
 }
 

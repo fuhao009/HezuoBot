@@ -50,7 +50,7 @@ function entry(packageId: string, rel: { document: any; bytes: string; sha256: s
 }
 
 function catalog(packages: unknown[], extra: Record<string, unknown> = {}) {
-  return { format: "openmaus.org-library", version: 1, libraryVersion: 3, organization: { id: ORG, name: "Customer Co" }, packages, ...extra };
+  return { format: "hezuo.org-library", version: 1, libraryVersion: 3, organization: { id: ORG, name: "Customer Co" }, packages, ...extra };
 }
 
 function relay(body: unknown, overrides: Record<string, unknown> = {}) {
@@ -59,7 +59,7 @@ function relay(body: unknown, overrides: Record<string, unknown> = {}) {
 }
 
 function snapshot(): string {
-  const copy = mkdtempSync(join(tmpdir(), "omb-org-library-crash-"));
+  const copy = mkdtempSync(join(tmpdir(), "hezuo-org-library-crash-"));
   homes.push(copy);
   cpSync(home, copy, { recursive: true });
   return copy;
@@ -70,13 +70,13 @@ async function installation(from?: string) {
     (await import("./message-db.ts")).closeMessageDb();
     home = from;
   } else {
-    home = mkdtempSync(join(tmpdir(), "omb-org-library-"));
+    home = mkdtempSync(join(tmpdir(), "hezuo-org-library-"));
     homes.push(home);
   }
   vi.resetModules();
   vi.stubEnv("HOME", home);
   vi.stubEnv("USERPROFILE", home);
-  vi.stubEnv("OMB_DATA_DIR", join(home, ".hezuo"));
+  vi.stubEnv("HEZUO_DATA_DIR", join(home, ".hezuo"));
   const { Store } = await import("./store.ts");
   const { RoutineManager } = await import("./routines.ts");
   const skills = await import("./skills.ts");
@@ -258,7 +258,7 @@ describe("adding from the shelf", () => {
     if (!outcome.ok || outcome.value.alreadyAdded) throw new Error(JSON.stringify(outcome));
     expect(outcome.status).toBe(201);
     const result = outcome.value.result;
-    const installId = createHash("sha256").update(`omb-install:v1\n${ADMIN}\n${ORG}\n${TEAM_ID}`).digest("hex").slice(0, 32);
+    const installId = createHash("sha256").update(`hezuo-install:v1\n${ADMIN}\n${ORG}\n${TEAM_ID}`).digest("hex").slice(0, 32);
     expect(result.installId).toBe(installId);
     const byKey = new Map(result.bots.map((bot) => [bot.installedPackage!.agentKey, app.store.bot(bot.id)!]));
     const scout = byKey.get("scout")!;

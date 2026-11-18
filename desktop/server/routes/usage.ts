@@ -14,7 +14,7 @@ import {
 import { DETAIL_MAX, ERROR_MAX } from "../usage-trace/detail.ts";
 import type { ToolReceipt, TraceRecorder } from "../usage-trace/recorder.ts";
 import { createTraceService, PAGE_MAX, type TraceServiceDeps } from "../usage-trace/service.ts";
-import { PASS, type RouteHandler } from "./table.ts";
+import { PASS, type RouteHandler, type InternalRouteHandler } from "./table.ts";
 
 export interface UsageRouteDeps {
   dataDir: string;
@@ -97,7 +97,7 @@ const MAX_TOOL_MS = 24 * 60 * 60_000;
 const MAX_SKEW_MS = 24 * 60 * 60_000;
 
 /** A receipt from the agents tools for one call this turn's capability made: OMB's own timing of the tools it serves. */
-export function createToolTimingRoute(recorder: Pick<TraceRecorder, "receipt">, threadId: string): RouteHandler {
+export function createToolTimingRoute(recorder: Pick<TraceRecorder, "receipt">, threadId: string): InternalRouteHandler {
   return async ({ req, res, path, method, json, readBody }) => {
     if (!(method === "POST" && path === "/api/internal/tool-timing")) return PASS;
     let body: unknown;

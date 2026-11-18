@@ -1,8 +1,7 @@
 // pnpm build:server
 // pnpm exec electron scripts/smoke-login-handoff.cjs
-// Send to My Cloud's secret path in real Electron: main asks the packaged server, forked as a utility process, for a saved
-// login over the private utility port (desktop/electron/cloud-logins.mjs, desktop/server/login-handoff.ts), exactly as cloud-send-main.mjs
-// does. Disposable home, fake engine; obvious fake secrets, never printed.
+// Ask the packaged server for a saved login over Electron's private utility-process port.
+// Disposable home and fake engine; fake secrets are never printed.
 const { app, utilityProcess } = require("electron");
 const assert = require("node:assert/strict");
 const { randomBytes } = require("node:crypto");
@@ -15,7 +14,7 @@ const { once } = require("node:events");
 const { setTimeout: delay } = require("node:timers/promises");
 
 const root = resolve(__dirname, "..");
-const home = mkdtempSync(join(tmpdir(), "omb-login-handoff-smoke-"));
+const home = mkdtempSync(join(tmpdir(), "hezuo-login-handoff-smoke-"));
 app.setPath("userData", join(home, "electron"));
 const owner = randomBytes(32).toString("base64url");
 const password = `fake-handoff-${randomBytes(6).toString("hex")}`;
@@ -41,14 +40,14 @@ async function until(check) {
 }
 
 app.whenReady().then(async () => {
-  const { createLoginHandoffClient } = await import(pathToFileURL(join(root, "desktop/electron/cloud-logins.mjs")).href);
+  const { createLoginHandoffClient } = await import(pathToFileURL(join(root, "desktop/electron/login-handoff-client.mjs")).href);
   const port = await freePort();
   writeFileSync(join(home, "config.json"), JSON.stringify({ instances: {
     claude: { driver: "claudeAgent", config: { cli: join(root, "desktop/server/testing/fake-claude-cli.ts") } },
   } }));
   harness = utilityProcess.fork(join(root, "dist-server/index.js"), [], { cwd: root, stdio: "pipe", env: {
-    HOME: home, USERPROFILE: home, OMB_DATA_DIR: home, PATH: "", OMB_PORT: String(port), OMB_WEBHOOK_PORT: String(await freePort()),
-    OMB_DESKTOP_PARENT: "1", ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}),
+    HOME: home, USERPROFILE: home, HEZUO_DATA_DIR: home, PATH: "", HEZUO_PORT: String(port), HEZUO_WEBHOOK_PORT: String(await freePort()),
+    HEZUO_DESKTOP_PARENT: "1", ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}),
   } });
   harness.stdout.on("data", (chunk) => { logs += chunk; });
   harness.stderr.on("data", (chunk) => { logs += chunk; });
@@ -80,7 +79,7 @@ app.whenReady().then(async () => {
   console.error(error);
   process.exitCode = 1;
 }).finally(async () => {
-  const evidence = join(tmpdir(), `omb-login-handoff-${Date.now()}.log`);
+  const evidence = join(tmpdir(), `hezuo-login-handoff-${Date.now()}.log`);
   writeFileSync(evidence, logs.replaceAll(owner, "[redacted]").replaceAll(password, "[redacted]"));
   console.log(`Fixture log: ${evidence}`);
   if (harness?.pid) {

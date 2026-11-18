@@ -1,20 +1,23 @@
-# 客户端设备、桌面中继与推送 API
+# 客户端设备与桌面中继 API
 
-本文面向桌面和原生手机客户端。账号登录及 AI 调用见 [客户端 API 总览](gateway-client-api.md)。以下契约按仓库实现编写；示例 UUID、时间和凭据均为占位值，不是可用账号或生产响应。
+> 范围：手机端（iOS/Android 原生工程）已退役，不再作为活跃开发、发布或验收对象。本文保留桌面安装、隧道、通用 relay 与电脑配对契约；本地 APNs 实现已删除，不再提供 APNs 兼容协议。本轮退役变更尚未部署到 193，不得据此声称线上已删除手机/APNs 能力。
+
+
+本文面向桌面和网关维护者，以及通用远程客户端的接入开发者。账号登录及 AI 调用见 [客户端 API 总览](gateway-client-api.md)。以下契约按仓库实现编写；示例 UUID、时间和凭据均为占位值，不是可用账号或生产响应。
 
 ## 1. 部署与凭据边界
 
-- **账号 bearer**：登录获得，用于列出、创建、轮换和撤销本人桌面安装，以及手机访问本人桌面。
-- **安装凭据**：`omb_install_<lookup>.<secret>`，仅桌面/宿主持有，用于 `self`、托管端点、推送及桌面隧道握手。账号 bearer 与安装凭据不可互换。
-- **原生手机不得为了连接而注册桌面安装**，也不得伪装为 `darwin`、`windows` 或 `linux`。手机持账号会话，选择同账号已注册的桌面即可。
+- **账号 bearer**：登录获得，用于列出、创建、轮换和撤销本人桌面安装，以及远程客户端访问本人桌面。
+- **安装凭据**：`hezuo_install_<lookup>.<secret>`，仅桌面/宿主持有，用于 `self`、托管端点及桌面隧道握手。账号 bearer 与安装凭据不可互换。
+- **远程客户端不得为了连接而注册桌面安装**，也不得伪装为 `darwin`、`windows` 或 `linux`。远程客户端持账号会话，选择同账号已注册的桌面即可；这是通用 relay 的凭据边界，不是恢复原生手机接入的说明。
 - 本地 Node 网关提供 `/v1/companion/relay` 及 `/v1/companion/:installationId/*`。只有控制平面 Worker 的部署没有这两个数据平面入口，不能把 Worker 域名当作 Node 中继地址。托管 Cloudflare endpoint 是另一条部署路径，不是 Node 中继的前置条件。
-- [当前远端部署](gateway-deployment-193.md)的网关地址为 `https://192.168.66.193:18487`。此本地 Node 部署**没有配置托管 Cloudflare Tunnel 或 APNs**，不要因接口存在就显示已开通：端点 `POST`/`DELETE` 缺配置返回 `503 endpoint_unavailable`；端点 `GET` 仍可查询数据库（未分配时为 `null`）；推送 `register`/`send` 缺配置返回 `503 push_unavailable`。`unregister` 实现不检查 APNs 配置，仍可删除本安装注册记录并返回 `204`。
+- [当前远端部署](gateway-deployment-193.md)的网关地址为 `https://192.168.66.193:18487`。此 Node 部署没有配置托管 Cloudflare Tunnel，不要因接口存在就显示已开通：端点 `POST`/`DELETE` 缺配置返回 `503 endpoint_unavailable`；端点 `GET` 仍可查询数据库（未分配时为 `null`）。本地 APNs 实现已删除，193 尚未部署本轮退役变更；线上能力以部署记录为准。
 
 ### TLS 信任和调用准备
 
-手机必须能路由到网关地址；手机上的 `127.0.0.1` 是手机本身。当前远端是内网地址，不表示公网可达。使用可验证的 HTTPS，或从可信运维渠道取得并显式信任网关 PEM 证书；不要关闭 TLS 校验。
+远程客户端必须能路由到网关地址；远程客户端上的 `127.0.0.1` 是远程客户端本身。当前远端是内网地址，不表示公网可达。使用可验证的 HTTPS，或从可信运维渠道取得并显式信任网关 PEM 证书；不要关闭 TLS 校验。
 
-当前部署的证书位于服务器 `/var/lib/hezuo-gateway/tls/gateway-cert.pem`；本机证书副本路径见部署文档。手机可在网关设置粘贴证书或安装该 CA。桌面绑定同一个网关 origin 和 CA；证书域名/IP 校验仍须成功。证书公钥可交付客户端，**私钥永不交付**。
+当前部署的证书位于服务器 `/var/lib/hezuo-gateway/tls/gateway-cert.pem`；本机证书副本路径见部署文档。远程客户端可在网关设置粘贴证书或安装该 CA。桌面绑定同一个网关 origin 和 CA；证书域名/IP 校验仍须成功。证书公钥可交付客户端，**私钥永不交付**。
 
 下文 shell 示例假定已安全设置变量；不要把真实 bearer 写进文档、代码、截图、遥测、URL、shell 历史或共享日志：
 
@@ -91,7 +94,7 @@ curl --cacert "$CA" -X POST "$GATEWAY/v1/installations" \
     "updatedAt": 1800000000000,
     "lastSeenAt": null
   },
-  "credential": "omb_install_<22-char-base64url>.<43-char-base64url>",
+  "credential": "hezuo_install_<22-char-base64url>.<43-char-base64url>",
   "credentialExpiresAt": 1807776000000
 }
 ```
@@ -141,7 +144,7 @@ curl --cacert "$CA" -X POST \
 
 ```json
 {
-  "credential": "omb_install_<new-22-char-base64url>.<new-43-char-base64url>",
+  "credential": "hezuo_install_<new-22-char-base64url>.<new-43-char-base64url>",
   "createdAt": 1800000060000,
   "credentialExpiresAt": 1807776060000
 }
@@ -191,25 +194,25 @@ Sec-WebSocket-Key: <WebSocket library generated key>
 
 单帧 payload 最大 64 KiB，解码器缓存上限 1 MiB；帧可跨 WebSocket message 分片，也可在一个 message 中连续携带多个帧。网关分配 stream ID（1 起，32 位回绕），发送空 payload 的 `OPEN`；桌面为该流连接本次启动的私有 companion origin。`DATA` 承载原始 HTTP/1.1 请求/响应字节（包括 SSE 和升级后的 WebSocket 流量），不是 JSON/base64；`END` 结束写入，`RESET` 中止流。协议实现和具体分块行为以链接源码为准，不可将整个 HTTP 请求随意包装成一个超限 DATA 帧。
 
-**生命周期注意**：网关只在桌面握手时验证安装凭据，没有承诺到期/撤销会主动踢掉已建立的桌面隧道；手机每个新请求仍会验证账号会话及当前安装归属，撤销后不再通过归属检查。手机 WS 升级后的字节流也不是逐消息重新鉴权。退出、轮换、撤销或切换账号时，客户端应关闭旧连接，不应把长连接视为凭据永久有效的证明。
+**生命周期注意**：网关只在桌面握手时验证安装凭据，没有承诺到期/撤销会主动踢掉已建立的桌面隧道；远程客户端每个新请求仍会验证账号会话及当前安装归属，撤销后不再通过归属检查。远程客户端 WS 升级后的字节流也不是逐消息重新鉴权。退出、轮换、撤销或切换账号时，客户端应关闭旧连接，不应把长连接视为凭据永久有效的证明。
 
-## 4. 手机 HTTP / WebSocket 调用桌面
+## 4. 远程客户端 HTTP / WebSocket 调用桌面
 
-手机先在**同一网关、同一账号**登录，通过安装列表取得桌面 UUID。基础地址是：
+远程客户端先在**同一网关、同一账号**登录，通过安装列表取得桌面 UUID。基础地址是：
 
 ```text
 https://192.168.66.193:18487/v1/companion/<installation UUID>
 ```
 
-每次 HTTP 请求及 WS 升级均发送 `Authorization: Bearer <account token>`。网关并行查 `/v1/me` 和 `/v1/installations` 校验会话、安装归属及桌面平台，再查在线隧道。既不需要配对码、二维码或 iOS handoff，也不把安装凭据交给手机。companion 仍执行自身 allowlist，不是管理接口或任意 harness 代理；同账号设备默认不因此取得 cloud desktop/browser control 能力。
+每次 HTTP 请求及 WS 升级均发送 `Authorization: Bearer <account token>`。网关并行查 `/v1/me` 和 `/v1/installations` 校验会话、安装归属及桌面平台，再查在线隧道。既不需要配对码、二维码或 iOS handoff，也不把安装凭据交给远程客户端。companion 仍执行自身 allowlist，不是管理接口或任意 harness 代理；同账号设备默认不因此取得 cloud desktop/browser control 能力。
 
 ### 路径、健康与流
 
 - `/v1/companion/:id` 和 `/v1/companion/:id/` 均转为桌面的 `/`；companion 不提供桌面网页，`/` 不是健康检查。
 - 前缀精确小写 `/v1/companion/`，ID 是 UUID，内部转小写；剥离该前缀和 ID，保留后续路径及 query。错误格式路径不会进入中继，会落到普通网关路由。不要把 `clientInstanceId` 当作 UUID。
-- 网关健康检查是无鉴权 `GET /healthz`，基础成功响应 `200 {"ok":true,"service":"openmausbot-control-plane"}`；配置允许时可附 `capacity`。鉴权配置错误为 `503 {"error":"misconfigured"}`。**它不证明任何桌面在线，也不证明 Cloudflare/APNs/AI 已就绪。**
+- 网关健康检查是无鉴权 `GET /healthz`，基础成功响应 `200 {"ok":true,"service":"hezuobot-control-plane"}`；配置允许时可附 `capacity`。鉴权配置错误为 `503 {"error":"misconfigured"}`。**它不证明任何桌面在线，也不证明 Cloudflare/AI 已就绪。**
 - 桌面端健康检查是经中继 `GET /api/health`；虽然 companion 本身允许公开健康路径，网关前缀仍要求账号鉴权和归属。正常 `200 {"app":"hezuo"}`，不会泄露 harness pid 等字段。
-- `/api/events` 是 SSE，不是 WebSocket。WS 路径由 companion 的实际业务/查看器会话返回，网关不另设通用手机 WS 路径；应在返回的路径前加当前安装中继前缀，并在升级头中带账号 bearer。不能向桌面专用 `/v1/companion/relay` 发送手机业务消息。
+- `/api/events` 是 SSE，不是 WebSocket。WS 路径由 companion 的实际业务/查看器会话返回，网关不另设通用远程客户端 WS 路径；应在返回的路径前加当前安装中继前缀，并在升级头中带账号 bearer。不能向桌面专用 `/v1/companion/relay` 发送远程客户端业务消息。
 - 原生客户端不发送 `Origin`；companion 拒绝带 Origin 的请求/升级。不要把这套原生连接方式直接放进浏览器：浏览器原生 WebSocket API 也不能自定义 Authorization 头。
 
 ```sh
@@ -227,7 +230,7 @@ curl --cacert "$CA" -N \
   -H "Authorization: Bearer $ACCOUNT_TOKEN"
 ```
 
-手机 WS 握手结构（`<returned companion WS path>` 必须是实际会话返回的路径，不是字面占位端点）：
+远程客户端 WS 握手结构（`<returned companion WS path>` 必须是实际会话返回的路径，不是字面占位端点）：
 
 ```http
 GET /v1/companion/<installation UUID>/<returned companion WS path> HTTP/1.1
@@ -240,7 +243,7 @@ Sec-WebSocket-Key: <WebSocket library generated key>
 
 ### 中继错误处理
 
-手机 HTTP 的**网关中继层**错误使用嵌套形状，例如：
+远程客户端 HTTP 的**网关中继层**错误使用嵌套形状，例如：
 
 ```json
 {"error":{"code":"desktop_offline","message":"desktop_offline"}}
@@ -279,48 +282,11 @@ curl --cacert "$CA" -X DELETE "$GATEWAY/v1/installations/self/endpoint" \
 - POST：成功 `200 {"endpoint":{...},"connectorToken":"<secret>"}`。无 body 或空 body 合法；非空 body 需 JSON，仅可选 printable `appVersion`（trim 后 1–64 字符）。token 只在 tunnel 配置和 DNS 就绪后取得，直接写入 OS 安全凭据库，不在 UI/日志显示，不能从 GET 恢复。接口没有给出固定 connector token TTL，不能假定等于安装凭据 90 天。
 - DELETE：完成/已删除为 `204` 空体；部分提供者清理失败 `503 endpoint_cleanup_pending`；忙为 `409 endpoint_busy`、`Retry-After: 2`。
 - 分配每安装每小时 20 次，删除 30 次；容量不足 `503 endpoint_capacity`、`Retry-After: 600`，提供者限流 `503 endpoint_rate_limited`、`Retry-After` 30–300 秒（缺省 60），其他提供者失败 `502 endpoint_unavailable`。这些与缺部署配置的 `503 endpoint_unavailable` 应结合状态处理。
-- 回收后 POST 可在同一 hostname 后重建 tunnel。端点拥有者和安全清理规则、15 分钟 GET 对账/账号恢复策略以权威详细文档为准，不在手机中实现提供者分配。
+- 回收后 POST 可在同一 hostname 后重建 tunnel。端点拥有者和安全清理规则、15 分钟 GET 对账/账号恢复策略以权威详细文档为准，不在远程客户端中实现提供者分配。
 
-## 6. 手机推送 register / unregister / send
+## 6. 控制平面通用失败与安全处理
 
-完整 APNs 配置、payload、提供者错误映射见 **[Phone push relay](../gateway/control-plane/README.md#phone-push-relay)**；精确 schema/返回值以 [push.ts](../gateway/control-plane/src/push.ts) 为准。[iOS companion](ios-companion.md)描述手机和宿主集成。**这里的调用者是持安装凭据的桌面/宿主，不是持账号会话的原生手机**；手机把 APNs token 通过其 companion 业务流程交给宿主，不能因此持有安装凭据。
-
-三个方法均为 `POST`、`application/json`、安装 bearer，严格对象；所有 token 均须为 **64–200 个小写十六进制字符**。以下是格式有效的虚构 token：
-
-```sh
-PUSH_TOKEN='0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
-
-# 成功：200 {"registered":true}
-curl --cacert "$CA" -X POST "$GATEWAY/v1/installations/self/push/register" \
-  -H "Authorization: Bearer $INSTALL_CREDENTIAL" \
-  -H 'Content-Type: application/json' \
-  --data "{\"v\":1,\"token\":\"$PUSH_TOKEN\",\"environment\":\"production\"}"
-
-# 成功：202 {"sent":true}
-curl --cacert "$CA" -X POST "$GATEWAY/v1/installations/self/push/send" \
-  -H "Authorization: Bearer $INSTALL_CREDENTIAL" \
-  -H 'Content-Type: application/json' \
-  --data "{\"v\":1,\"token\":\"$PUSH_TOKEN\",\"notification\":{\"kind\":\"approval\",\"title\":\"需要你的确认\",\"botId\":\"bot-1\",\"botName\":\"助手\",\"threadId\":\"thread-1\"}}"
-
-# 成功：204 空体（幂等删除）
-curl --cacert "$CA" -X POST "$GATEWAY/v1/installations/self/push/unregister" \
-  -H "Authorization: Bearer $INSTALL_CREDENTIAL" \
-  -H 'Content-Type: application/json' \
-  --data "{\"v\":1,\"token\":\"$PUSH_TOKEN\"}"
-```
-
-精确字段：
-
-- register：`{v:1, token, environment:"production"|"sandbox"}`，重复注册更新环境；环境不在部署允许列表为 `400 push_environment_not_allowed`。每安装最多 50 token（`409 push_device_limit`），每小时 120 次注册。
-- unregister：`{v:1, token}`；未知 token 也是 `204`。**实现没有 APNs 配置检查**，所以不要套用旧详细文档“所有 push 路由缺配置均 503”的概括到 unregister。
-- send：`{v:1, token, pairing?, notification:{kind,title,botId,botName,threadId,roomId?,roomName?}}`。`pairing` 正则 `^[A-Za-z0-9_-]{8,64}$`；`kind` 为 `^[a-z][a-z-]{0,39}$`；所有 ID 为 `^[\w-]{1,120}$`；`title` 1–200 Unicode 字符，名称 1–80，无首尾空白、控制字符或 U+2028/U+2029。其他字段一律拒绝（例如 `body`、消息正文），不得把聊天文本送到 Apple。
-- send 只接受**本安装已注册**的 token；否则 `404 push_device_unknown`，宿主可重新注册后重试一次。APNs 已判失效为 `410 push_device_unregistered`，宿主应丢弃记录，等待手机新注册。
-- 每安装每小时 600 次发送、每 token 每小时 60 次；超限/APNs 限流为 `429 rate_limited`、`Retry-After: 60`。无/无效 APNs 配置或提供者鉴权失败为 `503 push_unavailable`，其他发送失败为 `502 push_failed`。现有宿主对不可用配置退避一小时。
-- APNs token 不由网关签发，无固定 90 天有效期；按手机更新和 APNs 失效响应处理。撤销安装删除其注册。Apple 通知设置 24 小时 expiration，这不是手机 token 或安装凭据有效期。APNs 签名私钥、team/key 配置永远只在部署端。
-
-## 7. 控制平面通用失败与安全处理
-
-与中继嵌套错误不同，上述安装、endpoint、push 控制平面错误为：
+与中继嵌套错误不同，上述安装、endpoint 控制平面错误为：
 
 ```json
 {"error":"unauthorized"}
@@ -328,4 +294,4 @@ curl --cacert "$CA" -X POST "$GATEWAY/v1/installations/self/push/unregister" \
 
 通用：缺/错凭据 `401 unauthorized`；严格 schema/坏 JSON `400 invalid_request`；非 JSON 媒体类型 `415 unsupported_media_type`；默认控制平面请求体上限 16 KiB，超限 `413 request_too_large`；未匹配的路径或方法通常 `404 not_found`，不保证 `405`。带浏览器 Origin 的请求受精确 allowlist 约束，未允许为 `403 origin_not_allowed`。控制平面提供 `x-request-id` 可用于排错，不记录敏感请求体/凭据。
 
-安装凭据到期前用有效账号会话轮换；到期后 `self` 返回 401 不表示应注册重复安装。账号会话的有效期/退出行为由登录契约决定，不等于安装 90 天；模型凭据也不是这里可用的认证材料。凭据持久化用平台安全存储，不用普通前端存储或 URL；诊断时只记录状态、稳定错误码与请求 ID。重试遵守 `Retry-After`，对于响应丢失的创建、轮换、写入或发送，不假定请求没有执行。
+安装凭据到期前用有效账号会话轮换；到期后 `self` 返回 401 不表示应注册重复安装。账号会话的有效期/退出行为由登录契约决定，不等于安装 90 天；模型凭据也不是这里可用的认证材料。凭据持久化用平台安全存储，不用普通前端存储或 URL；诊断时只记录状态、稳定错误码与请求 ID。重试遵守 `Retry-After`，对于响应丢失的创建、轮换或写入，不假定请求没有执行。

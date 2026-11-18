@@ -36,7 +36,7 @@ delete (RUNTIME_LIVE_ROW as { finishedAt?: unknown }).finishedAt;
 delete (RUNTIME_LIVE_ROW as { question?: unknown }).question;
 const scratch: string[] = [];
 function directory(): string {
-  const path = mkdtempSync(join(tmpdir(), "omb-workspace-backup-"));
+  const path = mkdtempSync(join(tmpdir(), "hezuo-workspace-backup-"));
   scratch.push(path);
   return path;
 }
@@ -91,10 +91,10 @@ function fixture(root: string): DatabaseSync {
 function encryptedPayload(root: string, plaintext: Buffer): string {
   const salt = randomBytes(16);
   const iv = randomBytes(12);
-  const header = Buffer.concat([Buffer.from("OMB-WORKSPACE-1\n"), salt, iv]);
+  const header = Buffer.concat([Buffer.from("HEZUO-WORKSPACE-1\n"), salt, iv]);
   const cipher = createCipheriv("aes-256-gcm", scryptSync(PASSWORD, salt, 32, { N: 131_072, r: 8, p: 1, maxmem: 256 * 1024 ** 2 }), iv);
   cipher.setAAD(header);
-  const path = join(root, "malicious.ombbackup");
+  const path = join(root, "malicious.hezuobackup");
   writeFileSync(path, Buffer.concat([header, cipher.update(plaintext), cipher.final(), cipher.getAuthTag()]));
   return path;
 }
@@ -106,7 +106,7 @@ function tarEntry(path: string, type: "File" | "Directory" | "SymbolicLink" | "L
   return Buffer.concat([block, body, Buffer.alloc((512 - body.length % 512) % 512)]);
 }
 function caseSensitiveTempFolder(): boolean {
-  const probe = mkdtempSync(join(tmpdir(), "omb-case-probe-"));
+  const probe = mkdtempSync(join(tmpdir(), "hezuo-case-probe-"));
   try {
     writeFileSync(join(probe, "probe"), "");
     return !existsSync(join(probe, "PROBE"));
@@ -163,7 +163,7 @@ describe("encrypted full workspace backups", () => {
       const originalRuntimeDb = readFileSync(join(source, "runtime.db"));
       const exported = await createWorkspaceBackup(source, {
         password: PASSWORD, appVersion: "test",
-        clientState: { "omb-drafts": '{"thread":"unsent"}', "omb-draft-attachments": JSON.stringify({ thread: [{ kind: "file", path: join(source, "attachments", "image.png") }] }) },
+        clientState: { "hezuo-drafts": '{"thread":"unsent"}', "hezuo-draft-attachments": JSON.stringify({ thread: [{ kind: "file", path: join(source, "attachments", "image.png") }] }) },
       });
       expect(exported.summary).toMatchObject({ bots: 1, groups: 1, threads: 1, messages: 1 });
       expect(exported.summary).not.toHaveProperty("includesCredentials");
@@ -256,7 +256,7 @@ describe("encrypted full workspace backups", () => {
       const receipt = readLastWorkspaceRestore(target)!;
       expect(receipt.id).toBe(staged.id);
       expect(receipt).not.toHaveProperty("credentials");
-      expect(JSON.parse(receipt.clientState!["omb-draft-attachments"]).thread[0].path).toBe(join(target, "attachments", "image.png"));
+      expect(JSON.parse(receipt.clientState!["hezuo-draft-attachments"]).thread[0].path).toBe(join(target, "attachments", "image.png"));
       expect(applyPendingWorkspaceRestore(target)).toEqual({ restored: false });
       if (process.platform !== "win32") {
         expect(statSync(exported.path).mode & 0o777).toBe(0o600);
@@ -351,7 +351,7 @@ describe("encrypted full workspace backups", () => {
     expect(readdirSync(join(target, ".backups"))).toEqual([]);
     const corrupted = readFileSync(exported.path);
     corrupted[corrupted.length - 1] ^= 1;
-    const path = join(source, "corrupted.ombbackup");
+    const path = join(source, "corrupted.hezuobackup");
     writeFileSync(path, corrupted);
     await expect(stageWorkspaceBackup(target, path, { password: PASSWORD })).rejects.toThrow(/damaged/);
     expect(readFileSync(join(target, "untouched"), "utf8")).toBe("original");
@@ -368,7 +368,7 @@ describe("encrypted full workspace backups", () => {
       "caddy/data/private.key", "chrome-profile/Cookies", ".agent-browser/auth.json",
       `${basename(browserProfilesRoot())}/0123456789abcdef/Default/Cookies`,
       "vm-home/.browser-profiles/chrome/Cookies", "vm-homes/abc/.browser-profiles/chromium/Cookies",
-      "tmp/omb-mcp-123/mcp.json", ".tmp/secret",
+      "tmp/hezuo-mcp-123/mcp.json", ".tmp/secret",
       "logins.json.enc", "logins-key", "logins.json.enc.123.05a7b3e0-1234.tmp",
       "highlevel.json.enc", "highlevel-key", "connected-apps-installation.json", "webhook-key",
     ];

@@ -16,7 +16,7 @@ vi.mock("@/state/store", async (importOriginal) => {
   const original = await importOriginal<typeof import("@/state/store")>();
   return { ...original, useStore: () => ({ state: { ...original.initialState, config: fixture.config ?? original.initialState.config }, dispatch: fixture.dispatch }) };
 });
-// The connected-apps list (Composio accounts plus the native HighLevel connection) is seeded per test.
+// The connected-apps list from Composio accounts is seeded per test.
 vi.mock("./useBotApps", async (importOriginal) => ({
   ...await importOriginal<typeof import("./useBotApps")>(),
   useBotApps: () => fixture.apps,
@@ -26,14 +26,14 @@ vi.mock("@/lib/mcp-servers", async (importOriginal) => ({
   useMcpServers: () => ({ servers: fixture.servers, error: fixture.mcpError, refresh: vi.fn() }),
 }));
 
-// DesktopCapabilities reads window.ogb at module scope, and this suite runs in the node environment.
+// DesktopCapabilities reads window.hezuo at module scope, and this suite runs in the node environment.
 vi.mock("../DesktopCapabilities", () => ({
   useDesktopCapabilities: () => ({ capabilities: { host: { homeDir: undefined } } }),
 }));
 
 const { AccessSection } = await import("./AccessSection");
 
-// WorkingFolder reads window.ogb?.pickFolder at render time, so window is stubbed per test.
+// WorkingFolder reads window.hezuo?.pickFolder at render time, so window is stubbed per test.
 beforeEach(() => {
   vi.stubGlobal("window", {});
   fixture.dispatch.mockReset();
@@ -183,29 +183,14 @@ describe("AccessSection always-allowed list", () => {
 });
 
 describe("AccessSection Works on", () => {
-  type Node = ReactElement<{ children?: ReactNode; onClick?: () => void; [key: string]: unknown }>;
-  const nodes = (value: ReactNode): Node[] => {
-    if (!isValidElement(value)) return [];
-    const node = value as Node;
-    return [node, ...Children.toArray(node.props.children).flatMap(nodes)];
-  };
 
-  it("is one line and the way to the Computer panel, where the place is chosen", () => {
+  it("shows the execution location without a removed panel shortcut", () => {
     const markup = render(makeBot());
     expect(markup).toContain("Where Scout works: Chooses for you");
-    expect(markup).toContain("Open the Screen panel");
+    expect(markup).not.toContain("Open the Screen panel");
     expect([...markup.matchAll(/>(Auto|Cloud|Local VM|This computer|Browser|Off)<\/button>/g)]).toEqual([]);
     expect(render(makeBot({ computer: "off" }))).toContain("Where Scout works: No screen");
 
-    let tree!: ReturnType<typeof AccessSection>;
-    function Capture() { tree = AccessSection({ bot: makeBot(), derived: makeDerived() }); return tree; }
-    renderToStaticMarkup(createElement(StoreProvider, null, createElement(Capture)));
-    const open = nodes(tree).find((node) => node.type === "button" && renderToStaticMarkup(node).includes("Open the Screen panel"))!;
-    open.props.onClick!();
-    expect(fixture.dispatch.mock.calls).toEqual([
-      [{ type: "toggleSettings", open: false }],
-      [{ type: "toggleComputer", open: true }],
-    ]);
   });
 
   it("hides the Boat or VPS choice on My Cloud, whose cloud computers are the plan's", () => {
@@ -334,26 +319,37 @@ describe("AccessSection Record browser steps", () => {
 describe("AccessSection per-app scopes", () => {
   const app = (slug: string, label: string) => ({ slug, label, blurb: "", card: { logo: null, domain: null, label }, scope: "write" as const });
 
-  it("lists HighLevel by name next to the Composio apps once the server reports it connected", () => {
-    fixture.apps = { phase: "ready", connectedSlugs: ["gmail", "highlevel"], apps: [app("gmail", "Gmail"), app("highlevel", "HighLevel")] };
+  it("lists connected apps by name and includes each in tool-by-tool grants", () => {
+    fixture.apps = { phase: "ready", connectedSlugs: ["gmail", "slack"], apps: [app("gmail", "Gmail"), app("slack", "Slack")] };
     const html = render(makeBot({ connectorScopes: { apps: { gmail: "write" } } }));
-    expect(html).toContain('aria-label="highlevel access"');
-    expect(html).toMatch(/<span class="min-w-0 text-\[13px\] text-ink">HighLevel</);
+    expect(html).toContain('aria-label="slack access"');
+    expect(html).toMatch(/<span class="min-w-0 text-\[13px\] text-ink">Slack</);
     expect(html).not.toContain("not connected");
-    // Tool-by-tool grants are Composio's list; HighLevel is scoped by read/write only.
+    expect([...html.matchAll(/truncate font-mono text-\[13px\] text-ink">([^<]*)</g)].map((match) => match[1])).toEqual(["gmail", "slack"]);
+  });
+
+  it("omits unconnected apps without saved scopes from permission controls", () => {
+    fixture.apps = { phase: "ready", connectedSlugs: ["gmail"], apps: [app("gmail", "Gmail")] };
+    const html = render(makeBot({ connectorScopes: { apps: { gmail: "write" } } }));
+    expect(html).toContain('aria-label="gmail access"');
+    expect(html).not.toContain('aria-label="slack access"');
     expect([...html.matchAll(/truncate font-mono text-\[13px\] text-ink">([^<]*)</g)].map((match) => match[1])).toEqual(["gmail"]);
   });
 
-  it("leaves HighLevel out while it is not connected", () => {
+  it("keeps saved scopes visible for disconnected apps without granting their tools", () => {
     fixture.apps = { phase: "ready", connectedSlugs: ["gmail"], apps: [app("gmail", "Gmail")] };
-    const html = render(makeBot({ connectorScopes: { apps: { gmail: "write" } } }));
-    expect(html).not.toContain("HighLevel");
-    expect(html).not.toContain("highlevel");
+    const html = render(makeBot({ connectorScopes: { apps: { gmail: "write", slack: "read" } } }));
+    expect(html).toContain('aria-label="gmail access"');
+    expect(html).toContain('aria-label="slack access"');
+    expect(html).toContain("not connected");
+    expect([...html.matchAll(/truncate font-mono text-\[13px\] text-ink">([^<]*)</g)].map((match) => match[1])).toEqual(["gmail"]);
   });
 
   it("shows no scope rows until the account list is known", () => {
     const html = render(makeBot({ connectorScopes: { apps: { gmail: "write" } } }));
     expect(html).not.toContain("Limit this bot to specific apps");
+    expect(html).not.toContain('aria-label="gmail access"');
+    expect([...html.matchAll(/truncate font-mono text-\[13px\] text-ink">([^<]*)</g)]).toEqual([]);
   });
 });
 

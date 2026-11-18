@@ -52,7 +52,7 @@ describe("hermesConfiguredModel", () => {
   });
 
   const home = (env: string, cfg?: string) => {
-    const root = mkdtempSync(join(tmpdir(), "omb-hermes-"));
+    const root = mkdtempSync(join(tmpdir(), "hezuo-hermes-"));
     dirs.push(root);
     const h = join(root, ".hermes");
     mkdirSync(h, { recursive: true });
@@ -108,14 +108,14 @@ describe("hermesConfiguredModel", () => {
   });
 
   it("returns null when there is no .env and no config.yaml, leaving local-only setups unchanged", () => {
-    const root = mkdtempSync(join(tmpdir(), "omb-hermes-bare-"));
+    const root = mkdtempSync(join(tmpdir(), "hezuo-hermes-bare-"));
     dirs.push(root);
     mkdirSync(join(root, ".hermes"), { recursive: true });
     expect(hermesConfiguredModel({ HERMES_HOME: join(root, ".hermes") })).toBeNull();
   });
 
   it("offers the configured model when only config.yaml exists (Nous Portal OAuth)", () => {
-    const root = mkdtempSync(join(tmpdir(), "omb-hermes-nous-"));
+    const root = mkdtempSync(join(tmpdir(), "hezuo-hermes-nous-"));
     dirs.push(root);
     const h = join(root, ".hermes");
     mkdirSync(h, { recursive: true });
@@ -252,7 +252,7 @@ process.stdin.on("data", (chunk) => {
   ];
 
   function fakeCli(env: Record<string, string>, source = FAKE_CLI_SOURCE, name = "fake-hermes.ts"): { cli: string; env: Record<string, string> } {
-    const home = mkdtempSync(join(tmpdir(), "omb-hermes-probe-"));
+    const home = mkdtempSync(join(tmpdir(), "hezuo-hermes-probe-"));
     dirs.push(home);
     const cli = join(home, name);
     writeFileSync(cli, source, { mode: 0o755 });
@@ -268,7 +268,7 @@ process.stdin.on("data", (chunk) => {
   it("finds the catalog CLI on the supplied PATH, including a Windows npm shim", async () => {
     const { cli, env } = fakeCli({ [HERMES_ACP_MODELS_TIMEOUT_ENV]: "2000" });
     const root = dirname(cli);
-    const command = "omb-hermes-probe";
+    const command = "hezuo-hermes-probe";
     if (process.platform === "win32") {
       writeFileSync(join(root, "probe.js"), FAKE_CLI_SOURCE);
       writeFileSync(join(root, `${command}.cmd`), '@echo off\nnode "%~dp0\\probe.js" %*\n');

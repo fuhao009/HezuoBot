@@ -35,7 +35,7 @@ async function callInternal(
 }
 
 describe("X research internal routes", () => {
-  const included: ServiceCredential = { token: "omb_xd_t", api: "https://cloud.example.test/api/cloud/services/x", included: true };
+  const included: ServiceCredential = { token: "hezuo_xd_t", api: "https://cloud.example.test/api/cloud/services/x", included: true };
   const enabled = (client = fakeClient(), credential: () => ServiceCredential | null = () => included) =>
     ({ client, handler: createXResearchInternalRoutes({ credential, botEnabled: (id) => id === "bot-1", client: () => client }) });
 
@@ -106,20 +106,10 @@ describe("X research internal routes", () => {
       .toMatchObject({ status: 502, body: { error: X_MESSAGES.badKey, code: "bad_key" } });
   });
 
-  it("tells a Cloud home's bot the relay refused the Cloud's token, never to sign in again", async () => {
-    const client = fakeClient({ search: vi.fn(async () => { throw new XResearchError("bad_key", X_MESSAGES.badKey); }) });
-    const home = createXResearchInternalRoutes({ credential: () => included, botEnabled: () => true, client: () => client, cloudHome: true });
-    const answer = await callInternal(home, { body: { query: "hezuo" } });
-    expect(answer).toMatchObject({ status: 502, body: { error: X_MESSAGES.homeBadKey, code: "bad_key" } });
-    expect(answer.body.error).not.toMatch(/sign in again/i);
-    const other = createXResearchInternalRoutes({ credential: () => included, botEnabled: () => true, client: () => fakeClient({ search: vi.fn(async () => { throw new XResearchError("rate_limited", X_MESSAGES.rateLimited); }) }), cloudHome: true });
-    expect(await callInternal(other, { body: { query: "hezuo" } })).toMatchObject({ status: 502, body: { error: X_MESSAGES.rateLimited } });
-  });
-
-  it("keeps the Cloud home sentence for the plan's token only: a refused own treg key says to check the key", async () => {
+  it("preserves the provider's refusal for a person's own treg key", async () => {
     const ownKey: ServiceCredential = { token: "treg_own", api: "https://treg.to", included: false };
     const client = fakeClient({ search: vi.fn(async () => { throw new XResearchError("bad_key", X_MESSAGES.ownBadKey); }) });
-    const home = createXResearchInternalRoutes({ credential: () => ownKey, botEnabled: () => true, client: () => client, cloudHome: true });
+    const home = createXResearchInternalRoutes({ credential: () => ownKey, botEnabled: () => true, client: () => client });
     expect(await callInternal(home, { body: { query: "hezuo" } })).toMatchObject({ status: 502, body: { error: X_MESSAGES.ownBadKey } });
   });
 });

@@ -25,11 +25,13 @@ export function BotProfileAvatarCard({
   activeState,
   mascotMotion,
   onPatch,
+  allowGeneration = true,
 }: {
   bot: Bot;
   activeState: HezuoState;
   mascotMotion: { kind: Exclude<HezuoMotion, "none">; nonce: number } | null;
   onPatch: (patch: AvatarPatch) => void;
+  allowGeneration?: boolean;
 }) {
   const { fileRef, crop, uploading, generating, setSavingConnection, busy, error, upload, removeImage, generate } = useAvatarImage(bot, onPatch);
 
@@ -183,13 +185,13 @@ export function BotProfileAvatarCard({
           </>
         )}
 
-        <AvatarImageGenerator
+        {allowGeneration && <AvatarImageGenerator
           botLabel={bot.title || bot.name}
           disabled={uploading}
           generating={generating}
           onGenerate={generate}
           onSavingChange={setSavingConnection}
-        />
+        />}
 
         {error && <div role="alert" className="mt-3 text-[12px] text-danger">{error}</div>}
       </div>

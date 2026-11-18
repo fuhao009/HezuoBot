@@ -10,27 +10,27 @@ import {
 import { isAbsolute, join, relative, resolve, sep, win32 } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { browserBundlePaths, browserBundleSpec } from "../desktop/server/browser-bundle-release.ts";
-import { executableTarget } from "./prepare-cloudflared.mjs";
+import { executableTarget } from "./executable-target.mjs";
 
 export const BROWSER_LICENSE_FILES = [
   "agent-browser-LICENSE.txt", "LICENSE-axe-core.txt", "LICENSE-axe-core-THIRD-PARTY.txt", "README.md",
 ];
 const sourceRoot = fileURLToPath(new URL("../", import.meta.url));
 
-export function targetsForPreparation({ current = false, target, platform = process.platform, arch = process.arch } = {}) {
+export function targetsForPreparation({ current = false, target, platform = process.platform, arch = process.arch, env = process.env } = {}) {
   const targets = target ? [target] : current || platform !== "darwin" ? [`${platform}-${arch}`] : ["darwin-arm64", "darwin-x64"];
-  for (const value of targets) browserBundleSpec(value);
+  for (const value of targets) browserBundleSpec(value, env);
   return targets;
 }
 
-export function parsePrepareBrowserArgs(args = [], { platform = process.platform, arch = process.arch } = {}) {
+export function parsePrepareBrowserArgs(args = [], { platform = process.platform, arch = process.arch, env = process.env } = {}) {
   const options = { current: false };
   for (let index = 0; index < args.length; index += 1) {
     if (args[index] === "--current" && !options.current && !options.target) options.current = true;
     else if (args[index] === "--target" && !options.target && !options.current && args[index + 1]) options.target = args[++index];
     else throw new Error("Usage: node scripts/prepare-browser.mjs [--current | --target PLATFORM-ARCH]");
   }
-  targetsForPreparation({ ...options, platform, arch });
+  targetsForPreparation({ ...options, platform, arch, env });
   return options;
 }
 
@@ -85,9 +85,9 @@ export function verifyBundleInventory(directory, files) {
 }
 
 /** Called before signing; Developer ID signing necessarily changes Mach-O bytes. */
-export function verifyBrowserBundle(directory, target) {
-  const spec = browserBundleSpec(target);
-  const paths = browserBundlePaths(directory, target);
+export function verifyBrowserBundle(directory, target, env = process.env) {
+  const spec = browserBundleSpec(target, env);
+  const paths = browserBundlePaths(directory, target, env);
   if (!lstatSync(directory).isDirectory() || lstatSync(directory).isSymbolicLink()) throw new Error("Browser bundle must be a real directory");
   regularFile(paths.manifest);
   const manifest = JSON.parse(readFileSync(paths.manifest, "utf8"));
@@ -158,8 +158,8 @@ function extract(archive, directory) {
   if (result.error || result.status !== 0) throw new Error(`Browser archive extraction failed: ${result.error?.message ?? result.stderr ?? result.status}`);
 }
 
-export async function stageBrowserTarget(root, target, { cacheDirectory = process.env.OMB_BROWSER_ARCHIVE_DIR ?? join(root, "dist-native", "browser-archives") } = {}) {
-  const spec = browserBundleSpec(target);
+export async function stageBrowserTarget(root, target, { env = process.env, cacheDirectory = env.HEZUO_BROWSER_ARCHIVE_DIR ?? join(root, "dist-native", "browser-archives") } = {}) {
+  const spec = browserBundleSpec(target, env);
   const parent = join(root, "dist-native", "browser");
   mkdirSync(parent, { recursive: true });
   const scratch = mkdtempSync(join(parent, `.prepare-${target}-`));
@@ -168,7 +168,7 @@ export async function stageBrowserTarget(root, target, { cacheDirectory = proces
   try {
     const [engine, chrome] = await Promise.all([releaseBytes(spec.engine, cacheDirectory), releaseBytes(spec.chrome, cacheDirectory)]);
     mkdirSync(join(stage, "chrome"), { recursive: true });
-    const paths = browserBundlePaths(stage, target);
+    const paths = browserBundlePaths(stage, target, env);
     writeFileSync(paths.engine, engine, { mode: 0o755 });
     const archive = join(scratch, spec.chrome.asset);
     writeFileSync(archive, chrome);
@@ -180,7 +180,7 @@ export async function stageBrowserTarget(root, target, { cacheDirectory = proces
     mkdirSync(paths.licenses);
     for (const name of BROWSER_LICENSE_FILES) copyFileSync(join(sourceRoot, "third_party", "browser", name), join(paths.licenses, name));
     writeFileSync(paths.manifest, `${JSON.stringify({ ...spec, files: bundleInventory(stage) }, null, 2)}\n`);
-    verifyBrowserBundle(stage, target);
+    verifyBrowserBundle(stage, target, env);
     // Keep the previous complete tree until the new one passes every check.
     const previous = join(scratch, "previous");
     if (existsSync(destination)) renameSync(destination, previous);

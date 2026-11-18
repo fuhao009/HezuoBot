@@ -17,8 +17,8 @@ export type GrokCardAnswer = GrokTemplateCard & { export?: GrokExport; exportNot
 export interface CursorStatus { signedIn: boolean; waiting: boolean; error?: string }
 
 async function openInBrowser(url: string): Promise<void> {
-  if (window.ogb?.openExternal) {
-    await window.ogb.openExternal(url);
+  if (window.hezuo?.openExternal) {
+    await window.hezuo.openExternal(url);
     return;
   }
   const opened = window.open(url, "_blank", "noopener,noreferrer");

@@ -169,14 +169,13 @@ describe("configuration boundaries", () => {
     expect(parseStoredConfig({ imageGen: { key: "legacy" } }).imageGen).toEqual({ key: "legacy" });
     expect(() => parseConfigPatch({ imageGen: { provider: "unknown" } })).toThrow("provider");
     expect(() => parseConfigPatch({ imageGen: { customUrl: "https://user:secret@router.example/v1" } })).toThrow("customUrl");
-    const childEnv = { OMB_CUSTOM_IMAGE_KEY: "must-not-reach-bot" };
+    const childEnv = { HEZUO_CUSTOM_IMAGE_KEY: "must-not-reach-bot" };
     stripWorkspaceCredentialEnv(childEnv);
-    expect(childEnv).not.toHaveProperty("OMB_CUSTOM_IMAGE_KEY");
+    expect(childEnv).not.toHaveProperty("HEZUO_CUSTOM_IMAGE_KEY");
   });
-  it("persists a custom domain but excludes it from generic config patches", () => {
-    expect(parseStoredConfig({ customDomain: "https://bots.example.com" })).toEqual({ customDomain: "https://bots.example.com" });
+  it("ignores retired custom domain settings in stored config and patches", () => {
+    expect(parseStoredConfig({ customDomain: "https://bots.example.com" })).toEqual({});
     expect(parseConfigPatch({ customDomain: "https://unverified.example.com", language: "en" })).toEqual({ language: "en" });
-    expect(parseStoredConfig({ customDomain: "" })).toEqual({ customDomain: "" });
   });
   it("keeps supported stored settings and drops unrelated top-level data", () => {
     expect(
@@ -585,8 +584,8 @@ describe("configuration boundaries", () => {
     expect(parseConfigPatch({ features: { browser: false } })).toEqual({ features: { browser: false } });
     expect(builtInBrowserEnabled({ features: { browser: false } })).toBe(false);
     expect(builtInBrowserEnabled({ features: { browser: true } })).toBe(true);
-    const cloudHome = { OMB_CLOUD_ROLE: "home", OMB_CLOUD_MACHINE_ID: "3f9c2a4e-8b1d-4c6e-9a7f-2d5e8c1b0a93" };
-    expect(builtInBrowserEnabled({}, { OMB_PUBLIC_URL: "https://selfhosted.example.test" })).toBe(true);
+    const cloudHome = { HEZUO_CLOUD_ROLE: "home", HEZUO_CLOUD_MACHINE_ID: "3f9c2a4e-8b1d-4c6e-9a7f-2d5e8c1b0a93" };
+    expect(builtInBrowserEnabled({}, { HEZUO_PUBLIC_URL: "https://selfhosted.example.test" })).toBe(true);
     expect(builtInBrowserEnabled({}, cloudHome)).toBe(true);
     expect(builtInBrowserEnabled({ features: { browser: false } }, cloudHome)).toBe(false);
     expect(parseConfigPatch({ browserProfiles: [{ id: "work", name: " Work " }] })).toEqual({
@@ -827,7 +826,7 @@ describe("default fleet", () => {
 
   it("accepts clearing a Groq key and removes it from child environments", () => {
     expect(parseConfigPatch({ groq: { key: "" } })).toEqual({ groq: { key: "" } });
-    const env = { OMB_GROQ_API_KEY: "groq-fixture", KEEP: "yes" };
+    const env = { HEZUO_GROQ_API_KEY: "groq-fixture", KEEP: "yes" };
     stripWorkspaceCredentialEnv(env);
     expect(env).toEqual({ KEEP: "yes" });
   });
@@ -864,7 +863,7 @@ describe("default fleet", () => {
 
   it("accepts clearing a DeepSeek key and removes it from child environments", () => {
     expect(parseConfigPatch({ deepseek: { key: "" } })).toEqual({ deepseek: { key: "" } });
-    const env = { OMB_DEEPSEEK_API_KEY: "ds-fixture", DEEPSEEK_API_KEY: "ds-ambient", KEEP: "yes" };
+    const env = { HEZUO_DEEPSEEK_API_KEY: "ds-fixture", DEEPSEEK_API_KEY: "ds-ambient", KEEP: "yes" };
     stripWorkspaceCredentialEnv(env);
     expect(env).toEqual({ DEEPSEEK_API_KEY: "ds-ambient", KEEP: "yes" });
     expect(PROVIDER_CREDENTIAL_ENV).toContain("DEEPSEEK_API_KEY");
@@ -872,7 +871,7 @@ describe("default fleet", () => {
 
   it("accepts clearing a Meta key and removes it from child environments", () => {
     expect(parseConfigPatch({ meta: { key: "" } })).toEqual({ meta: { key: "" } });
-    const env = { OMB_META_API_KEY: "meta-fixture", META_API_KEY: "muse-code-login", KEEP: "yes" };
+    const env = { HEZUO_META_API_KEY: "meta-fixture", META_API_KEY: "muse-code-login", KEEP: "yes" };
     stripWorkspaceCredentialEnv(env);
     expect(env).toEqual({ META_API_KEY: "muse-code-login", KEEP: "yes" });
   });
@@ -991,8 +990,8 @@ describe("default fleet", () => {
   });
 
   it.each([
-    ["openai", "OMB_OPENAI_API_KEY", "https://api.openai.com/v1"],
-    ["openrouter", "OMB_OPENROUTER_API_KEY", "https://openrouter.ai/api/v1"],
+    ["openai", "HEZUO_OPENAI_API_KEY", "https://api.openai.com/v1"],
+    ["openrouter", "HEZUO_OPENROUTER_API_KEY", "https://openrouter.ai/api/v1"],
   ])("respects same-driver endpoint and credential overrides for %s", (id, keyEnv, defaultUrl) => {
     const workspace = { openai: { key: "openai-WORKSPACE" }, openrouter: { key: "openrouter-WORKSPACE" } };
     for (const config of [
@@ -1226,7 +1225,7 @@ describe("OpenCode Go configuration", () => {
     const stored = parseStoredConfig({
       profile: { name: "Ada" },
       opencodeGo: { providerKeys: {
-        VENICE_API_KEY: "venice-secret", venice_api_key: "lower", OPENCODE_API_KEY: "shadow", OMB_CLOUD_BOAT_TOKEN: "relay",
+        VENICE_API_KEY: "venice-secret", venice_api_key: "lower", OPENCODE_API_KEY: "shadow", HEZUO_CLOUD_BOAT_TOKEN: "relay",
         BOX_TOKEN: "boat", NODE_OPTIONS: "--require x", GROQ_API_KEY: "has space",
         DEEPSEEK_API_KEY: 42, TOGETHER_API_KEY: null, FIREWORKS_API_KEY: { key: "nested" },
       } },
@@ -1273,7 +1272,7 @@ describe("saving OpenCode provider keys", () => {
       expect(refused(name)).toContain("such as VENICE_API_KEY");
     }
     expect(refused("OPENCODE_API_KEY")).toContain("OpenCode API key box");
-    for (const name of ["OPENCODE_SERVER_KEY", "OMB_CLOUD_BOAT_TOKEN", "OMB_LICENSE_KEY", "BOX_TOKEN", "COMPOSIO_API_KEY",
+    for (const name of ["OPENCODE_SERVER_KEY", "HEZUO_CLOUD_BOAT_TOKEN", "HEZUO_LICENSE_KEY", "BOX_TOKEN", "COMPOSIO_API_KEY",
       "OPENAI_COMPAT_API_KEY", "XAI_API_KEY", "MISTRAL_API_KEY", "CURSOR_API_KEY", "FACTORY_API_KEY"]) {
       expect(refused(name)).toBe(`Hezuo keeps ${name} for itself, so OpenCode can't be given it here. Put this key in opencode.json instead.`);
     }
@@ -1338,11 +1337,11 @@ describe("credential env narrowing", () => {
       openaiCompat: { key: "SECRET-COMPAT", url: "https://api.groq.com/openai/v1", model: "llama" },
     };
     const instances = instanceConfigs(cfg);
-    expect(instances.openai.environment).toEqual({ OMB_OPENAI_API_KEY: "SECRET-OPENAI" });
-    expect(instances.openrouter.environment).toEqual({ OMB_OPENROUTER_API_KEY: "SECRET-OPENROUTER" });
+    expect(instances.openai.environment).toEqual({ HEZUO_OPENAI_API_KEY: "SECRET-OPENAI" });
+    expect(instances.openrouter.environment).toEqual({ HEZUO_OPENROUTER_API_KEY: "SECRET-OPENROUTER" });
     expect(instances.openaiCompat.environment).toEqual({ OPENAI_COMPAT_API_KEY: "SECRET-COMPAT", OPENAI_COMPAT_URL: "https://api.groq.com/openai/v1" });
-    expect(instances.openai.config).toEqual({ url: "https://api.openai.com/v1", apiKeyEnv: "OMB_OPENAI_API_KEY", catalog: "openai" });
-    expect(instances.openrouter.config).toEqual({ url: "https://openrouter.ai/api/v1", apiKeyEnv: "OMB_OPENROUTER_API_KEY" });
+    expect(instances.openai.config).toEqual({ url: "https://api.openai.com/v1", apiKeyEnv: "HEZUO_OPENAI_API_KEY", catalog: "openai" });
+    expect(instances.openrouter.config).toEqual({ url: "https://openrouter.ai/api/v1", apiKeyEnv: "HEZUO_OPENROUTER_API_KEY" });
     expect(instances.openai.access).toBe("api");
   });
 
@@ -1365,7 +1364,7 @@ describe("credential env narrowing", () => {
       openaiCompat: { key: "SECRET-COMPAT", url: "https://api.groq.com/openai/v1" },
       instances: { claude: { driver: "claudeAgent" }, openai: { driver: "openai-compat", displayName: "OpenAI" } },
     });
-    expect(instances.openai.config).toEqual({ url: "https://api.openai.com/v1", apiKeyEnv: "OMB_OPENAI_API_KEY", catalog: "openai" });
+    expect(instances.openai.config).toEqual({ url: "https://api.openai.com/v1", apiKeyEnv: "HEZUO_OPENAI_API_KEY", catalog: "openai" });
     expect(instances.openai.environment).toEqual({});
   });
 
@@ -1378,9 +1377,8 @@ describe("credential env narrowing", () => {
   });
 });
 
-describe("legacy feature flag migration", () => {
+describe("current feature flags", () => {
   const path = join(DATA_DIR, "config.json");
-  const readDisk = () => JSON.parse(readFileSync(path, "utf8"));
 
   beforeEach(() => {
     mkdirSync(DATA_DIR, { recursive: true });
@@ -1390,51 +1388,17 @@ describe("legacy feature flag migration", () => {
     rmSync(path, { force: true });
   });
 
-  it("carries a legacy skillRecorder opt-in over to skillAuthoring once, at startup", () => {
-    writeFileSync(path, JSON.stringify({ profile: { name: "Ada" }, features: { skillRecorder: true, browser: false } }));
-    ensureDirs();
-    expect(readDisk()).toEqual({ profile: { name: "Ada" }, features: { browser: false, skillAuthoring: true } });
-    expect(skillAuthoringEnabled(loadConfig())).toBe(true);
-    if (process.platform !== "win32") expect(statSync(path).mode & 0o777).toBe(0o600);
-    const written = readFileSync(path, "utf8");
-    ensureDirs();
-    expect(readFileSync(path, "utf8")).toBe(written);
-  });
-
-  it("keeps a legacy opt-out off and removes the old key", () => {
-    writeFileSync(path, JSON.stringify({ features: { skillRecorder: false } }));
-    ensureDirs();
-    expect(readDisk()).toEqual({ features: { skillAuthoring: false } });
-    expect(skillAuthoringEnabled(loadConfig())).toBe(false);
-  });
-
-  it("lets an explicit skillAuthoring value win over the legacy key", () => {
-    writeFileSync(path, JSON.stringify({ features: { skillRecorder: true, skillAuthoring: false } }));
-    ensureDirs();
-    expect(readDisk()).toEqual({ features: { skillAuthoring: false } });
-    expect(skillAuthoringEnabled(loadConfig())).toBe(false);
-  });
-
-  it("treats a non-boolean legacy value as off and a null features block as absent", () => {
-    writeFileSync(path, JSON.stringify({ features: { skillRecorder: "yes" } }));
-    ensureDirs();
-    expect(readDisk()).toEqual({ features: { skillAuthoring: false } });
-    const nulled = JSON.stringify({ features: null });
-    writeFileSync(path, nulled);
-    ensureDirs();
-    expect(readFileSync(path, "utf8")).toBe(nulled);
-  });
-
-  it("leaves a config without the legacy key untouched", () => {
-    for (const disk of [{ profile: { name: "Ada" } }, { features: {} }, { features: { skillAuthoring: true } }]) {
-      const raw = JSON.stringify(disk);
+  it("reads skillAuthoring without rewriting the saved configuration", () => {
+    for (const enabled of [true, false]) {
+      const raw = JSON.stringify({ features: { skillAuthoring: enabled } });
       writeFileSync(path, raw);
       ensureDirs();
+      expect(skillAuthoringEnabled(loadConfig())).toBe(enabled);
       expect(readFileSync(path, "utf8")).toBe(raw);
     }
   });
 
-  it("does not create a config file or throw on a fresh or unreadable install", () => {
+  it("does not create or rewrite a configuration during directory setup", () => {
     ensureDirs();
     expect(() => readFileSync(path, "utf8")).toThrow();
     writeFileSync(path, "{not json");
@@ -1446,17 +1410,17 @@ describe("legacy feature flag migration", () => {
 describe("credential env preference", () => {
   const VARS = [
     "XAI_API_KEY",
-    "OMB_GROQ_API_KEY",
-    "OMB_META_API_KEY",
+    "HEZUO_GROQ_API_KEY",
+    "HEZUO_META_API_KEY",
     "OPENAI_COMPAT_API_KEY",
     "OPENAI_COMPAT_URL",
     "OPENAI_COMPAT_MODEL",
     "OPENAI_COMPAT_PROVIDER",
     "BOX_TOKEN",
     "OPENCODE_API_KEY",
-    "OMB_TTS_KEY",
-    "OMB_FISH_AUDIO_API_KEY",
-    "OMB_OPENAI_IMAGE_KEY",
+    "HEZUO_TTS_KEY",
+    "HEZUO_FISH_AUDIO_API_KEY",
+    "HEZUO_OPENAI_IMAGE_KEY",
     "COMPOSIO_API_KEY",
   ] as const;
   let saved: Record<string, string | undefined>;
@@ -1490,9 +1454,9 @@ describe("credential env preference", () => {
     process.env.XAI_API_KEY = "env-xai";
     process.env.BOX_TOKEN = "env-box";
     process.env.OPENCODE_API_KEY = "env-ocg";
-    process.env.OMB_TTS_KEY = "env-tts";
-    process.env.OMB_FISH_AUDIO_API_KEY = "env-fish";
-    process.env.OMB_OPENAI_IMAGE_KEY = "env-image";
+    process.env.HEZUO_TTS_KEY = "env-tts";
+    process.env.HEZUO_FISH_AUDIO_API_KEY = "env-fish";
+    process.env.HEZUO_OPENAI_IMAGE_KEY = "env-image";
     const cfg = loadConfig();
     expect(cfg.xai).toEqual({ key: "env-xai", url: "https://api.example.test/v1" });
     expect(cfg.box).toEqual({ token: "env-box" });
@@ -1502,7 +1466,7 @@ describe("credential env preference", () => {
   });
 
   it("uses a preset voice only when the person has not chosen one or another provider", () => {
-    process.env.OMB_TTS_DEFAULT_VOICE = " preset-voice ";
+    process.env.HEZUO_TTS_DEFAULT_VOICE = " preset-voice ";
     expect(loadConfig().tts?.voice).toBe("preset-voice");
     writeFileSync(join(DATA_DIR, "config.json"), JSON.stringify({ tts: { voice: "chosen" } }));
     expect(loadConfig().tts?.voice).toBe("chosen");
@@ -1514,12 +1478,12 @@ describe("credential env preference", () => {
 
   it("never takes Cloud Pro's included tokens for the person's own keys, in config or an engine's environment", () => {
     const included = {
-      OMB_CLOUD_BOAT_URL: "https://cloud.example.test/api/cloud/services/boat/api/box/v1",
-      OMB_CLOUD_BOAT_TOKEN: "box_omb_included-relay-token",
-      OMB_CLOUD_VOICE_URL: "https://cloud.example.test/api/cloud/services/voice/v1",
-      OMB_CLOUD_VOICE_TOKEN: "omb_voice_included-relay-token",
-      OMB_CLOUD_DECIDER_URL: "https://cloud.example.test/api/cloud/services/decider",
-      OMB_CLOUD_DECIDER_TOKEN: "omb_decide_included-relay-token",
+      HEZUO_CLOUD_BOAT_URL: "https://cloud.example.test/api/cloud/services/boat/api/box/v1",
+      HEZUO_CLOUD_BOAT_TOKEN: "box_hezuo_included-relay-token",
+      HEZUO_CLOUD_VOICE_URL: "https://cloud.example.test/api/cloud/services/voice/v1",
+      HEZUO_CLOUD_VOICE_TOKEN: "hezuo_voice_included-relay-token",
+      HEZUO_CLOUD_DECIDER_URL: "https://cloud.example.test/api/cloud/services/decider",
+      HEZUO_CLOUD_DECIDER_TOKEN: "hezuo_decide_included-relay-token",
     };
     for (const [name, value] of Object.entries(included)) vi.stubEnv(name, value);
     try {
@@ -1533,26 +1497,17 @@ describe("credential env preference", () => {
       saveConfig({ tts: { voice: "chosen" }, box: { token: "" }, decider: { enabled: true, jobs: { roomRouting: true } } });
       const disk = readFileSync(join(DATA_DIR, "config.json"), "utf8");
       const runtime = JSON.stringify([loadConfig(), instanceConfigs(loadConfig()), persistableInstanceConfigs(loadConfig())]);
-      for (const token of [included.OMB_CLOUD_BOAT_TOKEN, included.OMB_CLOUD_VOICE_TOKEN, included.OMB_CLOUD_DECIDER_TOKEN]) {
+      for (const token of [included.HEZUO_CLOUD_BOAT_TOKEN, included.HEZUO_CLOUD_VOICE_TOKEN, included.HEZUO_CLOUD_DECIDER_TOKEN]) {
         expect(disk).not.toContain(token);
         expect(runtime).not.toContain(token);
       }
       process.env.BOX_TOKEN = "box_own";
-      process.env.OMB_TTS_KEY = "sk-own";
+      process.env.HEZUO_TTS_KEY = "sk-own";
       expect(loadConfig()).toMatchObject({ box: { token: "box_own" }, tts: { key: "sk-own" } });
       expect(JSON.stringify(instanceConfigs(loadConfig()))).not.toContain("box_own");
     } finally {
       vi.unstubAllEnvs();
     }
-  });
-
-  it("saves and removes the verified domain without replacing existing settings", () => {
-    saveConfig({ profile: { name: "Workspace owner" }, customDomain: "https://bots.example.com" });
-    expect(loadConfig().customDomain).toBe("https://bots.example.com");
-    saveConfig({ language: "en" });
-    expect(loadConfig().customDomain).toBe("https://bots.example.com");
-    saveConfig({ customDomain: "" });
-    expect(loadConfig()).toMatchObject({ customDomain: "", language: "en", profile: { name: "Workspace owner" } });
   });
 
   it("saves, trims and clears the computer name a paired phone shows", () => {
@@ -1809,8 +1764,8 @@ describe("credential env preference", () => {
     expect(process.env.XAI_API_KEY).toBe("just-saved");
     expect(process.env.COMPOSIO_API_KEY).toBe("ak_just_saved");
     expect(process.env.BOX_TOKEN).toBeUndefined();
-    expect(process.env.OMB_TTS_KEY).toBeUndefined();
-    expect(process.env.OMB_FISH_AUDIO_API_KEY).toBeUndefined();
+    expect(process.env.HEZUO_TTS_KEY).toBeUndefined();
+    expect(process.env.HEZUO_FISH_AUDIO_API_KEY).toBeUndefined();
   });
 
   it("saves and clears the built-in Groq key without changing an operator's Groq key", () => {
@@ -1847,11 +1802,11 @@ describe("credential env preference", () => {
   });
 
   it("syncCredentialEnv updates Fish Audio without replacing ElevenLabs", () => {
-    process.env.OMB_TTS_KEY = "eleven-kept";
-    process.env.OMB_FISH_AUDIO_API_KEY = "fish-old";
+    process.env.HEZUO_TTS_KEY = "eleven-kept";
+    process.env.HEZUO_FISH_AUDIO_API_KEY = "fish-old";
     syncCredentialEnv({ tts: { fishKey: "fish-new" } });
-    expect(process.env.OMB_TTS_KEY).toBe("eleven-kept");
-    expect(process.env.OMB_FISH_AUDIO_API_KEY).toBe("fish-new");
+    expect(process.env.HEZUO_TTS_KEY).toBe("eleven-kept");
+    expect(process.env.HEZUO_FISH_AUDIO_API_KEY).toBe("fish-new");
   });
 
   it("syncCredentialEnv keeps model and provider env in step with a save", () => {
@@ -1893,18 +1848,18 @@ describe("workspace credential env strip", () => {
   });
 
   it("keeps a hosted tenant's control-plane secrets out of every child env, and only those", () => {
-    // What a hosting control plane and a fleet put in the server's env; OMB_CLOUD_FUTURE_SECRET stands for a name added later.
+    // What a hosting control plane and a fleet put in the server's env; HEZUO_CLOUD_FUTURE_SECRET stands for a name added later.
     const operator = {
-      OMB_CLOUD_READY_TOKEN: "ready", OMB_CLOUD_BOOTSTRAP: "bootstrap", OMB_CLOUD_GATEWAY_TOKEN: "gateway",
-      OMB_CLOUD_MODELS: "models", OMB_CLOUD_REVISION: "revision", OMB_CLOUD_FUTURE_SECRET: "later",
-      OMB_LICENSE_KEY: "license", OMB_INSTALLATION_CREDENTIAL: "fleet", omb_cloud_ready_token: "windows-spelling",
+      HEZUO_CLOUD_READY_TOKEN: "ready", HEZUO_CLOUD_BOOTSTRAP: "bootstrap", HEZUO_CLOUD_GATEWAY_TOKEN: "gateway",
+      HEZUO_CLOUD_MODELS: "models", HEZUO_CLOUD_REVISION: "revision", HEZUO_CLOUD_FUTURE_SECRET: "later",
+      HEZUO_LICENSE_KEY: "license", HEZUO_INSTALLATION_CREDENTIAL: "fleet", hezuo_cloud_ready_token: "windows-spelling",
     };
     // What an engine deliberately receives (the hosted model token as its provider key), plus look-alike names.
     const engine = {
       PATH: "/usr/bin", ANTHROPIC_API_KEY: "hosted-token", ANTHROPIC_AUTH_TOKEN: "hosted-token",
       ANTHROPIC_BASE_URL: "https://admin.example.test/api/gateway/w/anthropic", HEZUO_COMPANY_API_KEY: "hosted-token",
-      OMB_MANAGED_CODEX_TOKEN: "hosted-token", CODEX_HOME: "/data/codex", OMB_HOOK_TOKEN_FILE: "/data/hook-tokens/a.token",
-      OMB_CLOUDFLARED_PATH: "/usr/local/bin/cloudflared", OMB_CLOUD: "not-prefixed", MY_OMB_CLOUD_NOTE: "user",
+      HEZUO_MANAGED_CODEX_TOKEN: "hosted-token", CODEX_HOME: "/data/codex", HEZUO_HOOK_TOKEN_FILE: "/data/hook-tokens/a.token",
+      HEZUO_CLOUDFLARED_PATH: "/usr/local/bin/cloudflared", HEZUO_CLOUD: "not-prefixed", MY_HEZUO_CLOUD_NOTE: "user",
     };
     for (const strip of [stripControlPlaneEnv, stripWorkspaceCredentialEnv]) {
       const env: Record<string, string | undefined> = { ...operator, ...engine };
@@ -1915,15 +1870,15 @@ describe("workspace credential env strip", () => {
 
   it("covers in-process secrets and private app-state paths", () => {
     expect(WORKSPACE_CREDENTIAL_ENV).toContain("BOX_TOKEN");
-    expect(WORKSPACE_CREDENTIAL_ENV).toContain("OMB_TTS_KEY");
-    expect(WORKSPACE_CREDENTIAL_ENV).toContain("OMB_CLOUD_BOAT_TOKEN");
-    expect(WORKSPACE_CREDENTIAL_ENV).toContain("OMB_CLOUD_VOICE_TOKEN");
-    expect(WORKSPACE_CREDENTIAL_ENV).toContain("OMB_CLOUD_DECIDER_TOKEN");
-    expect(WORKSPACE_CREDENTIAL_ENV).toContain("OMB_CLOUD_AI_TOKEN");
-    expect(WORKSPACE_CREDENTIAL_ENV).toContain("OMB_FISH_AUDIO_API_KEY");
-    expect(WORKSPACE_CREDENTIAL_ENV).toContain("OMB_OPENAI_IMAGE_KEY");
-    expect(WORKSPACE_CREDENTIAL_ENV).toContain("OMB_BROWSER_CONNECTION");
-    expect(WORKSPACE_CREDENTIAL_ENV).toContain("OMB_USER_DATA");
+    expect(WORKSPACE_CREDENTIAL_ENV).toContain("HEZUO_TTS_KEY");
+    expect(WORKSPACE_CREDENTIAL_ENV).toContain("HEZUO_CLOUD_BOAT_TOKEN");
+    expect(WORKSPACE_CREDENTIAL_ENV).toContain("HEZUO_CLOUD_VOICE_TOKEN");
+    expect(WORKSPACE_CREDENTIAL_ENV).toContain("HEZUO_CLOUD_DECIDER_TOKEN");
+    expect(WORKSPACE_CREDENTIAL_ENV).toContain("HEZUO_CLOUD_AI_TOKEN");
+    expect(WORKSPACE_CREDENTIAL_ENV).toContain("HEZUO_FISH_AUDIO_API_KEY");
+    expect(WORKSPACE_CREDENTIAL_ENV).toContain("HEZUO_OPENAI_IMAGE_KEY");
+    expect(WORKSPACE_CREDENTIAL_ENV).toContain("HEZUO_BROWSER_CONNECTION");
+    expect(WORKSPACE_CREDENTIAL_ENV).toContain("HEZUO_USER_DATA");
   });
 });
 
@@ -1964,7 +1919,7 @@ describe("customMcpServers", () => {
   it("skips reserved names — a custom entry can never shadow a built-in", () => {
     const out = customMcpServers(
       cfg({
-        ogb: { command: "evil" },
+        hezuo: { command: "evil" },
         computer: { command: "evil" },
         agents: { command: "evil" },
         fine: { command: "ok" },
@@ -2028,7 +1983,7 @@ describe("changedInstanceIds", () => {
     const fleet = instanceConfigs({});
     const compat = (env: Record<string, string>) => changedInstanceIds(engineLaunches(fleet, {}), engineLaunches(fleet, env));
     expect(compat({ OPENAI_COMPAT_URL: "https://compat.example/v1" })).toEqual(["openaiCompat"]);
-    expect(compat({ OMB_OPENAI_API_KEY: "o" })).toEqual(["openai"]);
+    expect(compat({ HEZUO_OPENAI_API_KEY: "o" })).toEqual(["openai"]);
     expect(compat({ BOX_TOKEN: "boat", COMPOSIO_API_KEY: "c" })).toEqual([]);
   });
   it("names an engine that was added or removed", () => {
@@ -2068,14 +2023,14 @@ describe("live settings", () => {
     const path = join(DATA_DIR, "config.json");
     let envKey: string | undefined;
     beforeEach(() => {
-      envKey = process.env.OMB_OPENAI_LIVE_KEY;
-      delete process.env.OMB_OPENAI_LIVE_KEY;
+      envKey = process.env.HEZUO_OPENAI_LIVE_KEY;
+      delete process.env.HEZUO_OPENAI_LIVE_KEY;
       mkdirSync(DATA_DIR, { recursive: true });
       rmSync(path, { force: true });
     });
     afterEach(() => {
-      if (envKey === undefined) delete process.env.OMB_OPENAI_LIVE_KEY;
-      else process.env.OMB_OPENAI_LIVE_KEY = envKey;
+      if (envKey === undefined) delete process.env.HEZUO_OPENAI_LIVE_KEY;
+      else process.env.HEZUO_OPENAI_LIVE_KEY = envKey;
       rmSync(path, { force: true });
     });
 
@@ -2088,7 +2043,7 @@ describe("live settings", () => {
     it("keeps a key from the desktop credential store, which reaches the harness as env", () => {
       // the desktop leaves an empty tombstone in the file and hands the key over as env
       saveConfig({ live: { key: "" } });
-      process.env.OMB_OPENAI_LIVE_KEY = "sk-from-keychain";
+      process.env.HEZUO_OPENAI_LIVE_KEY = "sk-from-keychain";
       saveConfig({ live: { readTypedReplies: false, voice: "cedar" } });
       expect(loadConfig().live).toEqual({ key: "sk-from-keychain", readTypedReplies: false, voice: "cedar" });
       expect(JSON.parse(readFileSync(path, "utf8")).live).toEqual({ key: "", readTypedReplies: false, voice: "cedar" });
@@ -2294,7 +2249,7 @@ describe("X research's included relay token", () => {
   });
 
   it("keeps the plan's research token and the person's own treg key as workspace credentials that never reach an engine", () => {
-    expect(WORKSPACE_CREDENTIAL_ENV).toContain("OMB_CLOUD_X_TOKEN");
-    expect(WORKSPACE_CREDENTIAL_ENV).toContain("OMB_TREG_KEY");
+    expect(WORKSPACE_CREDENTIAL_ENV).toContain("HEZUO_CLOUD_X_TOKEN");
+    expect(WORKSPACE_CREDENTIAL_ENV).toContain("HEZUO_TREG_KEY");
   });
 });

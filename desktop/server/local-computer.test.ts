@@ -97,16 +97,16 @@ describe("local computer descriptor contract", () => {
     };
     const gated = gatedLocalComputer(connection, { url: "http://127.0.0.1:1234/control", token: "fixture-token" });
     expect(gated).toMatchObject({ command: process.execPath, args: ["--experimental-strip-types", SPAWNED_PROXIES.localComputer], platform: "linux", scope: "local-computer", generation: connection.generation });
-    expect(gated.env).toEqual({ ...connection.env, ELECTRON_RUN_AS_NODE: "1", OMB_CUA_COMMAND: connection.command, OMB_CUA_ARGS: JSON.stringify(connection.args), OMB_CUA_PLATFORM: "linux", OMB_CONTROL_URL: "http://127.0.0.1:1234/control", OMB_CONTROL_TOKEN: "fixture-token", OMB_COMPUTER_JOURNAL: "0" });
+    expect(gated.env).toEqual({ ...connection.env, ELECTRON_RUN_AS_NODE: "1", HEZUO_CUA_COMMAND: connection.command, HEZUO_CUA_ARGS: JSON.stringify(connection.args), HEZUO_CUA_PLATFORM: "linux", HEZUO_CONTROL_URL: "http://127.0.0.1:1234/control", HEZUO_CONTROL_TOKEN: "fixture-token", HEZUO_COMPUTER_JOURNAL: "0" });
     expect(gated.args.join(" ")).not.toContain("fixture-token");
-    expect(connection.env).not.toHaveProperty("OMB_CONTROL_TOKEN");
+    expect(connection.env).not.toHaveProperty("HEZUO_CONTROL_TOKEN");
   });
   it("records computer calls for saved steps only when the mount asks", () => {
-    const connection = { command: "/trusted/cua-driver", args: ["mcp"], env: { OMB_COMPUTER_JOURNAL: "1" }, platform: "darwin" as const, scope: "local-computer" as const };
+    const connection = { command: "/trusted/cua-driver", args: ["mcp"], env: { HEZUO_COMPUTER_JOURNAL: "1" }, platform: "darwin" as const, scope: "local-computer" as const };
     const control = { url: "http://127.0.0.1:1234/control", token: "fixture-token" };
-    expect(gatedLocalComputer({ ...connection, env: {} }, control, true).env.OMB_COMPUTER_JOURNAL).toBe("1");
-    expect(gatedLocalComputer({ ...connection, env: {} }, control).env.OMB_COMPUTER_JOURNAL).toBe("0");
-    expect(gatedLocalComputer(connection, control, false).env.OMB_COMPUTER_JOURNAL).toBe("0");
+    expect(gatedLocalComputer({ ...connection, env: {} }, control, true).env.HEZUO_COMPUTER_JOURNAL).toBe("1");
+    expect(gatedLocalComputer({ ...connection, env: {} }, control).env.HEZUO_COMPUTER_JOURNAL).toBe("0");
+    expect(gatedLocalComputer(connection, control, false).env.HEZUO_COMPUTER_JOURNAL).toBe("0");
   });
   it("owns the helper's Node mode even when the daemon environment disagrees", () => {
     const gated = gatedLocalComputer({ command: "/trusted/cua-driver", args: ["mcp"], env: { ELECTRON_RUN_AS_NODE: "0" }, platform: "darwin", scope: "local-computer" }, { url: "http://127.0.0.1:1234/control", token: "fixture-token" });
@@ -116,18 +116,18 @@ describe("local computer descriptor contract", () => {
     const control = { url: "http://127.0.0.1:1234/control", token: "fixture-token" };
     const darwin = (extra: { args?: string[]; socketPath?: string }) => gatedLocalComputer({ command: "/trusted/cua-driver", args: ["mcp"], env: {}, platform: "darwin", scope: "local-computer", ...extra }, control);
     // macOS standalone: the descriptor starts the driver as bare `mcp` and names its socket separately.
-    expect(JSON.parse(darwin({ socketPath: "/trusted/driver.sock" }).env.OMB_CUA_ARGS!)).toEqual(["mcp", "--socket", "/trusted/driver.sock"]);
+    expect(JSON.parse(darwin({ socketPath: "/trusted/driver.sock" }).env.HEZUO_CUA_ARGS!)).toEqual(["mcp", "--socket", "/trusted/driver.sock"]);
     // An argv that already names its endpoint, or owns the runtime directly, is passed through untouched.
     for (const args of [["mcp", "--embedded", "--socket", "/trusted/driver.sock"], ["mcp", "--direct"]]) {
-      expect(JSON.parse(darwin({ args, socketPath: "/trusted/driver.sock" }).env.OMB_CUA_ARGS!)).toEqual(args);
+      expect(JSON.parse(darwin({ args, socketPath: "/trusted/driver.sock" }).env.HEZUO_CUA_ARGS!)).toEqual(args);
     }
     // A descriptor with no endpoint of its own keeps exactly the argv it declared.
-    expect(JSON.parse(darwin({}).env.OMB_CUA_ARGS!)).toEqual(["mcp"]);
+    expect(JSON.parse(darwin({}).env.HEZUO_CUA_ARGS!)).toEqual(["mcp"]);
     // Every other platform's descriptor declares its own argv; none of it is rewritten here.
     for (const platform of ["win32", "linux"] as const) {
       const args = ["mcp", "--embedded", "--socket", "/trusted/driver.sock"];
       const gated = gatedLocalComputer({ command: "/trusted/cua-driver", args, env: {}, platform, scope: "local-computer", socketPath: "/trusted/driver.sock" }, control);
-      expect(JSON.parse(gated.env.OMB_CUA_ARGS!)).toEqual(args);
+      expect(JSON.parse(gated.env.HEZUO_CUA_ARGS!)).toEqual(args);
     }
   });
   it("stays synchronized with the Electron producer", () => {
@@ -140,7 +140,7 @@ const temporaryDirectories: string[] = [];
 
 function privateUserData(name: string) {
   const base = process.platform === "win32" ? tmpdir() : realpathSync("/tmp");
-  const root = mkdtempSync(join(base, "omb-local-computer-"));
+  const root = mkdtempSync(join(base, "hezuo-local-computer-"));
   temporaryDirectories.push(root);
   const userData = join(root, name);
   mkdirSync(userData, { recursive: true, mode: 0o700 });

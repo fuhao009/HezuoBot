@@ -7,6 +7,6 @@ import { useStore } from "@/state/store";
 export function useUnifiedBotPanel(): boolean {
   const { state } = useStore();
   const advanced = useAdvancedMode();
-  const remoteClient = window.ogb?.remoteClient?.active === true;
+  const remoteClient = window.hezuo?.remoteClient?.active === true;
   return !remoteClient && (isProductWorkspace(state.config?.productManaged) || !advanced);
 }

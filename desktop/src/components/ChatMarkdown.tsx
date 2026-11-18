@@ -218,7 +218,7 @@ export function MermaidDiagram({ code }: MermaidDiagramProps) {
           theme: scheme === "light" ? "default" : "dark",
           fontFamily: MERMAID_FONT,
         });
-        return module.default.render(`omb-mermaid-${mermaidRenderId}`, code);
+        return module.default.render(`hezuo-mermaid-${mermaidRenderId}`, code);
       })
       .then((out) => {
         if (!alive) return;
@@ -420,7 +420,7 @@ const CURRENCY_DOLLAR = /(?<![$\p{L}\p{N}])(?:R|US|AU|A|CA|C|NZ|HK|SG|S|MX|NT|BZ
 function escapeLiteralDollars(text: string): string {
   const display: string[] = [];
   const hidden = text
-    .replace(/\$\$[\s\S]*?\$\$/g, (math) => `\u0000OMB_MATH_${display.push(math) - 1}\u0000`)
+    .replace(/\$\$[\s\S]*?\$\$/g, (math) => `\u0000HEZUO_MATH_${display.push(math) - 1}\u0000`)
     .replace(CURRENCY_DOLLAR, (sign) => `${sign.slice(0, -1)}\\$`);
   const literal = new Set<number>();
   const singles: number[] = [];
@@ -443,7 +443,7 @@ function escapeLiteralDollars(text: string): string {
   let escaped = "";
   for (let i = 0; i < hidden.length; i++) escaped += literal.has(i) ? "\\$" : hidden[i];
   display.forEach((math, index) => {
-    escaped = escaped.split(`\u0000OMB_MATH_${index}\u0000`).join(math);
+    escaped = escaped.split(`\u0000HEZUO_MATH_${index}\u0000`).join(math);
   });
   return escaped;
 }
@@ -451,7 +451,7 @@ function escapeLiteralDollars(text: string): string {
 export function normalizeMathDelimiters(text: string, imageOffsets?: Map<number, number>): string {
   const protectedCode: Array<{ value: string; sourceOffset: number }> = [];
   const protect = (value: string, sourceOffset: number): string => {
-    const token = `\u0000OMB_CODE_${protectedCode.length}\u0000`;
+    const token = `\u0000HEZUO_CODE_${protectedCode.length}\u0000`;
     protectedCode.push({ value, sourceOffset });
     return token;
   };
@@ -482,7 +482,7 @@ export function normalizeMathDelimiters(text: string, imageOffsets?: Map<number,
   normalized = escapeLiteralDollars(normalized);
   let shift = 0;
   // oxlint-disable-next-line no-control-regex -- restore opaque code and image sentinels
-  normalized = normalized.replace(/\u0000OMB_CODE_(\d+)\u0000/g, (token, index: string, at: number) => {
+  normalized = normalized.replace(/\u0000HEZUO_CODE_(\d+)\u0000/g, (token, index: string, at: number) => {
     const part = protectedCode[Number(index)];
     if (!part) return token;
     const { value, sourceOffset } = part;

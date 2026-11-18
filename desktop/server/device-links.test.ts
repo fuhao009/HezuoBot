@@ -1,7 +1,6 @@
 // The device link end to end in one process: the real shared-computers routes behind a real HTTP server's upgrades,
 // My Cloud's DeviceLinks, and the computer's own link client with its own check on each connection.
 import { randomUUID } from "node:crypto";
-import { getEventListeners } from "node:events";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { connect as tcpConnect, createServer as createTcpServer, type AddressInfo, type Socket } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
@@ -21,17 +20,15 @@ const cleanups: Array<() => unknown> = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); });
 
 /** My Cloud's HTTP side for lending: a bearer of `session-<id>` is that paired session. */
-async function cloud(options: { sleeping?: () => boolean; sleep?: AbortController } = {}) {
+async function cloud() {
   const live = new Set(["owner", "other"]);
   const links = new DeviceLinks({ pingMs: 100 });
   const lent = new LentComputers(`/nonexistent-${randomUUID()}/lent-computers.json`);
   const computers = new SharedComputers((id) => live.has(id), lent, links);
   const upgrades = createUpgrades();
-  const sleep = options.sleep ?? new AbortController();
   const route = createSharedComputerRoutes({
     enabled: () => true, computers, sessionLive: (id) => live.has(id), environmentId: "11111111-1111-4111-8111-111111111111",
-    cloudHomeLender: PERSON, principal: () => PERSON, personKey: () => PERSON,
-    power: () => ({ sleeping: options.sleeping ?? (() => false), sleepSignal: () => sleep.signal }),
+    principal: () => PERSON, personKey: () => PERSON,
     links, upgrades,
   });
   const handle = async (req: IncomingMessage, res: ServerResponse) => {
@@ -51,12 +48,12 @@ async function cloud(options: { sleeping?: () => boolean; sleep?: AbortControlle
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   cleanups.push(() => new Promise<void>((resolve) => { computers.close(); links.close(); upgrades.close(); server.closeAllConnections(); server.close(() => resolve()); }));
   const register = async (session = "owner", internet = true, id: string = randomUUID(), chrome = false) => {
-    const response = await fetch(`${base}/api/shared-computers/connect`, { method: "POST", headers: { authorization: `Bearer session-${session}`, "content-type": "application/json", "x-omb-computer-secret": secret },
+    const response = await fetch(`${base}/api/shared-computers/connect`, { method: "POST", headers: { authorization: `Bearer session-${session}`, "content-type": "application/json", "x-hezuo-computer-secret": secret },
       body: JSON.stringify({ id, name: "Ash's MacBook", environmentId: "11111111-1111-4111-8111-111111111111", folders: [], terminal: false, computer: false, platform: "darwin", internet, ...(chrome ? { chrome } : {}) }) });
     expect(response.status, await response.clone().text()).toBe(200);
     return id;
   };
-  return { base, links, computers, lent, live, register, sleep };
+  return { base, links, computers, lent, live, register };
 }
 
 /** A web server standing in for the public internet, reached only through the computer's own connect. */
@@ -75,7 +72,7 @@ function link(base: string, id: string, websitePort: number, options: { session?
   let opens = 0;
   const ended = runDeviceLink({
     url: `${base.replace("http", "ws")}${linkPath(id)}`, signal: stop.signal, onOpen: () => opens++,
-    headers: { authorization: `Bearer session-${options.session ?? "owner"}`, "x-omb-computer-secret": options.secret ?? secret },
+    headers: { authorization: `Bearer session-${options.session ?? "owner"}`, "x-hezuo-computer-secret": options.secret ?? secret },
     egress: {
       interfaces: () => ({}),
       resolve: async (host: string) => (host.endsWith(".example") ? [{ address: "93.184.215.14", family: 4 }] : host === "router.example.net" ? [{ address: "192.168.1.1", family: 4 }] : []),
@@ -172,7 +169,7 @@ describe("the device link", () => {
     const second = link(home.base, id, site.port);
     expect((await first.ended).code, "the newer link replaces the older").toBe(1000);
     await until(() => second.opens() === 1 && home.links.route(PERSON) !== null, "the second link");
-    await fetch(`${home.base}/api/shared-computers/${id}/disconnect`, { method: "POST", headers: { authorization: "Bearer session-owner", "content-type": "application/json", "x-omb-computer-secret": secret }, body: "{}" });
+    await fetch(`${home.base}/api/shared-computers/${id}/disconnect`, { method: "POST", headers: { authorization: "Bearer session-owner", "content-type": "application/json", "x-hezuo-computer-secret": secret }, body: "{}" });
     expect((await second.ended).code).toBe(LINK_ENDED);
     expect(home.links.route(PERSON)).toBeNull();
   });
@@ -205,36 +202,6 @@ describe("the device link", () => {
     expect((await mac.ended).code).toBe(LINK_ENDED);
   });
 
-  it("leaves no sleep listener behind when a link ends, however often the computer reconnects while My Cloud stays awake", async () => {
-    const sleep = new AbortController();
-    const home = await cloud({ sleep });
-    const site = await website();
-    const id = await home.register();
-    for (let round = 0; round < 5; round++) {
-      const mac = link(home.base, id, site.port);
-      await until(() => mac.opens() === 1, "the link");
-      mac.stop.abort();
-      await mac.ended;
-      await until(() => home.links.route(PERSON) === null, "the link to end on My Cloud");
-    }
-    await until(() => getEventListeners(sleep.signal, "abort").length === 0, "every ended link's sleep listener to go", 2_000);
-  });
-
-  it("closes as asleep when My Cloud agrees to sleep, and refuses a new link while it sleeps", async () => {
-    let sleeping = false;
-    const sleep = new AbortController();
-    const home = await cloud({ sleeping: () => sleeping, sleep });
-    const site = await website();
-    const id = await home.register();
-    const mac = link(home.base, id, site.port);
-    await until(() => mac.opens() === 1, "the link");
-    sleeping = true;
-    sleep.abort();
-    expect(await mac.ended).toEqual({ code: 4001, reason: "asleep" });
-    expect(home.links.route(PERSON)).toBeNull();
-    expect((await link(home.base, id, site.port).ended).code, "a link dialled while My Cloud sleeps is told so at once").toBe(4001);
-  });
-
   it("a Chrome stream goes only to a computer that lends Chrome, through its own door", async () => {
     const home = await cloud();
     const echo = createTcpServer((socket) => socket.pipe(socket));
@@ -244,7 +211,7 @@ describe("the device link", () => {
     const stop = new AbortController();
     const ended = runDeviceLink({
       url: `${home.base.replace("http", "ws")}${linkPath(id)}`, signal: stop.signal,
-      headers: { authorization: "Bearer session-owner", "x-omb-computer-secret": secret },
+      headers: { authorization: "Bearer session-owner", "x-hezuo-computer-secret": secret },
       lends: () => ({ internet: false, chrome: true }),
       chrome: { open: async () => ({ socket: tcpConnect((echo.address() as AddressInfo).port, "127.0.0.1") }) },
     });
@@ -282,7 +249,7 @@ describe("the device link", () => {
     const socket = tcpConnect(Number(url.port), "127.0.0.1");
     socket.on("error", () => {});
     await new Promise((resolve) => socket.once("connect", resolve));
-    socket.write(`GET ${url.pathname} HTTP/1.1\r\nhost: ${url.host}\r\nupgrade: websocket\r\nconnection: Upgrade\r\nsec-websocket-version: 13\r\nsec-websocket-key: ${Buffer.from(randomUUID().slice(0, 16)).toString("base64")}\r\nauthorization: Bearer session-owner\r\nx-omb-computer-secret: ${secret}\r\n\r\n`);
+    socket.write(`GET ${url.pathname} HTTP/1.1\r\nhost: ${url.host}\r\nupgrade: websocket\r\nconnection: Upgrade\r\nsec-websocket-version: 13\r\nsec-websocket-key: ${Buffer.from(randomUUID().slice(0, 16)).toString("base64")}\r\nauthorization: Bearer session-owner\r\nx-hezuo-computer-secret: ${secret}\r\n\r\n`);
     await until(() => home.links.route(PERSON) !== null, "the silent link to be accepted");
     socket.pause();
     await until(() => home.links.route(PERSON) === null, "the silent link to be dropped", 2_000);

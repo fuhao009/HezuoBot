@@ -17,7 +17,7 @@ function fakeFetch(...responses: Reply[]) {
 }
 
 const OWN = { token: "treg_own_key", api: "https://treg.example.test", included: false };
-const PLAN = { token: "omb_xd_plan", api: "https://cloud.example.test/api/cloud/services/x", included: true };
+const PLAN = { token: "hezuo_xd_plan", api: "https://cloud.example.test/api/cloud/services/x", included: true };
 const PEOPLE = { id: "apollo.people.search", name: "Find people", method: "GET", platform: "people", cost: { usd: 0.002, type: "per_call" }, input: { type: "object" }, test_request: { q: "hezuo" } };
 const COMPANIES = { id: "dataforseo.domains.bulk", name: "Domains", method: "POST", platform: "seo", input: { queryArrayEncoding: "comma" } };
 
@@ -59,8 +59,8 @@ describe("research with the person's own treg key", () => {
 
   it("sends a body endpoint's params as JSON and its query as the query string, arrays as the endpoint encodes them", async () => {
     const { fetcher, calls } = fakeFetch({ body: { endpoint: COMPANIES } }, { body: { tasks: [] } });
-    await createResearchClient(OWN, { fetcher }).call({ id: "dataforseo.domains.bulk", params: [{ target: "openmausbot.com" }], query: { fields: ["rank", "traffic"] } });
-    expect(calls[1]).toMatchObject({ method: "POST", url: "https://treg.example.test/call/dataforseo.domains.bulk?fields=rank%2Ctraffic", body: [{ target: "openmausbot.com" }] });
+    await createResearchClient(OWN, { fetcher }).call({ id: "dataforseo.domains.bulk", params: [{ target: "hezuo.com" }], query: { fields: ["rank", "traffic"] } });
+    expect(calls[1]).toMatchObject({ method: "POST", url: "https://treg.example.test/call/dataforseo.domains.bulk?fields=rank%2Ctraffic", body: [{ target: "hezuo.com" }] });
     expect(researchRequest(COMPANIES, { id: COMPANIES.id })).toEqual({ search: "", body: "{}" });
     expect(() => researchRequest(PEOPLE, { id: PEOPLE.id, params: { q: "a" }, query: { q: "b" } })).toThrow(/params or as query, not both/);
   });
@@ -97,7 +97,7 @@ describe("research through the plan's relay", () => {
     const { fetcher, calls } = fakeFetch(
       { body: { query: "people", results: [], budget: { leftUsd: 14 } } },
       { body: { endpoint: { id: "apollo.people.search" } } },
-      { body: { people: [] }, headers: { "x-omb-research-charged-usd": "0.0045", "x-omb-research-pending": "true" } },
+      { body: { people: [] }, headers: { "x-hezuo-research-charged-usd": "0.0045", "x-hezuo-research-pending": "true" } },
     );
     const client = createResearchClient(PLAN, { fetcher });
     expect(await client.search({ job: "people", limit: 3 })).toEqual({ query: "people", results: [], budget: { leftUsd: 14 } });
@@ -109,7 +109,7 @@ describe("research through the plan's relay", () => {
       ["POST", `${PLAN.api}/research/call/apollo.people.search`],
     ]);
     for (const call of calls) {
-      expect(call.headers.get("authorization")).toBe("Bearer omb_xd_plan");
+      expect(call.headers.get("authorization")).toBe("Bearer hezuo_xd_plan");
       expect(call.headers.get("x-treg-token")).toBeNull();
     }
     expect(calls[2]!.body).toEqual({ params: { q: "hezuo" }, query: { page: 2 } });
@@ -130,7 +130,7 @@ describe("whether research works", () => {
   it("asks the plan's relay with a search that names no job, which spends nothing, and reads its answer", async () => {
     const asked = fakeFetch({ status: 400, body: { error: "invalid_request", message: "Say what the research is for in q." } });
     expect(await researchOffered(PLAN, asked)).toBe(true);
-    expect(asked.calls.map((call) => [call.method, call.url, call.headers.get("authorization")])).toEqual([["GET", `${PLAN.api}/research/search`, "Bearer omb_xd_plan"]]);
+    expect(asked.calls.map((call) => [call.method, call.url, call.headers.get("authorization")])).toEqual([["GET", `${PLAN.api}/research/search`, "Bearer hezuo_xd_plan"]]);
     for (const [status, body] of [[503, { error: "service_unavailable", message: "Research isn't available right now." }], [402, { error: "subscription_inactive" }], [404, { error: "not_found" }], [401, { error: "invalid_api_key" }]] as const) {
       expect(await researchOffered(PLAN, fakeFetch({ status, body })), String(status)).toBe(false);
     }

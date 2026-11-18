@@ -3,7 +3,7 @@
 A bot's run can fail (the engine exits before a result), stall (no activity
 for twenty minutes), fail to start (a setting, a missing engine), or a
 scheduled routine can fail. Each used to leave one chip in the thread it died
-in and nothing anywhere else — the person found it hours later, from a phone,
+in and nothing anywhere else — the person found it hours later, from a remote client,
 by opening the desktop and reading every thread, then retried by hand.
 
 Now the team's coordinator hears first. When a run breaks on a bot whose
@@ -58,5 +58,5 @@ not woken for its result — it stays in that thread, findable with
 `list_threads` or `session_search`.
 
 What the person sees: the Chief's *Problems to look at* thread in the sidebar (and
-on the phone), with one entry per incident and the Chief's one-line report of
+in remote companion views), with one entry per incident and the Chief's one-line report of
 what it did — instead of a silent stall somewhere in the team.

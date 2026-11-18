@@ -3,18 +3,20 @@
 ## 先读什么
 
 1. 本文：建立后端结构、运行与维护概念。
-2. [客户端 API 统一入口](gateway-client-api.md)：桌面/手机具体怎么调用。
+2. [客户端 API 统一入口](gateway-client-api.md)：桌面与远程 companion 客户端的协议。
 3. [渠道与模型](gateway-channels.md)：配置持久化、加密、模型路由与热生效。
 4. [生产部署记录](gateway-deployment-193.md)：实际服务器、部署 SHA、验证证据与限制。
 5. [架构](architecture.md)：网关与桌面本地服务的数据边界。
 
-任务计费交付分支为 `backend/task-aware-billing`，基于 `backend/gateway-v1-lan`。仓库远端 `personal` 指向 `fuhao009/OpenMausBot`；`origin` 是上游项目，不能把本项目改动默认推往上游。实际部署 SHA 以部署记录为准，文档提交不等于功能部署。
+任务计费交付分支为 `backend/task-aware-billing`，基于 `backend/gateway-v1-lan`。推送前确认远端属于当前项目，不要默认推往上游。实际部署 SHA 以部署记录为准，文档提交不等于功能部署。
 
 ## 这套后端是什么
 
-`gateway/` 是账号、安装归属、模型访问权限、积分账本、模型路由和手机中继的服务端。`desktop/server/` 是用户电脑上的 bot、对话、工作区和工具执行服务，属于另一层。手机通过网关中继操作所属桌面；部署网关不会把桌面数据库搬到服务器。
+`gateway/` 是账号、安装归属、模型访问权限、积分账本、模型路由和 companion 中继的服务端。`desktop/server/` 是用户电脑上的 bot、对话、工作区和工具执行服务，属于另一层。远程 companion 客户端通过网关中继操作所属桌面；部署网关不会把桌面数据库搬到服务器。
 
 网关有两种宿主：Cloudflare Worker 和本地 Node/Miniflare HTTPS 服务。生产 `192.168.66.193` 使用后者，两者共享 `gateway/control-plane/src` 和 SQL migrations。不能把 Miniflare 当作只用于测试的假后端；这里它承载真实 Worker/D1 业务路径。
+
+手机端（iOS/Android 原生工程）已退役，不再作为活跃开发、发布或验收对象；通用 companion relay、桌面安装与电脑配对继续保留。本地 APNs 实现已删除，不再保留可用的 APNs 兼容协议。本轮退役变更尚未部署到 `192.168.66.193`，不得据本地源码或文档修改声称线上已删除手机/APNs 能力；线上状态仍以部署记录为准。
 
 ## 代码地图
 
@@ -29,14 +31,14 @@
 | `ai-wallet.ts` | 整数积分、预占、结算、调整、流水 | 金额安全整数/BigInt；历史价格快照不可重算 |
 | `task-billing.ts`、`cost-tariffs.ts` | 复杂度评估、选模、成本与积分运算、版本化策略和有界控制器 | 成本为运营者估算价；新请求锁价，未知成本不填零，不保证净利润 |
 | `installations.ts` | 桌面安装注册、归属、凭据轮换/撤销 | 账号、安装、模型凭据不能互换 |
-| `endpoints.ts`、`push.ts`、`highlevel.ts` | 可选托管隧道、APNS、HighLevel OAuth | 配置能力与账号登录独立，不能把未配置当已支持 |
+| `endpoints.ts`、`highlevel.ts` | 可选托管隧道、HighLevel OAuth | 配置能力与账号登录独立，不代表生产已启用 |
 | `admin-assets.ts`、`admin-html.ts`、`admin-script.ts`、`admin-style.ts` | `/admin` 静态界面与账号/结算交互 | Worker 直接打包字符串资产，无额外前端构建服务 |
 | `admin-channel-html.ts`、`admin-channel-script.ts` | 渠道与模型表单 | 表单→暂存→填写原因→版本化保存；不回显 key |
 | `admin-billing-html.ts`、`admin-billing-script.ts` | 智能计费策略、能力档案、指标和只读费率 | 仅运营者；15 秒刷新，离开页面或会话失效停止；不修改在途请求 |
 | `gateway/control-plane/migrations/` | Worker/D1 schema | 历史 SQL 不改，新建递增 migration |
 | `gateway/control-plane/test/` | 真实 workerd/D1 隔离测试 | 使用现有 env/setup，不能调用生产 |
 | `gateway/local/local-gateway.mjs` | CLI、bundle、迁移、运行时、定时任务 | 启动先迁移，后开放监听；运营者名单不依赖是否已配置 AI |
-| `gateway/local/local-gateway/` | TLS/config 私有文件、邮件、手机中继、macOS service | Linux 生产由 systemd 启动，不是 macOS service install |
+| `gateway/local/local-gateway/` | TLS/config 私有文件、邮件、companion 中继、macOS service | Linux 生产由 systemd 启动，不是 macOS service install |
 | `scripts/verify-gateway-admin.mjs` | 一次性真实网关 + 假上游验证 | 临时账号/密钥/DB，结束清理，不读生产配置 |
 | `packages/shared/product-account.ts` | 客户端公共类型 | 变更前协调客户端；类型里有名字不代表网关已实现同名 HTTP 路由 |
 
@@ -155,7 +157,7 @@ ssh root@192.168.66.193 'journalctl -u hezuo-gateway -n 100 --no-pager'
 
 ## 开发协作规则
 
-- 后端负责 `gateway/`、相关验证脚本和协议文档；桌面/手机由各端维护。不要顺手改变客户端配置或 UI。
+- 后端负责 `gateway/`、相关验证脚本和协议文档；桌面由客户端维护。不要顺手改变客户端配置或 UI。
 - 先写/更新请求和响应契约，再实现。公共字段、错误码或认证方式变化必须说明兼容性，客户端通过 Git 获取，不靠聊天口头通知。
 - 共享类型修改需要明确受影响端。现有公开模型结构没有渠道 URL/key，不能为了调试加进去。
 - 每次小提交保持可验收，推送 `personal` 对应分支。部署 SHA、验证证据、未完成边界一起记入交接文档。
@@ -164,4 +166,4 @@ ssh root@192.168.66.193 'journalctl -u hezuo-gateway -n 100 --no-pager'
 
 ## 当前明确边界
 
-已有账号/积分/人工结算、渠道/模型/只写 key、任务复杂度自动路由与动态积分估算。尚无全局用户列表、设备管理后台、自动故障切换、Anthropic/Gemini 转换或订阅凭据发现。积分/USD 是估值，不是现金兑付、充值收款或支付履约；成本未对供应商发票核账，估算毛利不是净利润。邮件/APNS/Cloudflare 托管端点并非已配置。生产渠道、策略实际启用和未验证范围见部署记录，不增加空按钮或假统计。
+已有账号/积分/人工结算、渠道/模型/只写 key、任务复杂度自动路由与动态积分估算。尚无全局用户列表、设备管理后台、自动故障切换、Anthropic/Gemini 转换或订阅凭据发现。积分/USD 是估值，不是现金兑付、充值收款或支付履约；成本未对供应商发票核账，估算毛利不是净利润。邮件/Cloudflare 托管端点并非已配置；本地 APNs 实现已删除，但本轮退役变更尚未部署到 193。生产渠道、策略实际启用和未验证范围见部署记录，不增加空按钮或假统计。

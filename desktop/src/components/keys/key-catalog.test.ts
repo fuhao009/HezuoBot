@@ -7,19 +7,19 @@ import { CREDENTIAL_TARGETS, credentialConfigPatch, desktopCredentialSlot, isCon
 import { KEY_CATALOG, KEY_SECTIONS, keyEntry, keyForInstance, keyMatches, looksLikeOtherKey, savedState, type KeyId } from "./key-catalog";
 
 const NOT_A_PERSONS_KEY: Record<string, string> = {
-  OMB_ANTHROPIC_API_URL: "the address the Anthropic key goes to, set by a hosted install",
-  OMB_HOSTED_MODEL_TOKEN: "a hosted install's model token",
-  OMB_HOSTED_MODELS: "a hosted install's model list",
-  OMB_COMPOSIO_BROKER_TOKEN: "Hezuo Cloud's connected-apps broker",
-  OMB_CLOUD_BOAT_TOKEN: "Hezuo Cloud's included computers",
-  OMB_CLOUD_VOICE_TOKEN: "Hezuo Cloud's included voice",
-  OMB_CLOUD_DECIDER_TOKEN: "Hezuo Cloud's included decisions",
-  OMB_CLOUD_AI_TOKEN: "Hezuo Cloud's included AI",
-  OMB_CLOUD_X_TOKEN: "Hezuo Cloud's included X research",
-  OMB_CLOUD_CONNECTED_APPS_GRANT: "Hezuo Cloud's connected apps",
-  OMB_BROWSER_CONNECTION: "the app's own browser, not a credential",
-  OMB_USER_DATA: "the app's own data folder, not a credential",
-  OMB_BOAT_API: "the Boat address, not a credential",
+  HEZUO_ANTHROPIC_API_URL: "the address the Anthropic key goes to, set by a hosted install",
+  HEZUO_HOSTED_MODEL_TOKEN: "a hosted install's model token",
+  HEZUO_HOSTED_MODELS: "a hosted install's model list",
+  HEZUO_CLOUD_BOAT_TOKEN: "Hezuo Cloud's included computers",
+  HEZUO_CLOUD_VOICE_TOKEN: "Hezuo Cloud's included voice",
+  HEZUO_CLOUD_DECIDER_TOKEN: "Hezuo Cloud's included decisions",
+  HEZUO_CLOUD_AI_TOKEN: "Hezuo Cloud's included AI",
+  HEZUO_CLOUD_X_TOKEN: "Hezuo Cloud's included X research",
+  HEZUO_CLOUD_CONNECTED_APPS_GRANT: "Hezuo Cloud's connected apps",
+  HEZUO_COMPOSIO_BROKER_TOKEN: "the install's connected-app broker token, not a person's API key",
+  HEZUO_BROWSER_CONNECTION: "the app's own browser, not a credential",
+  HEZUO_USER_DATA: "the app's own data folder, not a credential",
+  HEZUO_BOAT_API: "the Boat address, not a credential",
 };
 
 const electron = (file: string) => readFileSync(new URL(`../../../electron/${file}`, import.meta.url), "utf8");

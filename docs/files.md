@@ -2,7 +2,7 @@
 
 Files is a top-level page in the desktop app, for people with a Hezuo Cloud ("My Cloud"). It does two jobs:
 
-- **Lent folders, even while this computer sleeps.** Every folder lent to My Cloud (each moved bot's project folder, a folder added here) also gets a copy on My Cloud, kept up to date while this computer is on. The home folder, which this computer lends My Cloud by itself (`docs/cloud-pro.md`, "This computer works for your Clouds"), is too broad for a copy and stays live only. While it is away, bots read that copy, and a change to a folder lent with editing waits on My Cloud and lands here when the computer is back. Nobody chooses anything: what fits is copied, the rest stays live only.
+- **Lent folders, even while this computer sleeps.** Every folder lent to My Cloud (each moved bot's project folder, a folder added here) also gets a copy on My Cloud, kept up to date while this computer is on. The home folder, which this computer lends My Cloud by itself (the retired cloud-pro guide (historical only), "This computer works for your Clouds"), is too broad for a copy and stays live only. While it is away, bots read that copy, and a change to a folder lent with editing waits on My Cloud and lands here when the computer is back. Nobody chooses anything: what fits is copied, the rest stays live only.
 - **Your bots' work.** What Cloud bots make comes down to `Documents/Hezuo/<bot>/<conversation>` on this computer.
 
 It never merges two sides. Nothing on this computer is deleted because of something that happened on My Cloud, and a bot changes the person's files only in a folder lent with editing, by the same rules whether the computer is on or away.
@@ -104,5 +104,4 @@ The calls are listed in `desktop/electron/cloud-sync.d.mts` (`CloudFilesBridge`)
 ## Not in v1
 - Queuing apps and screen, and terminal steps, for when the computer is back: they still need it on.
 - Two-way folders beyond a bot's changes through `shared_computer` to a folder lent with editing.
-- Phones.
 - Connecting OneDrive, Google Drive or Dropbox to My Cloud. That's probably the better route for documents already in those services.

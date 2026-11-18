@@ -3,7 +3,7 @@ import { closeSync, existsSync, openSync, readFileSync, rmSync, writeFileSync } 
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, it } from "vitest";
-import { launchVerificationServer, runControlOmb, verificationServerEnvironment } from "../../scripts/control-omb.ts";
+import { launchVerificationServer, runControlHezuo, verificationServerEnvironment } from "../../scripts/control-hezuo.ts";
 import { AUTO_RETRY_LEAD } from "./incidents.ts";
 import { waitForExit } from "./testing/cleanup.ts";
 
@@ -25,7 +25,7 @@ it.each([false, true])("recovers the same conversation after an ACP internal err
     return value;
   };
   const control = async (...args: string[]) => {
-    const result = await runControlOmb([...args, "--url", url]) as any;
+    const result = await runControlHezuo([...args, "--url", url]) as any;
     evidence.push({ command: args, result });
     return result;
   };

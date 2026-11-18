@@ -1,6 +1,6 @@
 import { promptTokenBreakdown } from "../prompt-token-breakdown.ts";
 
-export const REQUEST_TOKEN_DIAGNOSTICS_ENV = "OMB_REQUEST_TOKEN_DIAGNOSTICS";
+export const REQUEST_TOKEN_DIAGNOSTICS_ENV = "HEZUO_REQUEST_TOKEN_DIAGNOSTICS";
 
 export function requestTokenBreakdown(payload: string) {
   const request = JSON.parse(payload) as Record<string, unknown>;

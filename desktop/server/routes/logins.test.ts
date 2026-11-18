@@ -28,7 +28,7 @@ afterEach(async () => {
 });
 
 async function serve() {
-  const dir = mkdtempSync(join(tmpdir(), "omb-login-routes-"));
+  const dir = mkdtempSync(join(tmpdir(), "hezuo-login-routes-"));
   dirs.push(dir);
   const store = new LoginStore({ dataDir: dir });
   const { sdk } = fakeOnePasswordSdk({ token: TOKEN, vaults: { v1: { title: "Shared with OMB", items: [

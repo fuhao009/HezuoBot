@@ -52,7 +52,7 @@ const membersSchema = z
 
 const manifestSchema = z.discriminatedUnion("version", [
   z.object({
-    format: z.preprocess((value) => value === "openmaus.team" ? TEAM_MANIFEST_FORMAT : value, z.literal(TEAM_MANIFEST_FORMAT, { error: "This is not a Hezuo team file" })),
+    format: z.literal(TEAM_MANIFEST_FORMAT, { error: "This is not a Hezuo team file" }),
     version: z.literal(LEGACY_TEAM_MANIFEST_VERSION),
     team: z.object({
       name: requiredText(100),
@@ -66,7 +66,7 @@ const manifestSchema = z.discriminatedUnion("version", [
     }),
   }),
   z.object({
-    format: z.preprocess((value) => value === "openmaus.team" ? TEAM_MANIFEST_FORMAT : value, z.literal(TEAM_MANIFEST_FORMAT, { error: "This is not a Hezuo team file" })),
+    format: z.literal(TEAM_MANIFEST_FORMAT, { error: "This is not a Hezuo team file" }),
     version: z.literal(TEAM_MANIFEST_VERSION),
     team: z.object({
       name: requiredText(100),

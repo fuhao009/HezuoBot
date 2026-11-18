@@ -44,13 +44,13 @@ person's own Postiz) and proves, for both ways of connecting:
 ## Screenshots
 
 ```sh
-OMB_VERIFY_PLAYWRIGHT=/path/to/playwright/index.mjs OMB_VERIFY_BROWSER_CHROME=/path/to/chrome node --experimental-strip-types scripts/verify-postiz.ts
+HEZUO_VERIFY_PLAYWRIGHT=/path/to/playwright/index.mjs HEZUO_VERIFY_BROWSER_CHROME=/path/to/chrome node --experimental-strip-types scripts/verify-postiz.ts
 ```
 
 This drives the real Apps modal in headless Chromium against the same stand-ins:
 the Social category, the sign-in waiting and connected states, a refused key,
 the key form and the key connection. Screenshots default to
-`/tmp/omb-postiz-evidence`; override with `OMB_UI_EVIDENCE_DIR`.
+`/tmp/hezuo-postiz-evidence`; override with `HEZUO_UI_EVIDENCE_DIR`.
 
 ## Live acceptance (a Postiz account owner)
 

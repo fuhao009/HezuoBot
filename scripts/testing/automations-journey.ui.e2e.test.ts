@@ -1,27 +1,21 @@
 // Automations as a person uses them, end to end in the real app: the real server and its webhook receiver in a
 // temporary home, a scripted engine that obeys tool calls, the real renderer in headless Chrome. Every step leaves a
-// screenshot. Run with OMB_UI_E2E=1; OMB_AUTOMATIONS_JOURNEY_SHOTS=DIR keeps the screenshots there.
-import { type ChildProcess } from "node:child_process";
-import { randomBytes } from "node:crypto";
-import { createWriteStream, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+// screenshot. Run with HEZUO_UI_E2E=1; HEZUO_AUTOMATIONS_JOURNEY_SHOTS=DIR keeps the screenshots there.
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { expect, it } from "vitest";
 
-import { cloudHomeChildEnvironments, spawnWithSecrets } from "../../desktop/server/cloud-home-start.ts";
-import { cloudHomeConfiguration, cloudPairingSignature } from "../../desktop/server/cloud-home.ts";
-import { removeTempDir, waitForExit } from "../../desktop/server/testing/cleanup.ts";
-import { freePortBlock } from "../../desktop/server/testing/ports.ts";
 import { launchRestartableServer, type RestartableServer } from "../../desktop/server/testing/restartable-server.ts";
-import { runControlOmb } from "../control-omb.ts";
-import { agentBrowser, ensureUiBrowser, sessionEnv, type UiHandle } from "./control-omb-ui.ts";
+import { runControlHezuo } from "../control-hezuo.ts";
+import { agentBrowser, ensureUiBrowser, sessionEnv, type UiHandle } from "./control-hezuo-ui.ts";
 import { mountPreview } from "./preview-fixture.ts";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
-const SHOTS = process.env.OMB_AUTOMATIONS_JOURNEY_SHOTS || join(ROOT, ".omb-scratch", "automations-journey");
+const SHOTS = process.env.HEZUO_AUTOMATIONS_JOURNEY_SHOTS || join(ROOT, ".hezuo-scratch", "automations-journey");
 const SHORT_TMP = process.platform === "win32" ? tmpdir() : "/tmp";
-const enabled = process.env.OMB_UI_E2E === "1";
+const enabled = process.env.HEZUO_UI_E2E === "1";
 
 const SCHEDULE = "Every day at 9 AM, Scout sends you a summary of your inbox";
 const EDITED = "Every day at 10:30 AM, Scout sends you a summary of your inbox and your calendar";
@@ -51,14 +45,14 @@ async function openApp(server: { url: string; port: number; dataDir: string; log
   mkdirSync(options.shots, { recursive: true });
   const tools = await ensureUiBrowser(process.env);
   const preview = await mountPreview({ info: { url: server.url } }, { entry: "/scripts/testing/threads-preview.tsx", route: "/__threads.html", title: "Automations journey", logLevel: "warn", proxyHeaders: options.proxyHeaders });
-  const handle: UiHandle = { url: server.url, previewUrl: preview.previewUrl, session: `omb-journey-${server.port}`, binary: tools.binary, home: server.dataDir, botId: Object.values(options.bots)[0]!, logPath: server.logPath, chrome: tools.chrome };
+  const handle: UiHandle = { url: server.url, previewUrl: preview.previewUrl, session: `hezuo-journey-${server.port}`, binary: tools.binary, home: server.dataDir, botId: Object.values(options.bots)[0]!, logPath: server.logPath, chrome: tools.chrome };
   const browserEnv = sessionEnv(handle);
   const browser = (...args: string[]) => agentBrowser(tools.binary, browserEnv, args, 120_000);
   await browser("set", "viewport", "1280", "800");
   await browser("open", preview.previewUrl);
   const handlePath = join(server.dataDir, "ui.json");
   writeFileSync(handlePath, JSON.stringify(handle));
-  const ui = (verb: string, ...args: string[]) => runControlOmb(["ui", verb, "--ui", handlePath, ...args]) as Promise<Record<string, any>>;
+  const ui = (verb: string, ...args: string[]) => runControlHezuo(["ui", verb, "--ui", handlePath, ...args]) as Promise<Record<string, any>>;
   const evaluate = async (js: string) => (await ui("eval", "--js", js)).result;
   const click = (name: string) => ui("click", "--name", name);
   let shot = 0;
@@ -125,7 +119,7 @@ async function openApp(server: { url: string; port: number; dataDir: string; log
     };
     const starter = (await api("GET", "/api/bots?messages=0")).bots[0];
     await api("PATCH", `/api/bots/${starter.id}/profile`, { name: "Hazel" });
-    const newBot = async (name: string) => ((await runControlOmb(["new-bot", "--name", name, "--url", live.url])) as { bot: { id: string } }).bot.id;
+    const newBot = async (name: string) => ((await runControlHezuo(["new-bot", "--name", name, "--url", live.url])) as { bot: { id: string } }).bot.id;
     const scout = await newBot("Scout");
     const ledger = await newBot("Ledger");
     writeFileSync(live.planPath, JSON.stringify(plan([{ id: starter.id }, { id: scout }, { id: ledger }])));
@@ -347,7 +341,7 @@ async function openApp(server: { url: string; port: number; dataDir: string; log
 
     // 10. Advanced mode, then a narrow window: nothing overflows, the panel and the calendar still work.
     await noOverflow("the list in Simple mode");
-    await evaluate(`localStorage.setItem("omb-advanced-mode", "1"); true`);
+    await evaluate(`localStorage.setItem("hezuo-advanced-mode", "1"); true`);
     await reload();
     await openAutomations();
     await expect.poll(() => rowStatus(EDITED)).toBe("working");
@@ -373,7 +367,7 @@ async function openApp(server: { url: string; port: number; dataDir: string; log
     expect(await evaluate(`[...document.querySelectorAll("[aria-pressed=true]")].map((button) => button.textContent.trim())`)).toContain("Day");
     await screenshot("narrow-calendar");
     await click("List");
-    await evaluate(`localStorage.setItem("omb-advanced-mode", "0"); true`);
+    await evaluate(`localStorage.setItem("hezuo-advanced-mode", "0"); true`);
     await reload();
     await openChat("Scout", MAIN);
     await evaluate(`${card(FORM)}.scrollIntoView({ block: "center" }); true`);
@@ -393,73 +387,15 @@ async function openApp(server: { url: string; port: number; dataDir: string; log
   }
 }, 900_000);
 
-const CLOUD_HOST = "omb-t-journey0123456.fly.dev";
 const OUTSIDE_WHY = "A webhook's run made or changed this routine, so it runs without full access. Open it and save it once to run it with full access.";
 
-/** A Cloud home as its image starts it (cloud-home-start's own environment and secrets pipe), with a fake public origin,
- * no network beyond loopback, the scripted engine, and the owner's paired device. */
-async function launchCloudHome() {
-  const home = mkdtempSync(join(SHORT_TMP, "omb-cloud-journey-"));
-  const dataDir = join(home, ".hezuo");
-  mkdirSync(join(home, "tmp"), { recursive: true });
-  mkdirSync(dataDir, { recursive: true });
-  const planPath = join(home, "room-plan.json");
-  writeFileSync(planPath, "{}");
-  const claude = join(home, "claude-cli.mjs");
-  writeFileSync(claude, `#!/usr/bin/env node
-if (process.argv[2] === "auth") { console.log(JSON.stringify({ loggedIn: true, email: "owner@example.test" })); process.exit(0); }
-process.env.FAKE_CLAUDE_VERSION = "2.1.284";
-process.env.FAKE_CLAUDE_MODE ??= "happy";
-await import(${JSON.stringify(pathToFileURL(join(ROOT, "desktop", "server", "testing", "fake-claude-cli.ts")).href)});
-`, { mode: 0o755 });
-  writeFileSync(join(dataDir, "config.json"), JSON.stringify({ language: "en", instances: {
-    ...Object.fromEntries(["cursor", "githubCopilot", "openaiCompat", "qwen", "hermes", "pi"].map((id) => [id, { driver: "not-a-real-driver" }])),
-    claude: { driver: "claudeAgent", displayName: "Claude", config: { cli: claude }, environment: { FAKE_CLAUDE_ROOM_PLAN: planPath } },
-  } }));
-  const port = await freePortBlock([0, 1]);
-  const secret = randomBytes(32).toString("base64url");
-  const offered: NodeJS.ProcessEnv = {
-    OMB_CLOUD_ROLE: "home", OMB_CLOUD_MACHINE_ID: "7a1c2e4f-9b3d-4c6e-8a7f-1d5e8c2b0a94", OMB_CLOUD_ADMIN_URL: "https://cloud.example.test",
-    OMB_PUBLIC_URL: `https://${CLOUD_HOST}`, OMB_CLOUD_BOOTSTRAP_SECRET: secret, OMB_DATA_DIR: dataDir, PATH: dirname(process.execPath),
-  };
-  const { server: serverEnv, secrets } = cloudHomeChildEnvironments(cloudHomeConfiguration(offered)!, offered, home);
-  const env = { ...serverEnv, OMB_PORT: String(port), OMB_WEBHOOK_PORT: String(port + 1), OMB_TEST_SEALED_PATH: "1", TMPDIR: join(home, "tmp") };
-  const offline = `data:text/javascript,${encodeURIComponent('const real = globalThis.fetch; globalThis.fetch = async (url, init) => String(url).startsWith("http://127.0.0.1:") ? real(url, init) : new Response("offline fixture", { status: 503 });')}`;
-  const evidenceDir = join(tmpdir(), "hezuo-verification-evidence");
-  mkdirSync(evidenceDir, { recursive: true });
-  const logPath = join(evidenceDir, `cloud-journey-${Date.now()}-${process.pid}.log`);
-  const log = createWriteStream(logPath);
-  const child: ChildProcess = spawnWithSecrets(process.execPath, ["--import", offline, join(ROOT, "desktop", "server", "index.ts")], env, secrets, undefined, true);
-  child.stdout?.pipe(log);
-  child.stderr?.pipe(log);
-  const url = `http://127.0.0.1:${port}`;
-  const deadline = Date.now() + 30_000;
-  for (;;) {
-    if (child.exitCode !== null) throw new Error(`the Cloud home exited; see ${logPath}`);
-    try { if ((await fetch(`${url}/api/health`)).ok) break; } catch { /* not listening yet */ }
-    if (Date.now() > deadline) throw new Error(`the Cloud home did not start; see ${logPath}`);
-    await new Promise((resolve) => setTimeout(resolve, 150));
-  }
-  const edge = { host: CLOUD_HOST, "x-forwarded-for": "203.0.113.9", "x-forwarded-proto": "https" };
-  const body = JSON.stringify({ label: "Hezuo app (Cloud)", ttlSeconds: 300 });
-  const timestamp = String(Math.floor(Date.now() / 1000)), nonce = randomBytes(16).toString("base64url");
-  const granted = await (await fetch(`${url}/api/cloud/pairing`, { method: "POST", headers: { ...edge, "content-type": "application/json",
-    "x-omb-cloud-timestamp": timestamp, "x-omb-cloud-nonce": nonce, "x-omb-cloud-signature": `v1=${cloudPairingSignature(secret, timestamp, nonce, body)}` }, body })).json() as { code: string };
-  const paired = await (await fetch(`${url}/api/auth/pair`, { method: "POST", headers: { ...edge, origin: `https://${CLOUD_HOST}`, "content-type": "application/json" }, body: JSON.stringify({ code: granted.code }) })).json() as { token: string };
-  const owner = { ...edge, origin: `https://${CLOUD_HOST}`, authorization: `Bearer ${paired.token}` };
-  return {
-    url, port, dataDir: home, logPath, planPath, hooksUrl: `http://127.0.0.1:${port + 1}`, owner,
-    close: async () => { await waitForExit(child, { signal: "SIGTERM", graceMs: 15_000 }); log.end(); await removeTempDir(home); },
-  };
-}
-
-(enabled ? it : it.skip)("on a Cloud: its public address, no keep-open hint, the same off/on, calls and cleanup, and each routine at the level it was made at", async () => {
-  const cloud = await launchCloudHome();
-  const shots = join(SHOTS, "cloud");
+(enabled ? it : it.skip)("local automations preserve owner permissions and confine routines created by incoming webhooks", async () => {
+  const local = await launchRestartableServer({ scripted: true, dataDirRoot: SHORT_TMP });
+  const shots = join(SHOTS, "local-permissions");
   let app: App | undefined;
   try {
     const api = async (method: string, path: string, body?: unknown) => {
-      const response = await fetch(`${cloud.url}${path}`, { method, headers: { ...cloud.owner, "content-type": "application/json" }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+      const response = await fetch(`${local.url}${path}`, { method, headers: { origin: local.url, "content-type": "application/json" }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
       const value = await response.json() as any;
       if (!response.ok) throw new Error(`${method} ${path}: ${response.status} ${JSON.stringify(value)}`);
       return value;
@@ -476,17 +412,17 @@ await import(${JSON.stringify(pathToFileURL(join(ROOT, "desktop", "server", "tes
       { key: "run-orders", match: ["Email the order list."], repeat: true, steps: [], approve: { tool_name: "mcp__composio__COMPOSIO_SEARCH_TOOLS", input: { queries: [] } }, reply: "Sent." },
       { key: "chat", match: [""], repeat: true, steps: [], reply: "OK." },
     ];
-    writeFileSync(cloud.planPath, JSON.stringify({ [scout]: { script }, [ledger]: { script } }));
-    const turns = () => existsSync(`${cloud.planPath}.evidence.jsonl`)
-      ? readFileSync(`${cloud.planPath}.evidence.jsonl`, "utf8").trim().split("\n").filter(Boolean).map((line) => JSON.parse(line)) : [];
+    writeFileSync(local.planPath, JSON.stringify({ [scout]: { script }, [ledger]: { script } }));
+    const turns = () => existsSync(`${local.planPath}.evidence.jsonl`)
+      ? readFileSync(`${local.planPath}.evidence.jsonl`, "utf8").trim().split("\n").filter(Boolean).map((line) => JSON.parse(line)) : [];
     const state = async () => ({ ...(await api("GET", "/api/routines")), ...(await api("GET", "/api/webhooks")) }) as { routines: any[]; runs: any[]; webhooks: any[] };
 
-    app = await openApp({ url: cloud.url, port: cloud.port, dataDir: cloud.dataDir, logPath: cloud.logPath }, { shots, bots: { Scout: scout, Ledger: ledger }, proxyHeaders: cloud.owner });
+    app = await openApp({ url: local.url, port: local.port, dataDir: local.dataDir, logPath: local.logPath }, { shots, bots: { Scout: scout, Ledger: ledger } });
     const { evaluate, click, screenshot, text, clickIn, rowText, rowStatus, flip, switchState, panel, cardText, clickCard, openAutomations, openChat, say } = app;
 
     await expect.poll(() => evaluate(`(() => { const skip = [...document.querySelectorAll("button")].find((button) => button.textContent.trim() === "Skip setup"); skip?.click(); return Boolean(skip); })()`), { timeout: 30_000 }).toBe(true);
 
-    // The owner sets up a schedule and a webhook from chat; the address to paste is the Cloud's public one.
+    // The owner sets up a schedule and a webhook from chat using the local receiver.
     await say("Scout", "every morning, summarize my inbox");
     await expect.poll(() => cardText(SCHEDULE), { timeout: 30_000 }).toContain("Next:");
     await say("Scout", "whenever our form sends a lead, draft a follow-up");
@@ -495,19 +431,20 @@ await import(${JSON.stringify(pathToFileURL(join(ROOT, "desktop", "server", "tes
     expect(await clickCard(FORM, "Copy address")).toBe(true);
     await expect.poll(() => evaluate("window.__copied.length")).toBe(1);
     const address = await evaluate("window.__copied[0]") as string;
-    expect(address).toMatch(new RegExp(`^https://${CLOUD_HOST.replaceAll(".", "\\.")}/hooks/wh_[\\w-]+/whsec_[\\w-]+$`));
-    await screenshot("cloud-chat-cards");
+    expect(address).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/hooks\/wh_[\w-]+\/whsec_[\w-]+$/);
+    expect(new URL(address).origin).toBe(local.hooksUrl);
+    await screenshot("local-chat-cards");
 
-    // Its calls: the right secret runs it, a wrong one is turned away, and More lists both. No "keep it open" hint.
-    const local = address.replace(`https://${CLOUD_HOST}`, cloud.hooksUrl);
-    expect((await fetch(local, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ lead: "Ada Lovelace", email: "ada@example.com" }) })).status).toBe(202);
+    // The right secret runs it, a wrong one is turned away, and More lists both calls.
+    const hookAddress = address;
+    expect((await fetch(hookAddress, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ lead: "Ada Lovelace", email: "ada@example.com" }) })).status).toBe(202);
     await expect.poll(async () => (await state()).routines.some((routine) => routine.name === "Hourly orders"), { timeout: 30_000 }).toBe(true);
-    expect((await fetch(local.replace(/whsec_[\w-]+$/, "whsec_wrong"), { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })).status).toBe(401);
+    expect((await fetch(hookAddress.replace(/whsec_[\w-]+$/, "whsec_wrong"), { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })).status).toBe(401);
     await openAutomations();
     await expect.poll(() => rowText(FORM), { timeout: 30_000 }).toMatch(/Working · last ran today/);
     await evaluate(`${"[...document.querySelectorAll('[data-automation]')]"}.find((item) => item.innerText.includes(${JSON.stringify(FORM)})).querySelector("button").click(); true`);
     await expect.poll(panel).toContain("Copy address");
-    expect(await panel()).not.toContain("Keep Hezuo open");
+    expect(await panel()).toContain("Keep Hezuo open");
     await evaluate(`document.querySelector('aside[aria-label="Automation"] details summary').click(); true`);
     await expect.poll(() => evaluate(`[...document.querySelectorAll('aside[aria-label="Automation"] [data-call]')].map((item) => item.innerText.replace(/\\n/g, " "))`))
       .toEqual([expect.stringMatching(/✗ Wrong secret$/), expect.stringMatching(/✓ Received$/)]);
@@ -554,7 +491,7 @@ await import(${JSON.stringify(pathToFileURL(join(ROOT, "desktop", "server", "tes
     await expect.poll(() => evaluate(`document.querySelector('[id^="approval-details-"]:not([hidden]) .text-warning')?.innerText ?? ""`)).toBe(OUTSIDE_WHY);
     await screenshot("cloud-webhook-made-routine-held");
 
-    // Deleting a bot takes its automations with it, on a Cloud too.
+    // Deleting a bot takes its automations with it.
     await api("POST", "/api/webhooks", { name: "Ledger leads", prompt: "Log the lead.", botId: ledger });
     await api("POST", "/api/routines", { name: "Ledger close", prompt: "Close the books.", botId: ledger, schedule: { type: "daily", time: "18:00", weekdays: [1, 2, 3, 4, 5] } });
     await openAutomations();
@@ -570,13 +507,13 @@ await import(${JSON.stringify(pathToFileURL(join(ROOT, "desktop", "server", "tes
     expect(await evaluate(`[...document.querySelectorAll("[data-automation]")].filter((item) => item.innerText.includes("Ledger")).length`)).toBe(0);
     const after = await state();
     expect([...after.routines, ...after.webhooks].filter((item) => item.botId === ledger)).toEqual([]);
-    await screenshot("cloud-bot-deleted");
+    await screenshot("local-bot-deleted");
   } catch (error) {
     await app?.screenshot("failure").catch(() => {});
     throw error;
   } finally {
     await app?.close();
-    console.info(JSON.stringify({ logPath: cloud.logPath, screenshots: shots }));
-    await cloud.close();
+    console.info(JSON.stringify({ logPath: local.logPath, screenshots: shots }));
+    await local.close();
   }
 }, 600_000);

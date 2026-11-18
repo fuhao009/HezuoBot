@@ -13,7 +13,7 @@ import { createLendingActivity } from "./lending-activity.mjs";
 import { helperMissing, SCREEN_LOCKED } from "./lent-screen-failures.mjs";
 
 async function scratch(t) {
-  const dir = await realpath(await mkdtemp(path.join(tmpdir(), "omb-lending-guards-")));
+  const dir = await realpath(await mkdtemp(path.join(tmpdir(), "hezuo-lending-guards-")));
   t.after(() => rm(dir, { recursive: true, force: true }));
   return dir;
 }
@@ -381,7 +381,7 @@ test("a locked screen is refused in one plain sentence before the driver is reac
 
 test("a missing or quarantined driver says how to restore it, and names no path", async t => {
   const dir = await scratch(t);
-  const gone = path.join(dir, "Program Files", "Hezuo", "resources", "cua-driver.exe");
+  const gone = path.join(dir, "Program Files", "HezuoBot", "resources", "cua-driver.exe");
   const { results } = await lend(t, dir, {
     folders: [], computer: true, cuaConnection: async () => ({ mcpCommand: gone, mcpArgs: ["mcp"], mcpEnv: {} }),
     jobs: [{ action: "computer_call", tool_name: "get_desktop_state", arguments: {} }],
@@ -393,8 +393,8 @@ test("a missing or quarantined driver says how to restore it, and names no path"
 test("computer control that never started gives its reason as a fix the person can make", async t => {
   for (const [reason, expected] of [
     ["cua-driver binary not found", helperMissing()],
-    ["embedded host failed: Packaged background CUA driver is missing; reinstall Hezuo", helperMissing()],
-    ["Accessibility and Screen Recording required; grant access in System Settings and restart Hezuo", /allow Accessibility and Screen Recording/],
+    ["embedded host failed: Packaged background CUA driver is missing; reinstall HezuoBot", helperMissing()],
+    ["Accessibility and Screen Recording required; grant access in System Settings and restart HezuoBot", /allow Accessibility and Screen Recording/],
     ["no running cua-driver daemon", /Computer control is not running on this computer/],
   ]) {
     const dir = await scratch(t);
@@ -412,7 +412,7 @@ test("the lent driver gets the host's system environment, never its credentials"
   t.after(() => { for (const key of Object.keys(process.env)) if (!(key in saved)) delete process.env[key]; Object.assign(process.env, saved); });
   // Real folders: on Windows USERPROFILE is os.homedir(), which sharing resolves to keep the home out of reach.
   for (const name of ["profile-home", "temp", "tmp"]) await mkdir(path.join(dir, name));
-  Object.assign(process.env, { SystemRoot: "C:\\Windows", USERPROFILE: path.join(dir, "profile-home"), TEMP: path.join(dir, "temp"), TMP: path.join(dir, "tmp"), ANTHROPIC_API_KEY: "sk-ant-fixture", OMB_CONTROL_TOKEN: "fixture-token" });
+  Object.assign(process.env, { SystemRoot: "C:\\Windows", USERPROFILE: path.join(dir, "profile-home"), TEMP: path.join(dir, "temp"), TMP: path.join(dir, "tmp"), ANTHROPIC_API_KEY: "sk-ant-fixture", HEZUO_CONTROL_TOKEN: "fixture-token" });
   const connection = await environmentDriver(dir);
   const { results } = await lend(t, dir, {
     folders: [], computer: true, cuaConnection: async () => connection,
@@ -424,7 +424,7 @@ test("the lent driver gets the host's system environment, never its credentials"
   assert.equal(seen.TEMP, path.join(dir, "temp"));
   assert.equal(seen.CUA_DRIVER_RS_TELEMETRY_ENABLED, "0");
   assert.equal(seen.ANTHROPIC_API_KEY, undefined);
-  assert.equal(seen.OMB_CONTROL_TOKEN, undefined);
+  assert.equal(seen.HEZUO_CONTROL_TOKEN, undefined);
 });
 
 test("a Windows path in a failure collapses to its file name before it leaves this computer", async t => {

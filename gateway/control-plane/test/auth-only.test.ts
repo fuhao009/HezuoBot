@@ -11,7 +11,17 @@ it("keeps authentication health available without tunnel credentials", async () 
   const ctx = createExecutionContext();
   const response = await worker.fetch(new Request(`${env.BETTER_AUTH_URL}/healthz`), authOnly, ctx);
   expect(response.status).toBe(200);
-  expect(await response.json()).toEqual({ ok: true, service: "openmausbot-control-plane" });
+  expect(await response.json()).toEqual({ ok: true, service: "hezuobot-control-plane" });
+  await waitOnExecutionContext(ctx);
+});
+
+it("requires an explicit auth origin instead of falling back to the request URL", async () => {
+  const missingOrigin = { ...env, BETTER_AUTH_URL: undefined };
+  expect(() => readAuthConfig(missingOrigin)).toThrow("BETTER_AUTH_URL is required");
+  const ctx = createExecutionContext();
+  const response = await worker.fetch(new Request("https://auth.hezuo.test/healthz"), missingOrigin, ctx);
+  expect(response.status).toBe(503);
+  expect(await response.json()).toEqual({ error: "misconfigured" });
   await waitOnExecutionContext(ctx);
 });
 

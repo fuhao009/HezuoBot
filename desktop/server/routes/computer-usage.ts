@@ -26,6 +26,6 @@ async function cloudComputers({ cfg, managedBoatOwners, computerProviderConfigTr
   if (!boat.boatConfigured(cfg)) return 0;
   if (computerProviderConfigTransitions.has("box")) return null;
   // A count must never adopt a legacy computer or retire a recorded deletion.
-  const inventory = await boat.listManagedBoats(cfg, managedBoatOwners(), { adoptLegacy: false });
+  const inventory = await boat.listManagedBoats(cfg, managedBoatOwners(), { reconcileRecords: false });
   return inventory.available ? inventory.instances.length : null;
 }

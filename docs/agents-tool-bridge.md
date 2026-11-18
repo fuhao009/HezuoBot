@@ -19,7 +19,7 @@ have been listed.
 It is off by default, except for a bot on a local model: one picked from a local
 server, or one on an OpenAI-compatible engine whose URL is on this machine or
 network. A small window cannot spare the full list, so those bots get the bridge
-without the switch. `OMB_AGENTS_TOOL_BRIDGE=0` turns that off too, and the rules
+without the switch. `HEZUO_AGENTS_TOOL_BRIDGE=0` turns that off too, and the rules
 under "Which bots and engines get it" still apply.
 
 ## Turning it on
@@ -30,7 +30,7 @@ In `~/.hezuo/config.json`:
 { "features": { "agentsToolBridge": true } }
 ```
 
-or for one server process, `OMB_AGENTS_TOOL_BRIDGE=1`. The variable wins over
+or for one server process, `HEZUO_AGENTS_TOOL_BRIDGE=1`. The variable wins over
 the saved setting when it is exactly `1` or `0`.
 
 ## The tools that stay listed
@@ -84,7 +84,7 @@ one line is logged naming the kind of error and nothing of what was read.
 Claude Code is not bridged when any of these holds:
 
 - The bot inherits this machine's own Claude Code setup
-  (`OMB_CLAUDE_INHERIT_USER_CONFIG=1`, or **Also use my Claude Code MCP
+  (`HEZUO_CLAUDE_INHERIT_USER_CONFIG=1`, or **Also use my Claude Code MCP
   servers**).
 - An entry of the engine's `tools` or `disallowedTools`, which go to the CLI as
   written (`desktop/server/drivers/claude.ts:1580-1583`), names the agents server or

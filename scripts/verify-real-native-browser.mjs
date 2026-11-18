@@ -14,7 +14,7 @@ import { normalizeProductTrust } from "../desktop/electron/product-ca.mjs";
 const repo = fileURLToPath(new URL("..", import.meta.url));
 const { values } = parseArgs({ options: {
   resource: { type: "string", default: "/Applications/Hezuo.app/Contents/Resources/product-service.json" },
-  credentials: { type: "string", default: join(repo, ".omb-scratch/development-test-credentials.md") },
+  credentials: { type: "string", default: join(repo, ".hezuo-scratch/development-test-credentials.md") },
   "prompt-file": { type: "string" },
   "timeout-seconds": { type: "string", default: "300" },
   "startup-only": { type: "boolean", default: false },
@@ -108,9 +108,9 @@ app.on('web-contents-created', (_event, contents) => {
       const document = await readFile(${JSON.stringify(credentialPath)}, 'utf8');
       const email = document.match(/账号：\x60([^\x60]+)\x60/)[1];
       const password = document.match(/密码：\x60([^\x60]+)\x60/)[1];
-      await contents.executeJavaScript("window.ogb.productAccount.onState(state => { if (['signed_out','signing_in','signed_in','unavailable'].includes(state.auth) && ['stopped','starting','ready','error','stopping'].includes(state.runtime)) console.log('native-state:' + state.auth + '/' + state.runtime + '/' + (/^[a-z0-9_]{1,80}$/.test(state.errorCode || '') ? state.errorCode : 'none')); }); null");
+      await contents.executeJavaScript("window.hezuo.productAccount.onState(state => { if (['signed_out','signing_in','signed_in','unavailable'].includes(state.auth) && ['stopped','starting','ready','error','stopping'].includes(state.runtime)) console.log('native-state:' + state.auth + '/' + state.runtime + '/' + (/^[a-z0-9_]{1,80}$/.test(state.errorCode || '') ? state.errorCode : 'none')); }); null");
       stage('auth-submitted');
-      const state = await contents.executeJavaScript('window.ogb.productAccount.signInWithPassword(' + JSON.stringify(email) + ',' + JSON.stringify(password) + ')');
+      const state = await contents.executeJavaScript('window.hezuo.productAccount.signInWithPassword(' + JSON.stringify(email) + ',' + JSON.stringify(password) + ')');
       stage(state?.auth === 'signed_in' ? 'auth-signed-in' : 'auth-not-signed-in');
       if (state?.auth !== 'signed_in') {
         if (/^[a-z0-9_]{1,80}$/.test(state?.errorCode ?? '')) stage('auth-code:' + state.errorCode);
@@ -124,7 +124,7 @@ import(${JSON.stringify(new URL("../desktop/electron/main.mjs", import.meta.url)
 `, { mode: 0o600 });
 const env = {};
 for (const key of ["PATH", "LANG", "LC_ALL", "TZ", "USER", "TMPDIR", "SYSTEMROOT", "WINDIR", "COMSPEC", "PATHEXT"]) if (process.env[key]) env[key] = process.env[key];
-Object.assign(env, { HOME: join(root, "home"), USERPROFILE: join(root, "home"), OMB_PRODUCT_SERVICE_URL: trust.origin, NODE_EXTRA_CA_CERTS: join(root, "trust.pem") });
+Object.assign(env, { HOME: join(root, "home"), USERPROFILE: join(root, "home"), HEZUO_PRODUCT_SERVICE_URL: trust.origin, NODE_EXTRA_CA_CERTS: join(root, "trust.pem") });
 let child, runId, descriptor;
 const report = { mode: "real-electron-normal-account", root, status: "starting", run: null };
 const save = () => writeFile(join(root, "result.json"), JSON.stringify(report, null, 2), { mode: 0o600 });
@@ -221,5 +221,8 @@ try {
   if (!child || child.exitCode !== null || child.signalCode !== null) {
     await Promise.all(["home", "user-data", "logs"].map(name => rm(join(root, name), { recursive: true, force: true })));
     console.log(JSON.stringify({ stage: "private-data-removed" }));
-  } else throw new Error("Owned Electron did not exit; private data retained to avoid deleting a live profile");
+  } else {
+    console.error("Owned Electron did not exit; private data retained to avoid deleting a live profile");
+    process.exitCode = 1;
+  }
 }

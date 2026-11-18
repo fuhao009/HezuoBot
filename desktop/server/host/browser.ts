@@ -6,7 +6,6 @@ import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 
 import type { Audience } from "../audience.ts";
-import type { CloudLendingRefusal } from "../cloud-lending.ts";
 import type { AppConfig } from "../config.ts";
 import { browserEngineAttachCdpUrl, browserProfilePartitionId, browserProfilePartitionTarget, builtInBrowserEnabled, DATA_DIR } from "../config.ts";
 import { BrowserRuntime, TransportError, attachesToChrome, browserRuntimeEnv, formatBrowserTiming } from "../browser-runtime.ts";
@@ -62,21 +61,14 @@ export interface BrowserHostDeps {
     depth: number; skillAuthoring: boolean; createdBots: number; openedThreads: number;
   }): string;
   DESKTOP_MANAGED: boolean;
-  CLOUD_HOME: unknown;
   PORT: number;
-  /** A Cloud home's way out through the person's own lent computer. */
   device?: EgressSetup["device"];
-  /** Why a turn may not use the person's lent computer (cloud-lending.ts plus the memory check), or null when it may.
-   * Without it, no browser a turn holds may. */
+  /** Without proof a turn may use the lent computer, no browser that turn holds may use it. */
   lendRefusal?(turn: TurnOwner): LendRefusal | null;
-  /** My Cloud's way to the person's own Chrome on the computer that lends it, and which computer that is. */
   lentChrome?: { route(): ChromeRoute | null; lender(): ChromeLender | null };
   /** The engine memory guard, told which browsers each thread's turn starts or holds. */
   engineMemory?: { useBrowsers(browsers: EngineBrowsers): void };
-  /** Whose browser a conversation's turns use on a Team Cloud: the member's, the group chat's or the team's. Every
-   * browser is the bot's own without it. */
   audienceOf?(threadId: string): Audience;
-  /** The box every Chrome of the bots' browsers runs in (a Team Cloud's), or none. */
   browserBox?(seccompFd: number, ro: readonly string[]): LauncherBox | null;
   browserBackend?: Backend;
 }
@@ -93,11 +85,10 @@ function lentDevice(device: NonNullable<EgressSetup["device"]>, holder: (session
 }
 
 type Spec = { command: string; args?: readonly string[]; env: Record<string, string> };
-type LendRefusal = CloudLendingRefusal | "memory-changed";
-const BOT_SESSION = /^bot-[A-Za-z0-9_.-]+$/;
+type LendRefusal = "unproven" | "not-owner" | "someone-else" | "memory-changed";
 
 export function createBrowserHost(deps: BrowserHostDeps) {
-  const { cfg, turnResources, activeInternalGenerationByThread, mintInternalCapability, DESKTOP_MANAGED, CLOUD_HOME, PORT } = deps;
+  const { cfg, turnResources, activeInternalGenerationByThread, mintInternalCapability, DESKTOP_MANAGED, PORT } = deps;
   const store: Pick<Store, "bots" | "bot" | "botByThread"> = { get bots() { return deps.store().bots; }, bot: (id: string) => deps.store().bot(id),
     botByThread: (threadId: string) => deps.store().botByThread(threadId) };
 
@@ -109,7 +100,7 @@ export function createBrowserHost(deps: BrowserHostDeps) {
       throw error instanceof RelayTimeout ? new TransportError(error.message) : error;
     }),
     steps: browserSteps,
-    onTiming: process.env.OMB_BROWSER_TIMING === "1" ? (timing) => console.info(formatBrowserTiming(timing)) : undefined,
+    onTiming: process.env.HEZUO_BROWSER_TIMING === "1" ? (timing) => console.info(formatBrowserTiming(timing)) : undefined,
   });
   const browserBox = deps.browserBox;
   const boxed = Boolean(browserBox?.(LAUNCHER_SECCOMP_FD, []));
@@ -117,8 +108,8 @@ export function createBrowserHost(deps: BrowserHostDeps) {
   const agentBrowserLive = new BrowserLive({ runtime: agentBrowserRuntime, devTools: {
     url: (port) => relay(port, { action: "cdp_url" }, { timeoutMs: 5_000, maxBytes: 65_536 }).then((answer) => answer.data?.cdpUrl),
   } });
-  const host: HostKind = DESKTOP_MANAGED ? "desktop" : CLOUD_HOME || existsSync("/.dockerenv") ? "container" : "server";
-  const idleMs = () => browserIdleMs(cfg, { cloudHome: Boolean(CLOUD_HOME) });
+  const host: HostKind = DESKTOP_MANAGED ? "desktop" : existsSync("/.dockerenv") ? "container" : "server";
+  const idleMs = () => browserIdleMs(cfg);
   const engineKind = () => DESKTOP_MANAGED && deps.browserBackend ? "chrome" : browserEngineKind(cfg);
   const chromeEngine = new ChromeEngine({
     dataDir: DATA_DIR,
@@ -142,8 +133,7 @@ export function createBrowserHost(deps: BrowserHostDeps) {
   const lentChromeAllowed = (session: string) => chromeRefusal(session) === null;
   /** A new conversation can't undo a memory change, so that refusal points to Memory instead. */
   const refusedAs = (session: string) => (chromeRefusals.get(session) === "memory-changed" ? "memory-changed" : "not-allowed");
-  // The desktop's idle time, not a Cloud home's shorter one: each reconnect may make Chrome ask the person to Allow again.
-  const doors = lentChrome ? new LentChromeDoors({ route: () => lentChrome.route(), allowed: lentChromeAllowed, idleMs: () => browserIdleMs(cfg, { cloudHome: false }) }) : undefined;
+  const doors = lentChrome ? new LentChromeDoors({ route: () => lentChrome.route(), allowed: lentChromeAllowed, idleMs: () => browserIdleMs(cfg) }) : undefined;
   const doorUrls = new Map<string, string>();
   const leftovers = new Map<string, Promise<void>>();
   async function lentChromeDoor(session: string): Promise<string | undefined> {
@@ -168,8 +158,6 @@ export function createBrowserHost(deps: BrowserHostDeps) {
     const url = doorUrls.get(session);
     return url !== undefined && spec.env.AGENT_BROWSER_CDP === url;
   }
-  // A tool call that would open Reddit from Hezuo Cloud is refused before it reaches the browser. My Chrome is the
-  // person's own, outside the egress gate too; on My Cloud a call that can't reach it now says why instead.
   const browserRuntime = new RuntimeRouter(agentBrowserRuntime, chromeEngine, {
     refusal: (_session, spec, params) => (attachesToChrome(spec.env) ? null : browserEgress.callRefusal(params)),
     // After beforeDispatch's claim the holder is this call's own turn, so the verdict is the caller's, not the last
@@ -181,7 +169,7 @@ export function createBrowserHost(deps: BrowserHostDeps) {
       if (!lender) return lentChromeGuidance("not-lent", null);
       return lender.online ? null : lentChromeGuidance("offline", lender);
     },
-    annotate: passkeyAnnotation(CLOUD_HOME ? "cloud" : DESKTOP_MANAGED ? "desktop" : "server"),
+    annotate: passkeyAnnotation(DESKTOP_MANAGED ? "desktop" : "server"),
     // agent-browser's own error names only the CDP connection; the door knows what went wrong on the way.
     afterCall: (session, spec, result) => {
       const failed = result as { isError?: unknown; content?: unknown };
@@ -207,17 +195,15 @@ export function createBrowserHost(deps: BrowserHostDeps) {
   const audiences = new AudienceBrowsers(join(DATA_DIR, "browser", "audiences.json"));
   const browserAudience = (threadId: string | undefined): Audience => (threadId && deps.audienceOf ? deps.audienceOf(threadId) : "team");
   const device = deps.device && lentDevice(deps.device, (session) => turnResources.holder(`browser:${session}`), mayLend);
-  const egressHost = DESKTOP_MANAGED ? "desktop" : CLOUD_HOME ? "cloud" : "server";
+  const egressHost = DESKTOP_MANAGED ? "desktop" : "server";
   browserEgress.configure({ host: egressHost, config: () => cfg.browserEngine?.egress, ...(device ? { device } : {}) });
   /** A live bot's, profile's or temporary browser of this data dir, for any audience. */
   const belongs = (session: string) => isTemporaryBrowserSession(session) || audiences.variants().some((suffix) =>
     store.bots.some((bot) => browserSessionId(bot.id + suffix, "") === session)
     || (cfg.browserProfiles ?? []).some((profile) => !usesMyChrome(profile.id) && browserSessionId("", browserProfilePartitionId(profile) + suffix) === session));
-  // The agent-browser daemon outlives its MCP transport and this server; My Chrome is the person's own. A Cloud home's
-  // HOME is this server's alone, so a deleted bot's browser there is closed too.
   const agentBrowserSweep = new BrowserSweep({
     engine: () => { const engine = browserEngineStatus(); return engine.kind === "ready" ? engine.binaryPath : null; },
-    owns: (session) => belongs(session) || (Boolean(CLOUD_HOME) && BOT_SESSION.test(session)),
+    owns: belongs,
     live: (session) => usedBrowserSessions.has(session) && belongs(session),
     held: (session) => !turnResources.free(`browser:${session}`),
     closeIdle: (session) => browserRuntime.closeIfIdle(session, idleMs(), usedBrowserSessions.get(session)),
@@ -291,18 +277,15 @@ export function createBrowserHost(deps: BrowserHostDeps) {
   function myChromeAvailable(): boolean {
     return DESKTOP_MANAGED || browserEngineAttachCdpUrl(cfg) !== null || Boolean(lentChrome?.lender());
   }
-  /** A My Chrome profile on My Cloud: the person's lent Chrome, through this session's door. */
   function lentChromeSession(profileId: string | undefined): boolean {
     return !DESKTOP_MANAGED && browserEngineAttachCdpUrl(cfg) === null && doors !== undefined && usesMyChrome(profileId);
   }
-  /** Where My Chrome is on My Cloud: the computer that lends it, or that one could. */
   function lentChromeSummary(): { myChromeOn?: ChromeLender; myChromeLendable?: true } {
     const lender = lentChrome?.lender() ?? null;
     if (lender) return { myChromeOn: lender };
     return lentChrome ? { myChromeLendable: true } : {};
   }
-  /** On My Cloud a My Chrome profile stays the person's Chrome while no computer lends it: its calls say so, and never
-   * fall back to the built-in browser, whose sign-ins differ. */
+  /** A My Chrome profile must never fall back to the built-in browser, whose sign-ins differ. */
   function usesMyChrome(profileId: string | undefined): boolean {
     return Boolean(profileId) && (myChromeAvailable() || lentChrome !== undefined)
       && cfg.browserProfiles?.some((profile) => profile.id === profileId && profile.browser === "chrome") === true;
@@ -339,7 +322,7 @@ export function createBrowserHost(deps: BrowserHostDeps) {
       kind: "browser", depth: 0, skillAuthoring: false, createdBots: 0, openedThreads: 0 });
     return {
       command: process.execPath, args: [SPAWNED_PROXIES.harnessMcp, "browser"], env: {
-        ...AGENTS_NODE_FLAG, [harnessMcpTokenEnv("browser")]: token, OMB_HARNESS_URL: `http://127.0.0.1:${PORT}`,
+        ...AGENTS_NODE_FLAG, [harnessMcpTokenEnv("browser")]: token, HEZUO_HARNESS_URL: `http://127.0.0.1:${PORT}`,
       },
     };
   }
@@ -476,16 +459,10 @@ export function createBrowserHost(deps: BrowserHostDeps) {
     if (request.partitionId) return chromeEngine.erase({ kind: "profile", id: request.partitionId, partitionId: request.partitionId });
     return Promise.resolve(true);
   }
-  /**
-   * The agent-browser whose saved sessions a deletion erases: the one Hezuo installed, or on a Cloud home the
-   * image's own. Another one on PATH may be a wrapper whose failing close would hold the cleanup journal forever, so
-   * it only closes the running browser.
-   */
+  /** Another agent-browser on PATH may be a wrapper whose failing close would hold the cleanup journal forever. */
   function cleanupEngine(): { binaryPath: string } | null {
     const managed = browserEngineStatus({ managedOnly: true });
-    if (managed.kind === "ready") return managed;
-    const used = browserEngineStatus();
-    return CLOUD_HOME && used.kind === "ready" ? used : null;
+    return managed.kind === "ready" ? managed : null;
   }
   /** A deleted bot's or profile's browser on both engines, for every audience: stopped and its saved sign-ins erased;
    * true once that is done. */
@@ -512,8 +489,6 @@ export function createBrowserHost(deps: BrowserHostDeps) {
     const results = await Promise.all([eraseChromeBrowser(request), ...session ? [erased(session)] : []]);
     return results.every(Boolean);
   }
-  /** A person who left a Team Cloud: their own browser of every bot and every shared profile, stopped and its saved
-   * sign-ins and profile folder erased. True once that is done. */
   async function eraseAudienceBrowsers(audience: Audience): Promise<boolean> {
     const suffix = audienceBrowserSuffix(audience);
     if (!suffix || !audiences.variants().includes(suffix)) return true;
@@ -527,7 +502,7 @@ export function createBrowserHost(deps: BrowserHostDeps) {
   /** Chrome receives private copies; a boxed agent-browser reads them from its own profile's folder. */
   function uploadPaths(files: ReadonlyArray<{ file: string; name: string | null }>, session: string, spec: Spec): Promise<string[]> {
     const chrome = chromeTarget(session, spec);
-    const folder = boxed && !chrome ? join(browserProfileDirectory(session), "omb-uploads") : join(DATA_DIR, "browser-uploads");
+    const folder = boxed && !chrome ? join(browserProfileDirectory(session), "hezuo-uploads") : join(DATA_DIR, "browser-uploads");
     return namedUploadPaths(files, folder, Date.now(), { everyFile: boxed || Boolean(chrome) });
   }
   /** The saved sign-ins of a bot's or a shared profile's browser, for one audience. */

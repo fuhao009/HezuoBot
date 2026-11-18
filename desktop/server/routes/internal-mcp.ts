@@ -13,14 +13,13 @@ import type { McpAuthState, McpOAuthManager } from "../mcp-oauth.ts";
 import type { McpProbeResult } from "../mcp-probe.ts";
 import { isRemoteMcpServer, parseMcpServerMutation, parseStoredMcpServer, type StoredMcpServer, type StoredRemoteMcpServer, type StoredStdioMcpServer } from "../mcp-registry.ts";
 import { serverLine, type ServerLineKey } from "../server-lines.ts";
-import { PASS, type RouteHandler } from "./table.ts";
+import { PASS, type InternalRouteHandler } from "./table.ts";
 
 const PATH = "/api/internal/mcp-servers";
 const ACTIONS = ["list", "add", "update", "enable", "disable", "test", "sign_in", "sign_out", "remove"] as const;
 type McpAction = (typeof ACTIONS)[number];
 const MAX_TOOL_NAMES = 100;
 
-const OWNER_ONLY = "MCP servers are managed by the owner.";
 const ASK_ADMIN = "Ask a workspace admin to add it.";
 
 /** When a change reaches the bot's tools: a turn's servers are fixed when it starts, and the person's answer to a card
@@ -40,8 +39,6 @@ export interface InternalMcpDeps {
   sender: { id: string; mcpServers?: string[] };
   threadId: string;
   fullAccess(): boolean;
-  /** Refuses every action, list included. */
-  guestDriven(): boolean;
   /** True off a Team Cloud; on one, the person this turn acts for is an owner or admin. */
   teamAdmin(): boolean;
   /** The bot's tool selection reaches this server; never widened here. */
@@ -84,10 +81,9 @@ type Outcome = { status: number; text: string; dropped?: string[] } | { status: 
 /** Which call a line is about, to find that call's own row. */
 export type McpCall = { action: McpAction; name?: string };
 
-export function createInternalMcpRoutes(deps: InternalMcpDeps): RouteHandler {
+export function createInternalMcpRoutes(deps: InternalMcpDeps): InternalRouteHandler {
   return async ({ res, path, method, json }) => {
     if (path !== PATH || (method !== "GET" && method !== "POST")) return PASS;
-    if (deps.guestDriven()) return json(res, 403, { error: OWNER_ONLY });
     const controller = new AbortController();
     const disconnect = () => { if (!res.writableEnded) controller.abort(); };
     res.once("close", disconnect);

@@ -5,7 +5,7 @@ import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
-import { launchVerificationServer } from "./control-omb.ts";
+import { launchVerificationServer } from "./control-hezuo.ts";
 import { handleToolCall } from "./mcp-server.ts";
 import { createBotTestApi } from "../desktop/electron/bot-test-api.mjs";
 
@@ -29,7 +29,7 @@ const timing = (value, label) => assert.ok(value === null || (Number.isFinite(va
 try {
   fixture = await launchVerificationServer({
     ...process.env,
-    OMB_TEST_DESKTOP_OWNER_TOKEN: ownerToken,
+    HEZUO_TEST_DESKTOP_OWNER_TOKEN: ownerToken,
     FAKE_CLAUDE_MODE: "slow",
     FAKE_CLAUDE_SLOW_FINISH_GATE: gate,
     FAKE_CLAUDE_TOOL_CALLS: "[]",

@@ -13,7 +13,7 @@ if (process.platform !== "linux") throw new Error("the X11 input smoke is Linux-
 if (!process.env.DISPLAY) throw new Error("the X11 input smoke needs an active DISPLAY");
 if (!existsSync(driver)) throw new Error(`missing staged Cua Driver: ${driver}`);
 
-const prefix = "omb-cua-x11-input-";
+const prefix = "hezuo-cua-x11-input-";
 const sandbox = mkdtempSync(path.join(tmpdir(), prefix));
 if (path.dirname(sandbox) !== path.resolve(tmpdir()) || !path.basename(sandbox).startsWith(prefix)) {
   throw new Error(`unexpected smoke directory: ${sandbox}`);

@@ -255,7 +255,7 @@ describe("account AI status and credentials", () => {
       body: { deviceId: DEVICE_A },
     });
     expect(issue.status).toBe(201);
-    await expect(issue.json()).resolves.toMatchObject({ token: expect.stringMatching(/^omb_product_ai_/) });
+    await expect(issue.json()).resolves.toMatchObject({ token: expect.stringMatching(/^hezuo_product_ai_/) });
   });
 
   it("moves to ready once the balance covers one reservation and issues a device credential", async () => {
@@ -280,7 +280,7 @@ describe("account AI status and credentials", () => {
     });
     expect(issued.status).toBe(201);
     const credential = await issued.json<{ id: string; token: string; expiresAt: number }>();
-    expect(credential.token).toMatch(/^omb_product_ai_[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}$/);
+    expect(credential.token).toMatch(/^hezuo_product_ai_[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}$/);
     expect(credential.expiresAt).toBeGreaterThan(Date.now());
     // The account bearer endpoint never echoes the credential.
     expect(await (await call("/v1/account/ai", { token: account.token, env: operator.env })).text())

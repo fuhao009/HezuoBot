@@ -17,12 +17,15 @@ A bot's own peers list is the one setting that narrows reach. When it is set
 **Let it talk to every bot**, and a bot it blocks is told to say so in plain
 words naming that setting.
 
+The former Team Cloud open-reach end-to-end fixture is retired; the retained
+local coordination checks below do not establish that hosted scenario.
+
 Run these checks against disposable fixtures only:
 
 ```sh
 pnpm exec vitest run desktop/server/peer-roster.test.ts desktop/server/peer-roster-owners.test.ts desktop/server/chief-of-staff.test.ts desktop/server/runtime-coordinator.test.ts desktop/server/bot-overview.test.ts desktop/src/components/bot-settings/PermissionsSection.test.ts --maxWorkers=2
-pnpm exec vitest run desktop/server/peer-allowlist.e2e.test.ts desktop/server/room-coordination.e2e.test.ts desktop/server/direct-coordination.e2e.test.ts desktop/server/cloud-team-open-reach.e2e.test.ts --maxWorkers=2
-OMB_UI_E2E=1 pnpm exec vitest run scripts/testing/team-access-ui.e2e.test.ts --maxWorkers=1
+pnpm exec vitest run desktop/server/peer-allowlist.e2e.test.ts desktop/server/room-coordination.e2e.test.ts desktop/server/direct-coordination.e2e.test.ts --maxWorkers=2
+HEZUO_UI_E2E=1 pnpm exec vitest run scripts/testing/team-access-ui.e2e.test.ts --maxWorkers=1
 ```
 
 The real settings UI check creates Clive in Office and three separate

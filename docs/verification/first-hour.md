@@ -1,62 +1,23 @@
-# A new Cloud's first hour
+# A new Cloud's first hour — retired
 
-What a new personal Cloud's Chief does in its first hour and day
-(`desktop/server/host/first-hour.ts`), and how to see it without a real Google account,
-a model or the Electron app.
+## Retired scope
 
-## The end-to-end scenario
+The former personal Cloud home end-to-end scenario is retired. Its exclusive
+fixture has been removed. There is no supported command here to launch a Cloud
+home, provision trial credit, or connect a person's Google account. Historical
+welcome messages and screenshots are not current acceptance evidence.
 
-```sh
-pnpm exec vitest run desktop/server/first-hour.e2e.test.ts
-```
+## Remaining local coverage and safety
 
-It starts a real Cloud home (`OMB_CLOUD_ROLE=home`) in a temporary home with
-the fake Claude CLI, and the connected-apps service from
-`desktop/server/testing/broker-fake.ts`, which the Cloud registers with by itself as
-its plan includes it. The fake CLI answers by a marker in its prompt
-(`FAKE_CLAUDE_MARKER_REPLIES`) and makes the Composio calls written in a file
-(`FAKE_CLAUDE_TOOL_CALLS_FILE`). Nothing reaches Google, Composio or a model.
+The first-hour host logic still has local unit coverage in
+`desktop/server/host/first-hour.test.ts`; its implementation is
+`desktop/server/host/first-hour.ts`. This is not a replacement for the removed
+Cloud deployment scenario or proof of live Gmail/Calendar integration.
 
-Expected:
+Keep fixtures in disposable homes with fake providers. A first look must stay
+read-and-draft: a connection or welcome card must not authorize sending or
+deleting mail. The current relay boundary is covered by
+`desktop/server/read-and-draft.test.ts`. Do not transfer live credentials,
+contact Google, or enable a retired Cloud role to reproduce old evidence.
 
-- The Chief's chat is the first thing: one message, "Hi Sam! I'm Hezuo, your
-  Chief of Staff. … What do you want off your plate?", the Cloud's welcome steps
-  recorded as done (`cloud-welcome-done`) and Hezuo's own welcome card off.
-- After the first answer, the Chief says why ("So I can see what needs you
-  today, connect Gmail and Google Calendar…") and two connection cards follow.
-  Its system prompt says it is the person's first day and never to ask for
-  Gmail or Calendar itself.
-- Gmail connected (the card's own status check): the first look runs as the
-  Chief's turn in its chat, its prompt never stored as the person's message.
-  Through the relay it reads and writes one reply draft; its send and delete
-  are refused, never reach the service, and are in the decision log
-  (`read-and-draft`). The card shows Connected, continuing.
-- Then, once each: "Every morning at 8 I'll send you a brief of what needs
-  you.", and the phone card, whose button opens the app's own pairing
-  (`open_phone_pairing`). "Your first look is ready" is in the notifications.
-- The brief is on (the one watch routine), and the signed power read never
-  lets the home sleep past 7:50 in the person's zone.
-- The signed health read carries `firstHour` (each milestone's time since the
-  first boot, the apps, `look: delivered`) and `value` (one draft, five
-  minutes), and no name, address or subject.
-
-## The pieces
-
-```sh
-pnpm exec vitest run desktop/server/host/first-hour.test.ts desktop/server/host/brief-morning.test.ts desktop/server/host/first-hour-words.test.ts desktop/server/host/value-ledger.test.ts desktop/server/read-and-draft.test.ts
-```
-
-- `desktop/server/host/first-hour.test.ts`: the greeting in the person's language and by name only
-  while unanswered; the offer once, after the first answer or unasked after 90
-  seconds; the first look, then the brief line and the phone, each once; a
-  decline carries on to the phone with no brief line; a first look that could
-  not run says so; the first look's three-draft fence; the push to a phone
-  paired after the first look; the day-two recap ("So far I've sorted 40
-  emails, drafted 6 replies and prepped 4 meetings: about 2 hours back.") only
-  after 8:00 on day two, once, and never when nothing was done.
-- `desktop/server/host/brief-morning.test.ts`: the brief posted and pushed at 8:00 in the person's
-  zone and not a minute before, once a day; its first line from the counts since
-  the person was last here, left out when they just were; a running watch run
-  waited for up to 20 minutes; the wake ten minutes early, through a clock
-  change; nothing where no morning time is set.
-- `desktop/server/read-and-draft.test.ts`: the first look's relay fence.
+No checks were run for this documentation update.

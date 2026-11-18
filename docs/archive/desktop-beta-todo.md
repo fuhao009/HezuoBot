@@ -230,7 +230,7 @@ npx vitest run --root .. --config desktop/vite.config.ts <改动涉及的测试�
   工具允许/拒绝、零余额拦截、账号隔离、退出撤销令牌及三个窗口尺寸通过。
   最终 `reservedMicroPoints = 0`，活跃模型令牌 0，app 正常退出 code 0。
 - 收据及截图：
-  `/private/var/folders/s0/5h112y2d3495p65t6p7cph400000gn/T/omb-product-verify-g20Heg/evidence/receipt.json`。
+  `/private/var/folders/s0/5h112y2d3495p65t6p7cph400000gn/T/omb-product-verify-g20Heg/evidence/receipt.json` (historical original path)。
 - 当前桌面分支附带的旧 Worker 不接受 `billing` 字段；不能通过丢弃预算兼容。
   隔离联调使用任务计费后端工作树入口和迁移，不修改网关源码。
 - D1 逐段/逐工具重建估算表见 `verification/product-account.md`：

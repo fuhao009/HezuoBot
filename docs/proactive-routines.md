@@ -166,7 +166,7 @@ there is no brief at all. Its row says
 ## Not in v1
 
 - More than one account per app.
-- Phone push when the app is closed (there is no caller of the push relay yet).
+- Closed-client push delivery: the retained push relay has no caller documented here and is not a supported notification path.
 - Quiet hours.
 - A sweep of old run conversations.
 - A run against a real Google account: the Composio slugs and answer shapes

@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, expect, it } from "vitest";
-import { verificationServerEnvironment } from "../../scripts/control-omb.ts";
+import { verificationServerEnvironment } from "../../scripts/control-hezuo.ts";
 import { removeTempDir, waitForExit } from "./testing/cleanup.ts";
 import { freePortBlock } from "./testing/ports.ts";
 
@@ -22,7 +22,7 @@ afterEach(async () => {
 const server = (url: string, extra: object = {}) => ({ driver: "openai-compat", ...extra, config: { url, managedModels: ["fixture-model"] } });
 
 it("lists an OpenAI-compatible server with its provider's mark, and a stored icon over it", async () => {
-  const home = mkdtempSync(join(tmpdir(), "omb-instance-icons-"));
+  const home = mkdtempSync(join(tmpdir(), "hezuo-instance-icons-"));
   homes.push(home);
   mkdirSync(join(home, "tmp"), { recursive: true });
   writeFileSync(join(home, "config.json"), JSON.stringify({
@@ -34,7 +34,7 @@ it("lists an OpenAI-compatible server with its provider's mark, and a stored ico
   }));
   const port = await freePortBlock([0, 1]);
   const base = `http://127.0.0.1:${port}`;
-  const child = spawn(process.execPath, ["--experimental-strip-types", join(ROOT, "server/index.ts")], {
+  const child = spawn(process.execPath, ["--experimental-strip-types", join(ROOT, "desktop/server/index.ts")], {
     cwd: ROOT, env: verificationServerEnvironment(process.env, home, port), stdio: ["ignore", "pipe", "pipe"],
   });
   children.push(child);

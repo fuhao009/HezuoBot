@@ -6,14 +6,14 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { bwrapArgs, planBox, type BoxRequest } from "../bot-box/plan.ts";
-import { detectBox } from "../bot-box/detect.ts";
+import { bwrapArgs, planBox, type BoxRequest } from "../execution-sandbox/plan.ts";
+import { detectBox } from "../execution-sandbox/detect.ts";
 import { audienceHome, engineHomesRoot, homedSpawn } from "./layout.ts";
 import { syncSignIns } from "./sign-ins.ts";
 
-const detection = detectBox({ env: { ...process.env, OMB_BOT_BOX: "1" } });
+const detection = detectBox({ env: { ...process.env, HEZUO_BOT_BOX: "1" } });
 const available = detection.box === "bwrap" && detection.tools !== null;
-const root = mkdtempSync(join(tmpdir(), "omb-engine-box-"));
+const root = mkdtempSync(join(tmpdir(), "hezuo-engine-box-"));
 afterAll(() => rmSync(root, { recursive: true, force: true }));
 
 const serverHome = join(root, "home"), dataDir = join(serverHome, ".hezuo");

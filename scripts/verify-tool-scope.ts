@@ -9,8 +9,8 @@ import { setTimeout as delay } from "node:timers/promises";
 import type { ToolScope } from "../packages/shared/tool-scope.ts";
 
 const cli = resolve(process.argv[2] ?? "grok");
-const home = mkdtempSync(join(tmpdir(), "omb-grok-selection-"));
-process.env.HOME = home; process.env.USERPROFILE = home; process.env.OMB_DATA_DIR = join(home, "data");
+const home = mkdtempSync(join(tmpdir(), "hezuo-grok-selection-"));
+process.env.HOME = home; process.env.USERPROFILE = home; process.env.HEZUO_DATA_DIR = join(home, "data");
 const { GrokAgentDriver } = await import("../desktop/server/drivers/acp/grok.ts");
 const { localHost } = await import("../desktop/server/drivers/local-inject.ts");
 const { ensureDirs } = await import("../desktop/server/config.ts"); ensureDirs();

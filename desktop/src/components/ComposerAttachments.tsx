@@ -17,7 +17,7 @@ import type { CitationAttachment } from "@/lib/citations";
 
 /** Electron 32 removed File.path — only the preload can name a file. */
 export function pathForFile(file: File): string {
-  return window.ogb?.getPathForFile?.(file) ?? "";
+  return window.hezuo?.getPathForFile?.(file) ?? "";
 }
 
 /** The sidebar takes files dropped on a bot itself, so this composer leaves them alone. */

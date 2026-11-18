@@ -1,6 +1,6 @@
 import { WORKSPACE_BACKUP_CLIENT_KEYS, type WorkspaceBackupClientState } from "../../../packages/shared/workspace-backup-client";
 
-export const WORKSPACE_RESTORE_MARKER = "omb-pending-workspace-restore";
+export const WORKSPACE_RESTORE_MARKER = "hezuo-pending-workspace-restore";
 
 export function collectWorkspaceClientState(storage: Pick<Storage, "getItem"> = localStorage): WorkspaceBackupClientState {
   const result: WorkspaceBackupClientState = {};

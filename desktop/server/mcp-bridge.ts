@@ -232,7 +232,7 @@ export function createReplyQueue(
   };
 }
 
-const OWN_ID = "omb-bridge-";
+const OWN_ID = "hezuo-bridge-";
 const SERVER_INFO_META = "io.modelcontextprotocol/serverInfo";
 
 function isObject(value: unknown): value is Record<string, unknown> {

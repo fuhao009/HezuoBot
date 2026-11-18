@@ -3,6 +3,7 @@ import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { readFileSync } from "node:fs";
+import { URL as NodeURL } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { phraseAt, phraseHoldMs } from "@/lib/live-activity";
@@ -192,7 +193,7 @@ describe("the Now card", () => {
 });
 
 describe("thinking shimmer box", () => {
-  const css = readFileSync("src/styles.css", "utf8");
+  const css = readFileSync(new NodeURL("../styles.css", import.meta.url), "utf8");
 
   it("pads the phrase and its sheen past ascenders, descenders and arabic marks without moving the layout", () => {
     const rule = css.match(/\.thinking-shimmer \{[^}]*\}/)?.[0] ?? "";

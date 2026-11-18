@@ -20,7 +20,7 @@ markSimpleModePromptSeen();
 setAdvancedMode(true);
 applySkin((params.get("skin") ?? "midnight") as SkinId);
 
-const ORIGIN = "https://omb-u-fixture.fly.dev";
+const ORIGIN = "https://hezuo-u-fixture.fly.dev";
 const account = {
   status: "connected", account: { id: "acct_fixture", email: "you@example.test" }, deviceId: "device-fixture",
   entitlement: { plan: "pro", tier: "pro", status: "active", expiresAt: Date.now() + 30 * 86_400_000, version: 3 },
@@ -33,7 +33,7 @@ const cloudAccount = {
   signOut: signedIn, openDashboard: signedIn, offer: async () => null, connectHome: signedIn, connectHomeForPhone: signedIn,
 };
 let openSettings: ((section?: string) => void) | null = null;
-Object.assign(window, { ogb: {
+Object.assign(window, { hezuo: {
   platform: "darwin",
   app: { version: "0.1.130", ownPage: page === "local" },
   getCapabilities: async () => ({ host: { platform: "darwin", label: "macOS", session: "unknown", packaged: true }, windowChrome: "mac-inset",

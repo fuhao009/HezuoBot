@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
 
-const flag = "--omb-startup-fixture";
+const flag = "--hezuo-startup-fixture";
 if (!process.versions.electron) {
   const output = mkdtempSync(join(tmpdir(), "hezuo-startup-evidence-"));
   const env = { ...process.env, HOME: output, USERPROFILE: output,

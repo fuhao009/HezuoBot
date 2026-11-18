@@ -53,7 +53,7 @@ export function useHezuoWelcomeDue(viewer: WelcomeViewer | null): { bot: Bot | u
   // The app tour runs only when Settings starts it; one never taken does not hold this back.
   const touring = state.tourOpen;
   const onboardingDue = !viewer || welcomeDue(state.config, {
-    remoteClient: window.ogb?.remoteClient?.active === true, legacyDone: emailGateDone(),
+    remoteClient: window.hezuo?.remoteClient?.active === true, legacyDone: emailGateDone(),
     hosted: viewer.hosted, canSave: viewer.canSave, cloudHome: viewer.cloudHome,
   });
   const due = Boolean(state.config) && hezuoWelcomeDue({ bot, onboardingDue, welcomeOpen: state.welcomeOpen, tourOpen: touring })

@@ -8,8 +8,15 @@ import { resolveAgentBrowserReleaseAsset } from "../desktop/server/browser-engin
 import { BROWSER_LICENSE_FILES, browserExtractionCommand, bundleInventory, parsePrepareBrowserArgs, releaseBytes, stageBrowserTarget, targetsForPreparation, verifyAssetBytes, verifyBrowserBundle, verifyBundleInventory } from "./prepare-browser.mjs";
 
 const fixtures = [];
-function fixture() { const root = mkdtempSync(join(tmpdir(), "omb-browser-prepare-test-")); fixtures.push(root); return root; }
+function fixture() { const root = mkdtempSync(join(tmpdir(), "hezuo-browser-prepare-test-")); fixtures.push(root); return root; }
 afterEach(() => { vi.unstubAllGlobals(); for (const root of fixtures.splice(0)) rmSync(root, { recursive: true, force: true }); });
+
+const windowsFixtureEnv = {
+  HEZUO_BROWSER_ENGINE_WINDOWS_URL: "https://example.test/agent-browser.exe",
+  HEZUO_BROWSER_ENGINE_WINDOWS_SHA256: "a".repeat(64),
+  HEZUO_BROWSER_ENGINE_WINDOWS_VERSION: "test-fixture.1",
+  HEZUO_BROWSER_ENGINE_WINDOWS_BYTES: "1024",
+};
 
 describe("pinned desktop browser preparation", () => {
   it("pins the exact headless vendor archives for only shipped targets", () => {
@@ -23,11 +30,11 @@ describe("pinned desktop browser preparation", () => {
       "win32-x64": [120466147, "9f405cfaf7bc08bf9e046e653cd3086c0faa1d4e25907de857f7e7f093a20122"],
     };
     for (const target of SUPPORTED_BROWSER_TARGETS) {
-      const spec = browserBundleSpec(target);
+      const spec = browserBundleSpec(target, windowsFixtureEnv);
       expect([spec.chrome.bytes, spec.chrome.sha256]).toEqual(pins[target]);
       expect(spec.chrome.url).toMatch(/^https:\/\/storage.googleapis.com\/chrome-for-testing-public\/153\.0\.8010\.47\/[^/]+\/chrome-headless-shell-[^/]+\.zip$/);
       const [platform, arch] = target.split("-");
-      const engine = resolveAgentBrowserReleaseAsset(platform, arch);
+      const engine = resolveAgentBrowserReleaseAsset(platform, arch, false, windowsFixtureEnv);
       expect(spec.engine).toMatchObject({ bytes: engine.bytes, sha256: engine.sha256, asset: engine.asset });
       expect(spec.chrome.license).toMatch(/LICENSE\.headless_shell$/);
     }
@@ -36,18 +43,18 @@ describe("pinned desktop browser preparation", () => {
   it("chooses host targets and rejects unsupported/cross-directory inputs", () => {
     expect(targetsForPreparation({ platform: "darwin", arch: "arm64" })).toEqual(["darwin-arm64", "darwin-x64"]);
     expect(targetsForPreparation({ platform: "darwin", arch: "arm64", current: true })).toEqual(["darwin-arm64"]);
-    expect(targetsForPreparation({ platform: "win32", arch: "x64" })).toEqual(["win32-x64"]);
+    expect(targetsForPreparation({ platform: "win32", arch: "x64", env: windowsFixtureEnv })).toEqual(["win32-x64"]);
     expect(targetsForPreparation({ target: "linux-x64" })).toEqual(["linux-x64"]);
     expect(targetsForPreparation({ platform: "linux", arch: "arm64" })).toEqual(["linux-arm64"]);
-    for (const target of ["win32-arm64", "../darwin-arm64", "freebsd-x64"]) expect(() => browserBundleSpec(target)).toThrow(/Unsupported/);
+    for (const target of ["win32-arm64", "../darwin-arm64", "freebsd-x64"]) expect(() => browserBundleSpec(target, windowsFixtureEnv)).toThrow(/Unsupported/);
     expect(() => targetsForPreparation({ platform: "win32", arch: "arm64" })).toThrow(/Unsupported/);
   });
 
   it("has stable resource-relative paths on every platform", () => {
     const root = join("app", "resources", "browser-engine");
     for (const target of SUPPORTED_BROWSER_TARGETS) {
-      const spec = browserBundleSpec(target);
-      const paths = browserBundlePaths(root, target);
+      const spec = browserBundleSpec(target, windowsFixtureEnv);
+      const paths = browserBundlePaths(root, target, windowsFixtureEnv);
       expect(paths.engine).toBe(join(root, target.startsWith("win32") ? "agent-browser.exe" : "agent-browser"));
       expect(paths.chrome).toBe(join(root, spec.chrome.executable));
       expect(paths.manifest).toBe(join(root, "manifest.json"));

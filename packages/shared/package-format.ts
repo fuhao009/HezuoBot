@@ -27,8 +27,8 @@ export const TEAM_BRIEF_MAX_BYTES = 24_000, RELEASE_NOTES_MAX = 4_000;
 /** v1 limits, kept exactly as the v1 reader always enforced them. */
 export const PACKAGE_V1_VERSION = 1;
 export const PACKAGE_V1_MAX_SKILLS = 20;
-export const BOTMRR_MARKDOWN_VERSION = 1;
-const BOTMRR_MARKDOWN_MAX_BYTES = 1_000_000;
+export const PACKAGE_MARKDOWN_VERSION = 1;
+const PACKAGE_MARKDOWN_MAX_BYTES = 1_000_000;
 
 export const NEWER_PACKAGE_MESSAGE = "This file was made by a newer Hezuo. Update the app, then import it again.";
 
@@ -685,7 +685,7 @@ function checkV2References(pkg: PackageDefinition): void {
 
 function markdownDocument(markdown: string): unknown {
   if (markdown.length > PACKAGE_MAX_BYTES) throw tooLarge();
-  if (utf8Bytes(markdown) > BOTMRR_MARKDOWN_MAX_BYTES) throw new PackageFormatError("too_large", "The bot playbook is too large");
+  if (utf8Bytes(markdown) > PACKAGE_MARKDOWN_MAX_BYTES) throw new PackageFormatError("too_large", "The bot playbook is too large");
   const frontmatter = markdown.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
   if (!frontmatter) throw new PackageFormatError("not_a_package", "This Markdown is missing YAML frontmatter");
   let metadata: unknown;
@@ -695,10 +695,10 @@ function markdownDocument(markdown: string): unknown {
     throw new PackageFormatError("not_a_package", "This Markdown has invalid YAML frontmatter");
   }
   if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
-    throw new PackageFormatError("not_a_package", "This Markdown is missing its BotMRR blueprint");
+    throw new PackageFormatError("not_a_package", "This Markdown is missing its package blueprint");
   }
   const { botmrr, ...definition } = metadata as Record<string, unknown>;
-  if (botmrr !== BOTMRR_MARKDOWN_VERSION) throw new PackageFormatError("unsupported_version", "BotMRR Markdown version is not supported");
+  if (botmrr !== PACKAGE_MARKDOWN_VERSION) throw new PackageFormatError("unsupported_version", "Package Markdown version is not supported");
   for (const heading of ["Activation", "Mission", "Outcomes", "Connections", "Team", "Chief of Staff", "Completion rule"]) {
     if (!markdown.includes(`## ${heading}`)) throw new PackageFormatError("invalid", `This Markdown is missing its ${heading} section`);
   }
@@ -706,32 +706,16 @@ function markdownDocument(markdown: string): unknown {
 }
 
 
-/** Read-only migration of pre-Hezuo package identity and routine execution targets. */
-function migrateLegacyPackage(value: unknown): unknown {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
-  const document = value as Record<string, unknown>;
-  if (document.format !== "openmaus.package") return value;
-  const pkg = document.package;
-  if (!pkg || typeof pkg !== "object" || Array.isArray(pkg)) return { ...document, format: PACKAGE_FORMAT };
-  const definition = pkg as Record<string, unknown>;
-  const routines = Array.isArray(definition.routines) ? definition.routines.map((routine: unknown) => {
-    if (!routine || typeof routine !== "object" || Array.isArray(routine)) return routine;
-    const row = routine as Record<string, unknown>;
-    return row.runOn === "maus" ? { ...row, runOn: "hezuo" } : row;
-  }) : definition.routines;
-  return { ...document, format: PACKAGE_FORMAT, package: { ...definition, ...(routines === undefined ? {} : { routines }) } };
-}
-
-/** True for a BotMRR Markdown string or an object that says it is a package. */
+/** True for a package Markdown string or an object that says it is a package. */
 export function isPackageDocument(value: unknown): boolean {
   if (typeof value === "string") return /^---\r?\n[\s\S]*?\bbotmrr:\s*1\b/m.test(value);
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value) &&
-    [PACKAGE_FORMAT, "openmaus.package"].includes((value as { format?: unknown }).format as string);
+  return value !== null && typeof value === "object" && !Array.isArray(value) &&
+    "format" in value && value.format === PACKAGE_FORMAT;
 }
 
 /** Parse exactly one v1 document (JSON object or Markdown) with the v1 rules. */
 export function parsePackageV1(value: unknown): PackageDocumentV1 {
-  const source = typeof value === "string" ? markdownDocument(value) : migrateLegacyPackage(value);
+  const source = typeof value === "string" ? markdownDocument(value) : value;
   const parsed = packageDocumentV1Schema.safeParse(source);
   if (!parsed.success) throw new PackageFormatError("invalid", v1SchemaSentence(parsed.error));
   checkV1References(parsed.data.package);
@@ -766,11 +750,10 @@ export function upgradeV1(document: PackageDocumentV1): PackageDocument {
   });
 }
 
-/** Accepts v1 (object or BotMRR Markdown string) and v2 (object). Always
+/** Accepts v1 (object or package Markdown string) and v2 (object). Always
  * returns v2. trust "file" (the default) deletes package.publisher: only
  * Admin may stamp who published a release. */
 export function parsePackageDocument(value: unknown, options: { trust?: PackageTrust } = {}): PackageDocument {
-  value = migrateLegacyPackage(value);
   const trust = options.trust ?? "file";
   let document: PackageDocument;
   if (typeof value === "string") {

@@ -27,7 +27,7 @@ import(${JSON.stringify(pathToFileURL(entry).href)}).catch(fail);`);
   const executable = require("electron");
   const env = { ...process.env }; delete env.ELECTRON_RUN_AS_NODE;
   const code = await new Promise((resolve, reject) => {
-    const child = spawn(executable, [bootstrap, process.argv[2] ?? join(process.cwd(), ".omb-scratch", "embedded-browser-evidence")], { env, stdio: "inherit" });
+    const child = spawn(executable, [bootstrap, process.argv[2] ?? join(process.cwd(), ".hezuo-scratch", "embedded-browser-evidence")], { env, stdio: "inherit" });
     child.once("error", reject); child.once("exit", resolve);
   });
   if (code !== 0) process.exitCode = 1;

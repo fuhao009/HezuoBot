@@ -1,11 +1,10 @@
 import { withMcpSignIn, type McpOAuthManager } from "../mcp-oauth.ts";
-import { brokeredServer, type BrokerPath } from "../bot-box/broker-probe.ts";
+import { brokeredServer, type BrokerPath } from "../execution-sandbox/broker-probe.ts";
 import { probeMcpServer, sendsCredentials, type McpProbeOptions, type McpProbeResult } from "../mcp-probe.ts";
 import { MAX_MCP_SERVERS, isRemoteMcpServer, parseStoredMcpServer, type McpRunsOn, type StoredMcpServer, type StoredRemoteMcpServer } from "../mcp-registry.ts";
 import { postizKeyHeaders } from "../postiz/connection.ts";
 import type { AppConfig } from "../config.ts";
 import type { ChatAppsMcp } from "../chat-apps-mcp.ts";
-import type { CloudHomeConfig } from "../cloud-home.ts";
 import type { BusyFlag } from "../routes/config.ts";
 import type { SessionRegistry } from "../sessions.ts";
 import type { TeamConnectionsHost } from "./team-connections-host.ts";
@@ -15,14 +14,12 @@ export interface McpConfigDeps {
   sessions: Pick<SessionRegistry, "isLive">;
   mcpOAuth: McpOAuthManager;
   teamConnections: Pick<TeamConnectionsHost, "personMcp" | "people">;
-  cloudHome: Pick<CloudHomeConfig, "publicOrigin"> | null;
   fallbackPublicUrl: string | null;
   mcpConfigBusy: BusyFlag;
   /** Secrets as booleans, sign-in state attached. */
   mcpServerResponse(): Record<string, unknown>;
   mcpPolicyRefusal(name: string, server: object): string | undefined;
   persistMcpServers(next: Record<string, unknown>): void;
-  savedCustomDomain(): string | null;
   appCatalog?: Pick<ChatAppsMcp, "probeOptions" | "serverChanged" | "forgetServer"> & Partial<Pick<ChatAppsMcp, "hasApps">>;
   /** A Team Cloud: each member's own key and sign-in for a removed server go with it. */
   forgetPeople?(name: string): void;

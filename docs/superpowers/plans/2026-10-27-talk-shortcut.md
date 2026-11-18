@@ -6,8 +6,6 @@
 
 **Architecture:** `globalShortcut` sees the press; the existing speech helper sees the release (`--finish-on-release`, polling `CGEventSource.flagsState`). Small injected-dependency modules in Electron main do the rest: `talk-keys` (presets), `talk-shortcut` (registration and call presence), `talk-server` (find Hezuo, keep the Quick asks chat, send, follow `/api/events`), `talk-panel` (the non-activating box), `talk-session` (the ask state machine). `speech.mjs` gains sinks so main can own a speech session without a window.
 
-**Tech Stack:** Electron ^43.5.0 main (ESM `.mjs`, preload `.cjs`), Swift helper (`swiftc`), Node `node:test` for `desktop/electron/*.node-test.mjs`, vitest (+ happy-dom) for `desktop/electron/*.test.mjs`, `desktop/server/`, `desktop/src/`; React settings row.
-
 **Spec:** `docs/superpowers/specs/2026-10-27-talk-shortcut-design.md`
 
 ## Global Constraints
@@ -36,22 +34,6 @@
 
 ## File Structure
 
-| File | Responsibility |
-| --- | --- |
-| `desktop/server/routes/tasks.ts` (modify) | `POST /api/bots/:id/tasks` accepts `select: false` |
-| `desktop/electron/resources/speech-helper.swift` (modify) | `--finish-on-release <mods>`, `--release-check <mods> <flags>` |
-| `desktop/electron/speech.mjs` (modify) | sinks, owner-scoped stop/finish, `speechBusy()`, `finishOnRelease` option |
-| `desktop/electron/talk-keys.mjs` (new) | the three presets |
-| `desktop/electron/desktop-prefs.mjs`, `.d.mts` (modify) | talk prefs, Quick asks chat per server, injectable store |
-| `desktop/electron/talk-shortcut.mjs`, `.d.mts` (new) | register/unregister with prefs; call presence |
-| `desktop/electron/talk-server.mjs`, `.d.mts` (new) | find Hezuo, Quick asks chat, SSE reading, reply tracking, ask |
-| `desktop/electron/talk-panel.mjs`, `desktop/electron/talk-panel-preload.cjs` (new) | the box window, its `data:` page, `isTalkPanel` |
-| `desktop/electron/talk-session.mjs` (new) | the ask state machine |
-| `desktop/electron/main.mjs`, `desktop/electron/preload.cjs`, `desktop/src/types/ogb.d.ts` (modify) | wiring, `appWindows()`, IPC, bridge |
-| `desktop/src/lib/call-presence.ts`, `desktop/src/components/LiveCallHost.tsx` | tell main when a call runs |
-| `desktop/src/components/TalkShortcutRow.tsx`, `SettingsModal.tsx`, `desktop/src/locales/en.json` | Settings → General row |
-| `docs/verification/talk-shortcut.md`, `docs/verification/README.md` | verification recipe |
-
 ---
 
 ### Task 1: Create a chat without selecting it
@@ -65,7 +47,7 @@
 **Interfaces:**
 - Produces: `POST /api/bots/:id/tasks` body `{ title?: string, select?: boolean, … }`; `select: false` creates without selecting; non-boolean `select` → 400 `{ error: "select must be a boolean" }`. Response unchanged: 201 `{ bot, task }`.
 
-- [ ] **Step 1: Write the failing test** (`launchVerificationServer` from `scripts/control-omb.ts`, same `api()` helper as `desktop/server/bot-projects-api.test.ts:12-21`, `beforeAll` 90 s timeout)
+- [ ] **Step 1: Write the failing test** (`launchVerificationServer` from `scripts/control-hezuo.ts`, same `api()` helper as `desktop/server/bot-projects-api.test.ts:12-21`, `beforeAll` 90 s timeout)
 
 ```ts
 it("creates a chat without switching the bot's open chat when select is false", async () => {
@@ -112,7 +94,6 @@ git commit -m "feat(server): create a chat without selecting it"
 ### Task 2: The speech helper finishes when the keys are let go
 
 **Files:**
-- Modify: `desktop/electron/resources/speech-helper.swift` (header comment 1-13, imports 14-16, after `finishFile` 48-52, finish timer 72-82)
 - Test: `desktop/electron/speech-helper-release.node-test.mjs` (new)
 
 **Interfaces:**
@@ -120,29 +101,11 @@ git commit -m "feat(server): create a chat without selecting it"
 
 - [ ] **Step 1: Write the failing test** (skipped unless macOS with `xcrun --find swiftc`; compiles single-arch `-Onone` into a temp dir and runs the loose binary, which is fine because `--release-check` exits before any TCC-protected call)
 
-```js
-const CONTROL = 0x40000, OPTION = 0x80000, SHIFT = 0x20000, COMMAND = 0x100000;
-test("the helper finishes when any of the chosen modifiers is let go", { skip: !swiftc && "needs macOS with swiftc" }, () => {
-  // build bin from new URL("./resources/speech-helper.swift", import.meta.url) with xcrun swiftc -Onone, timeout 180_000
-  const check = (mods, flags) => JSON.parse(execFileSync(bin, ["--release-check", mods, String(flags)], { encoding: "utf8", timeout: 10_000 }));
-  assert.deepEqual(check("control,option", CONTROL | OPTION), { released: false });
-  assert.deepEqual(check("control,option", CONTROL | OPTION | SHIFT), { released: false });
-  assert.deepEqual(check("control,option", CONTROL), { released: true });
-  assert.deepEqual(check("control,option", 0), { released: true });
-  assert.deepEqual(check("option,shift", OPTION | SHIFT), { released: false });
-  assert.deepEqual(check("option,shift", SHIFT | COMMAND), { released: true });
-  const bad = spawnSync(bin, ["--release-check", "control,hyper", "0"], { encoding: "utf8", timeout: 10_000 });
-  assert.equal(bad.status, 1);
-  assert.deepEqual(JSON.parse(bad.stdout), { error: "bad-modifiers" });
-});
-```
-
 - [ ] **Step 2: Run it to see it fail**
 
 Run: `node --test desktop/electron/speech-helper-release.node-test.mjs`
 Expected: FAIL (`--release-check` unknown: the helper goes on to ask for speech authorization and is killed or times out after 10 s).
 
-- [ ] **Step 3: Implement in `speech-helper.swift`**
   - `import CoreGraphics`.
   - `func releaseModifiers(_ list: String) -> CGEventFlags?` — map names to `.maskControl`, `.maskAlternate`, `.maskShift`, `.maskCommand`; nil for an empty list or any unknown name.
   - `func released(_ required: CGEventFlags, _ current: CGEventFlags) -> Bool` — `!current.contains(required)`.
@@ -157,11 +120,6 @@ Run: `node --test desktop/electron/speech-helper-release.node-test.mjs && node d
 Expected: PASS, and the universal build still links.
 
 - [ ] **Step 5: Commit**
-
-```bash
-git add desktop/electron/resources/speech-helper.swift desktop/electron/speech-helper-release.node-test.mjs
-git commit -m "feat(speech): finish recognition when the talk keys are let go"
-```
 
 ---
 
@@ -448,7 +406,7 @@ test("readFrames joins frames split across chunks and skips heartbeats and junk"
 });
 ```
 
-- [ ] **Step 2: Write the failing fixture test** (`desktop/server/talk-server.e2e.test.ts`; launch with `OMB_TEST_DESKTOP_OWNER_TOKEN: owner` and send `x-hezuo-desktop-owner` on every request, as `desktop/server/chat-pages.e2e.test.ts:54-56` does, so it runs the packaged desktop's path)
+- [ ] **Step 2: Write the failing fixture test** (`desktop/server/talk-server.e2e.test.ts`; launch with `HEZUO_TEST_DESKTOP_OWNER_TOKEN: owner` and send `x-hezuo-desktop-owner` on every request, as `desktop/server/chat-pages.e2e.test.ts:54-56` does, so it runs the packaged desktop's path)
 
 ```ts
 it("asks Hezuo in its own Quick asks chat, as the desktop app does, and follows the reply to the end", async () => {
@@ -697,12 +655,12 @@ git commit -m "feat(talk): one ask from press to reply"
 ### Task 8: Wire it into the desktop app
 
 **Files:**
-- Modify: `desktop/electron/main.mjs` (electron import line 1, speech import line 11, the 12 `BrowserWindow.getAllWindows()` sites at 139, 269, 359, 945, 952, 1544, 1550, 1826, 2905, 3068, 3198, 3204; speech IPC 2477-2491; prefs at 3066; `before-quit` 3222), `desktop/electron/preload.cjs` (`HOME_PAGE` line 43, speech block 162-174), `desktop/src/types/ogb.d.ts` (after `speechFinish`, ~261)
+- Modify: `desktop/electron/main.mjs` (electron import line 1, speech import line 11, the 12 `BrowserWindow.getAllWindows()` sites at 139, 269, 359, 945, 952, 1544, 1550, 1826, 2905, 3068, 3198, 3204; speech IPC 2477-2491; prefs at 3066; `before-quit` 3222), `desktop/electron/preload.cjs` (`HOME_PAGE` line 43, speech block 162-174), `desktop/src/types/hezuo.d.ts` (after `speechFinish`, ~261)
 - Test: `desktop/electron/talk-main.node-test.mjs` (new, reads `main.mjs` and `preload.cjs` source like `desktop/electron/local-only-hoist.node-test.mjs`), `desktop/electron/preload.node-test.mjs` (add)
 
 **Interfaces:**
 - Consumes: everything from Tasks 3-7.
-- Produces: `window.ogb.talkShortcut?: TalkShortcutBridge` (this computer's page only) and `window.ogb.callActive?(active: boolean): Promise<void>` (this computer's page and My Cloud's own page). IPC `talk-shortcut:state`, `talk-shortcut:set` (`localOnly`), `call:active` (`localOrHome`: a Live call on My Cloud's page holds the microphone too; the worst a page can do with it is block the shortcut).
+- Produces: `window.hezuo.talkShortcut?: TalkShortcutBridge` (this computer's page only) and `window.hezuo.callActive?(active: boolean): Promise<void>` (this computer's page and My Cloud's own page). IPC `talk-shortcut:state`, `talk-shortcut:set` (`localOnly`), `call:active` (`localOrHome`: a Live call on My Cloud's page holds the microphone too; the worst a page can do with it is block the shortcut).
 
 Wiring in `main.mjs`:
 - `function appWindows() { return BrowserWindow.getAllWindows().filter((win) => !isTalkPanel(win)); }` (a hoisted declaration near the top) replaces every `BrowserWindow.getAllWindows()` call.
@@ -748,7 +706,7 @@ test("the talk bridge asks main over its own channels with only what it understa
 Run: `node --test desktop/electron/talk-main.node-test.mjs desktop/electron/preload.node-test.mjs`
 Expected: FAIL (12 `getAllWindows` sites; no talk channels; no `talkShortcut` in the bridge).
 
-- [ ] **Step 3: Implement** the wiring above, the preload keys (`talkShortcut: { state, set }`, `callActive`; `"callActive"` added to `HOME_PAGE`), and `ogb.d.ts`: `talkShortcut?: import("../../electron/talk-shortcut.mjs").TalkShortcutBridge;` with a doc comment "This computer's page only: Settings → General's talk shortcut." and `callActive?(active: boolean): Promise<void>;` with "A call holds the microphone, so the talk shortcut waits."
+- [ ] **Step 3: Implement** the wiring above, the preload keys (`talkShortcut: { state, set }`, `callActive`; `"callActive"` added to `HOME_PAGE`), and `hezuo.d.ts`: `talkShortcut?: import("../../electron/talk-shortcut.mjs").TalkShortcutBridge;` with a doc comment "This computer's page only: Settings → General's talk shortcut." and `callActive?(active: boolean): Promise<void>;` with "A call holds the microphone, so the talk shortcut waits."
 
 - [ ] **Step 4: Run the checks**
 
@@ -758,7 +716,7 @@ Expected: PASS, no type or lint errors.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add desktop/electron/main.mjs desktop/electron/preload.cjs desktop/src/types/ogb.d.ts desktop/electron/talk-main.node-test.mjs desktop/electron/preload.node-test.mjs
+git add desktop/electron/main.mjs desktop/electron/preload.cjs desktop/src/types/hezuo.d.ts desktop/electron/talk-main.node-test.mjs desktop/electron/preload.node-test.mjs
 git commit -m "feat(talk): wire the talk shortcut into the desktop app"
 ```
 
@@ -769,10 +727,10 @@ git commit -m "feat(talk): wire the talk shortcut into the desktop app"
 **Files:**
 - Create: `desktop/src/lib/call-presence.ts`, `desktop/src/components/TalkShortcutRow.tsx`
 - Modify: `desktop/src/components/LiveCallHost.tsx` (call the hook), `desktop/src/components/SettingsModal.tsx` (General keywords line 85; render `<TalkShortcutRow />` right after `<DefaultBotSidebarRow />` at ~671), `desktop/src/locales/en.json` (beside `settings.analytics.*`, ~1228)
-- Test: `desktop/src/lib/call-presence.test.ts`, `desktop/src/components/TalkShortcutRow.test.ts` (happy-dom, `createRoot` + `act`, with `settle`/`show`/`click` helpers as `desktop/src/components/UpdatesConsent.test.ts:14-27`; `toggle()` is `button[aria-label="Talk to Hezuo from any app"]`; `bridge = { state: vi.fn(async () => current), set: vi.fn(async change => (current = { ...current, ...change })) }` on `window.ogb.talkShortcut`)
+- Test: `desktop/src/lib/call-presence.test.ts`, `desktop/src/components/TalkShortcutRow.test.ts` (happy-dom, `createRoot` + `act`, with `settle`/`show`/`click` helpers as `desktop/src/components/UpdatesConsent.test.ts:14-27`; `toggle()` is `button[aria-label="Talk to Hezuo from any app"]`; `bridge = { state: vi.fn(async () => current), set: vi.fn(async change => (current = { ...current, ...change })) }` on `window.hezuo.talkShortcut`)
 
 **Interfaces:**
-- Consumes: `window.ogb.talkShortcut`, `window.ogb.callActive` (Task 8); `useOnCall`, `startCall`, `endCall` (`desktop/src/lib/call.ts`); `useLiveMedia`, `isLiveCallRunning`, `LiveMediaPhase` (`desktop/src/lib/live-call-media.ts`).
+- Consumes: `window.hezuo.talkShortcut`, `window.hezuo.callActive` (Task 8); `useOnCall`, `startCall`, `endCall` (`desktop/src/lib/call.ts`); `useLiveMedia`, `isLiveCallRunning`, `LiveMediaPhase` (`desktop/src/lib/live-call-media.ts`).
 - Produces: `callInProgress(onCall: string | null, phase: LiveMediaPhase): boolean`; `useReportCallPresence(): void` (reports on mount and on every change, so a reloaded page clears a stale `true`); `TalkShortcutRow()`.
 - Strings: `settings.talk.title` "Talk to Hezuo from any app", `settings.talk.subtitle` "Hold {key}, speak, let go. Hezuo answers in a small box at the bottom of the screen; click it to open the chat.", `settings.talk.aria` "Talk to Hezuo from any app", `settings.talk.keyAria` "Talk shortcut", `settings.talk.taken` "{key} is used by another app. Pick another shortcut.". Keywords: `"talk"`, `"voice"`, `"shortcut"`, `"hotkey"`, `"hold to talk"`, `"push to talk"`, `"quick asks"`.
 - Row: hidden without the bridge or when `!state.available`; `SettingRow` with the `Switch`; when on, a `Select size="sm"` of `state.keys` (labels) in the row's `message`, and under it `role="alert"` `settings.talk.taken` when `state.taken`; each change shows the state `set()` returns.
@@ -789,14 +747,14 @@ it("a turn call or a running Live call is a call", () => {
 });
 it("tells main when a call starts and ends, and says none on mount", async () => {
   const callActive = vi.fn(async () => {});
-  (window as any).ogb = { callActive };
+  (window as any).hezuo = { callActive };
   await act(async () => { root.render(createElement(() => { useReportCallPresence(); return null; })); });
   await act(async () => { startCall("bot-1"); });
   await act(async () => { endCall("bot-1"); });
   expect(callActive.mock.calls).toEqual([[false], [true], [false]]);
 });
 // TalkShortcutRow.test.ts — base state { available: true, enabled: true, key: "ctrl-opt-space", keys: KEYS, taken: false }
-it("is not shown without the bridge or where Apple speech is unavailable");   // no ogb → host empty; available:false → host empty
+it("is not shown without the bridge or where Apple speech is unavailable");   // no hezuo → host empty; available:false → host empty
 it("shows the switch on with the key in its subtitle, and turns it off", async () => {
   await show();
   expect(host.textContent).toContain("Talk to Hezuo from any app");
@@ -842,7 +800,7 @@ git commit -m "feat(talk): Settings row, and calls tell main they hold the micro
 
 `talk-shortcut.md` sections (in this repo's recipe style, see `docs/verification/local-environments.md`):
 1. **Floor: automated checks** — `node --test desktop/electron/talk-*.node-test.mjs desktop/electron/desktop-prefs.node-test.mjs desktop/electron/preload.node-test.mjs desktop/electron/speech-helper-release.node-test.mjs`; `pnpm exec vitest run desktop/electron/speech.test.mjs desktop/server/task-select.test.ts desktop/server/talk-server.e2e.test.ts desktop/src/lib/call-presence.test.ts desktop/src/components/TalkShortcutRow.test.ts --maxWorkers=1`; `pnpm typecheck && pnpm lint && pnpm i18n:check`. What they prove and what they do not (the real hotkey, the microphone, focus, Spaces).
-2. **Setup** — a packaged build of the branch installed beside, never over, the installed Hezuo (maintainers: the OMB2 side-by-side build), launched with `OMB_DATA_DIR=$HOME/.hezuo-test` unless the check needs real bots; only one running app may hold the key. Composer dictation used once first so Microphone and Speech Recognition are granted.
+2. **Setup** — a packaged build of the branch installed beside, never over, the installed Hezuo (maintainers: the Hezuo side-by-side build), launched with `HEZUO_DATA_DIR=$HOME/.hezuo-test` unless the check needs real bots; only one running app may hold the key. Composer dictation used once first so Microphone and Speech Recognition are granted.
 3. **By hand**, each with its expected result:
    - Settings → General shows the row, on, "Hold ⌃⌥Space, speak, let go".
    - In Safari's address bar: hold ⌃⌥, tap Space, say "what can you do", let go of ⌃⌥. Live words, then the reply, bottom-centre of that display. `osascript -e 'tell application "System Events" to name of first application process whose frontmost is true'` prints `Safari` before and after; the caret still blinks in Safari; the Hezuo window stays behind.
@@ -878,4 +836,3 @@ git commit -m "docs(verification): talk shortcut recipe"
 - **Spec coverage.** Key via `globalShortcut` + helper release (Tasks 2, 4); repeat presses ignored, press during a reply starts anew (7); registration failure shown in Settings (4, 9); speech sinks, `speechBusy`, `replaced()` (3); `call:active` and refusal during calls or dictation (4, 7, 8, 9); the box, its window flags, `data:` page with strict CSP, `open()`/`dismiss()` only, states, 12 s hide unless hovered, click opens the chat, panel skipped by every window list (6, 7, 8); local server, Hezuo lookup, owner header, send with `sendId`, SSE follow, needs-you, 120 s, empty transcript, server down (5, 7, 8); prefs, Settings row, hidden without Apple speech, not in `REMOTE_SAFE` (4, 8, 9); Quick asks chat created, reused, recreated, per server (1, 4, 5); testing section (all tasks, 10). Dev reaching the dev server (8, 10).
 - **Deviations from the spec, on purpose.** The ask posts `threadId` (the spec's `{text, sendId}` would land in Hezuo's selected chat, `desktop/server/routes/bot-messages.ts:202`, against the Quick asks decision). Speech sink tests live in vitest `desktop/electron/speech.test.mjs`, not a node-test, because `speech.mjs` imports Electron's `app`. `call:active` is `localOrHome`, not `localOnly`, so a Live call on My Cloud's page also blocks the shortcut. The box's copy is English in v1.
 - **Types.** `TalkView`, `TalkChat`, `TalkUpdate`, `TalkShortcutState`, `TalkKeyId` and every factory name are spelled the same in each task's Interfaces and tests.
-- **Left open to the implementer.** Exact page markup and CSS within the tokens given; the Swift parsing style.

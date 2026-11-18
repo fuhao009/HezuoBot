@@ -1,7 +1,7 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { createTalkServer, QUICK_ASKS_TITLE, type TalkChat, type TalkUpdate } from "../electron/talk-server.mjs";
-import { launchVerificationServer } from "../../scripts/control-omb.ts";
+import { launchVerificationServer } from "../../scripts/control-hezuo.ts";
 
 const owner = randomBytes(32).toString("base64url");
 const realFetch = globalThis.fetch;
@@ -10,7 +10,7 @@ const request = (route: string, init?: RequestInit) => fetch(`${fixture.info.url
 
 beforeAll(async () => {
   globalThis.fetch = (input, init = {}) => realFetch(input, { ...init, headers: { ...Object.fromEntries(new Headers(init.headers)), "x-hezuo-desktop-owner": owner } });
-  fixture = await launchVerificationServer({ ...process.env, OMB_TEST_DESKTOP_OWNER_TOKEN: owner });
+  fixture = await launchVerificationServer({ ...process.env, HEZUO_TEST_DESKTOP_OWNER_TOKEN: owner });
 }, 90_000);
 afterAll(async () => {
   globalThis.fetch = realFetch;
@@ -31,21 +31,4 @@ it("asks Hezuo in its own Quick asks chat, as the desktop app does, and follows 
   expect(after.threadId).toBe(before.threadId);
   expect(after.tasks.find((t: any) => t.threadId === chat.threadId).title).toBe(QUICK_ASKS_TITLE);
   expect(await talk.prepare()).toEqual(chat);
-}, 90_000);
-
-it("a computer whose bots moved to My Cloud refuses asks with moved, both a new chat and a send to the saved one", async () => {
-  let saved: TalkChat | null = null;
-  const prefs = { quickAsksChat: () => saved, setQuickAsksChat: (_s: string, chat: TalkChat) => { saved = chat; } };
-  const chat = await createTalkServer({ request, serverKey: () => "fixture", prefs }).prepare();
-  expect((await request("/api/move/freeze", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })).status).toBe(200);
-  try {
-    const fresh = createTalkServer({ request, serverKey: () => "fixture", prefs: { quickAsksChat: () => null, setQuickAsksChat: () => {} } });
-    await expect(fresh.prepare()).rejects.toMatchObject({ name: "TalkServerError", code: "moved" });
-    const talk = createTalkServer({ request, serverKey: () => "fixture", prefs });
-    expect(await talk.prepare()).toEqual(chat);
-    await expect(talk.ask({ chat, text: "Still there?", sendId: randomUUID(), signal: AbortSignal.timeout(30_000), onUpdate: () => {} }))
-      .rejects.toMatchObject({ name: "TalkServerError", code: "moved" });
-  } finally {
-    await request("/api/move/freeze", { method: "DELETE" });
-  }
 }, 90_000);

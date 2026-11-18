@@ -12,7 +12,8 @@ import { onJsonBody, parsedBodyOf } from "../harness/http.ts";
 interface AdminAuditHost {
   desktopManaged: boolean;
   hostedWorkspace: boolean;
-  cloudTeam: boolean;
+  /** A shared team's audit includes team-specific bot configuration. */
+  team?: boolean;
   dataDir: string;
   store(): Pick<Store, "bot" | "group">;
   webhooks(): WebhookTrigger[];
@@ -27,7 +28,7 @@ export function createAdminAudit(host: AdminAuditHost) {
   const { sessions } = host;
   function adminActivityRecording(): boolean {
     if (host.desktopManaged) return false;
-    if (host.hostedWorkspace || host.cloudTeam) return true;
+    if (host.hostedWorkspace || host.team) return true;
     const chatOnly = (scopes: readonly string[]) => !scopes.includes("admin");
     return sharedSignIn(host.signInAllowList()) || sessions.list().some((session) => chatOnly(session.scopes)) ||
       sessions.openPairings().some((pairing) => chatOnly(pairing.scopes));
@@ -48,7 +49,7 @@ export function createAdminAudit(host: AdminAuditHost) {
   });
   
   const WEBHOOK_AUDIT_FIELDS = ["name", "prompt", "botId", "runOn", "enabled", "eventTypes"] as const;
-  const BOT_AUDITED = host.cloudTeam ? TEAM_BOT_AUDIT_FIELDS : BOT_AUDIT_FIELDS;
+  const BOT_AUDITED = host.team ? TEAM_BOT_AUDIT_FIELDS : BOT_AUDIT_FIELDS;
   const auditBot = (id: string | undefined) => (id ? botAuditSnapshot(host.store().bot(id) as unknown as Record<string, unknown> | null, BOT_AUDITED) : null);
   const auditHook = (id: string | undefined) => (id ? host.webhooks().find((hook) => hook.id === id) : undefined);
   const hookFields = (hook: WebhookTrigger, fields: readonly string[] = WEBHOOK_AUDIT_FIELDS) =>

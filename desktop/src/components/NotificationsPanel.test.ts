@@ -21,12 +21,12 @@ describe("notificationThreadName", () => {
 
 describe("bot filter", () => {
   const rows = [
+    { botId: "b1", botName: "Scout" },
     { botId: "b2", botName: "Dev" },
-    { botId: "b1", botName: "Claw1" },
-    { botId: "b2", botName: "Dev" },
+    { botId: "b2", botName: "Renamed Dev" },
   ];
   it("lists each bot once, sorted by name", () => {
-    expect(notificationBots(rows)).toEqual([{ id: "b1", name: "Claw1" }, { id: "b2", name: "Dev" }]);
+    expect(notificationBots(rows)).toEqual([{ id: "b2", name: "Dev" }, { id: "b1", name: "Scout" }]);
   });
   it("filters to one bot, or returns everything for all", () => {
     expect(filterNotifications(rows, "b2")).toHaveLength(2);

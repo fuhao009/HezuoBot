@@ -69,8 +69,8 @@ test("blocked disk/redaction worker cannot delay product capability acknowledgem
     } };
     await relay.sendProductAi(child, { state: "ready", connection: {
       origin: "https://operator.example", userId: "user-1", tokenId: "token-1",
-      token: `omb_product_ai_${"a".repeat(22)}.${"b".repeat(43)}`, expiresAt: Date.now() + 900_000,
-      defaultModel: "hezuo-default", models: [{ id: "hezuo-default", label: "Hezuo", protocol: "chat", pricingVersion: "v1",
+      token: `hezuo_product_ai_${"a".repeat(22)}.${"b".repeat(43)}`, expiresAt: Date.now() + 900_000,
+      defaultModel: "hezuo-default", models: [{ id: "hezuo-default", label: "HezuoBot", protocol: "chat", pricingVersion: "v1",
         inputMicroPointsPerMillion: 2_000_000, cachedInputMicroPointsPerMillion: 500_000,
         outputMicroPointsPerMillion: 4_000_000, maxContextTokens: 1000, maxOutputTokens: 100 }],
     } });

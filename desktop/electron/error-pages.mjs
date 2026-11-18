@@ -10,7 +10,7 @@ export function buildErrorPage({ allPortsOccupied, logDir }) {
   const serverLogPath = path.join(logDir, "server.log");
   const serverLogHref = pathToFileURL(serverLogPath).href;
   const reason = allPortsOccupied
-    ? "Every Hezuo port answered health checks from another process — likely a second copy of the app, or another program on ports 8799–28799. Quit that program, then quit and reopen Hezuo."
+    ? "Every HezuoBot port answered health checks from another process — likely a second copy of the app, or another program on ports 8799–28799. Quit that program, then quit and reopen Hezuo."
     : "The background server didn't come up in time — this is usually slow startup, not a port conflict. Quit and reopen Hezuo.";
   return (
     "data:text/html;charset=utf-8," +

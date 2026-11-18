@@ -58,9 +58,9 @@ export function keepWarmArgs(
 
 export function keepWarmMcpServers(mcpServers: Record<string, unknown>, deadSocket: string): Record<string, unknown> {
   const out: Record<string, unknown> = { ...mcpServers };
-  const ogb = out.ogb as { args?: unknown } | undefined;
-  if (ogb && Array.isArray(ogb.args) && ogb.args.length >= 2) {
-    out.ogb = { ...ogb, args: [...ogb.args.slice(0, -1), deadSocket] };
+  const hezuo = out.hezuo as { args?: unknown } | undefined;
+  if (hezuo && Array.isArray(hezuo.args) && hezuo.args.length >= 2) {
+    out.hezuo = { ...hezuo, args: [...hezuo.args.slice(0, -1), deadSocket] };
   }
   return out;
 }
@@ -140,7 +140,7 @@ export function runForkedPrompt<T>(opts: {
   const { contract, what } = opts;
   let dir: string;
   try {
-    dir = mkdtempSync(join(tmpdir(), "omb-keepwarm-"));
+    dir = mkdtempSync(join(tmpdir(), "hezuo-keepwarm-"));
   } catch (error) {
     return Promise.resolve(opts.failed(`the ${what} could not start: ${(error as Error).message}`));
   }
@@ -164,7 +164,7 @@ export function runForkedPrompt<T>(opts: {
     }
     args = keepWarmArgs(contract.args, { sessionId: opts.sessionId, mcpConfigPath, settingsPath, systemPromptPath }, opts.persist);
     // The harness's hook helper must never hear about a fork.
-    for (const key of Object.keys(env)) if (key.startsWith("OMB_HOOK_")) delete env[key];
+    for (const key of Object.keys(env)) if (key.startsWith("HEZUO_HOOK_")) delete env[key];
     // In the packaged app process.execPath is Electron: the deny hook runs it as node.
     if (process.versions.electron) env.ELECTRON_RUN_AS_NODE = "1";
   } catch (error) {

@@ -107,19 +107,19 @@ The log stays on this machine: workspace backups leave it out.
 
 - **Desktop app:** in the operating system's encrypted store
   (`credentials.bin`), like the other workspace keys. The server receives the
-  Jev key as `OMB_JEV_API_KEY` and the OpenRouter key as
-  `OMB_OPENROUTER_DECIDER_KEY` at start-up; `config.json` keeps only an
+  Jev key as `HEZUO_JEV_API_KEY` and the OpenRouter key as
+  `HEZUO_OPENROUTER_DECIDER_KEY` at start-up; `config.json` keeps only an
   empty placeholder.
 - **Server or browser use:** in the server's own `config.json` (mode 0600),
   under `decider.key` (Jev) or `decider.openrouterKey` (OpenRouter).
-  `OMB_JEV_API_KEY` and `OMB_OPENROUTER_DECIDER_KEY` override them.
+  `HEZUO_JEV_API_KEY` and `HEZUO_OPENROUTER_DECIDER_KEY` override them.
 - **The OpenRouter key is shared with your OpenRouter models.** The decision
   model uses the first of these it finds:
   1. a key saved here, in **Settings → Decision model** (`decider.openrouterKey`
-     or `OMB_OPENROUTER_DECIDER_KEY`): the optional "use a different key"
+     or `HEZUO_OPENROUTER_DECIDER_KEY`): the optional "use a different key"
      override, which wins so a key saved before sharing keeps working;
   2. the OpenRouter key under **Settings → API keys** (`openrouter.key` or
-     `OMB_OPENROUTER_API_KEY`);
+     `HEZUO_OPENROUTER_API_KEY`);
   3. none: it is off until one is saved.
 
   With the shared key, Settings says **Using your OpenRouter API key** and links
@@ -134,14 +134,14 @@ The log stays on this machine: workspace backups leave it out.
   until a key is saved again.
 - **Cloud Pro:** decisions are included, with no key to paste. With no key of
   the person's own, the Cloud home uses its relay token
-  (`OMB_CLOUD_DECIDER_TOKEN`), sent only to the Admin's relay, never to Jev
+  (`HEZUO_CLOUD_DECIDER_TOKEN`), sent only to the Admin's relay, never to Jev
   or `baseUrl`, and only for room routing and the key check (other jobs need
   a key of the person's own). Settings says **Included with your Cloud plan**, and
   the master switch is on until someone switches it off. A key saved here
   always wins; clearing it falls back to the included decisions. The relay
   speaks Jev's API only, so the included decisions are Jev's: with OpenRouter
   selected nothing is included and you need an OpenRouter key. See
-  [cloud-pro.md](cloud-pro.md), "Included Boat computers, voice and
+  cloud-pro (retired historical guide), "Included Boat computers, voice and
   decisions".
 
 The keys are write-only: `GET /api/config` reports only whether one is saved,
@@ -214,9 +214,9 @@ API is alpha at OpenRouter and may change. The model list comes from
 
 `desktop/server/decider/room-routing.eval.test.ts` replays 53 labelled room messages
 (`desktop/server/decider/fixtures/room-routing.json`) against the live model. It is
-skipped unless `OMB_JEV_LIVE_EVAL=1` is set with a key, and costs about
+skipped unless `HEZUO_JEV_LIVE_EVAL=1` is set with a key, and costs about
 $0.002 per run. The same eval runs against OpenRouter with
-`OMB_OPENROUTER_LIVE_EVAL=1` and `OMB_OPENROUTER_DECIDER_KEY`, using the
-model in `OMB_OPENROUTER_EVAL_MODEL` (else the default); the cost depends on
+`HEZUO_OPENROUTER_LIVE_EVAL=1` and `HEZUO_OPENROUTER_DECIDER_KEY`, using the
+model in `HEZUO_OPENROUTER_EVAL_MODEL` (else the default); the cost depends on
 the model. It is the check for whether a model's own probabilities hold up at
 the 0.6 threshold.

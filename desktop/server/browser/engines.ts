@@ -22,7 +22,7 @@ import { LiveV1 } from "./viewers/live-v1.ts";
 import { StreamV2, type StreamRequest } from "./viewers/stream-v2.ts";
 
 /** A spec's command when the new engine runs the session; its one argument is the profile key. */
-export const CHROME_ENGINE = "omb-cdp";
+export const CHROME_ENGINE = "hezuo-cdp";
 
 type Spec = Pick<BrowserSpawnSpec, "command" | "env"> & { args?: readonly string[] };
 
@@ -91,7 +91,7 @@ export class ChromeEngine {
       sandbox,
       ...(options.log ? { log: options.log } : {}),
     });
-    const maxRunning = Number(env.OMB_BROWSER_MAX_RUNNING) || MAX_RUNNING[options.host];
+    const maxRunning = Number(env.HEZUO_BROWSER_MAX_RUNNING) || MAX_RUNNING[options.host];
     this.service = new BrowserService({
       dataDir: options.dataDir,
       backend: () => backend,
@@ -169,10 +169,10 @@ export class ChromeEngine {
 
   /** For the browser status: what the new engine will run here. */
   summary(): { kind: "engine"; version: string; chrome: string } | { kind: "unavailable"; reason: string } {
-    if (this.#options.backend) return { kind: "engine", version: "omb-cdp", chrome: "Embedded Chromium" };
+    if (this.#options.backend) return { kind: "engine", version: "hezuo-cdp", chrome: "Embedded Chromium" };
     const plan = this.launcher.plan();
     if (plan.kind === "legacy") return { kind: "unavailable", reason: `Chrome is needed for the new browser: ${plan.reason}` };
-    return { kind: "engine", version: "omb-cdp", chrome: this.launcher.describe() };
+    return { kind: "engine", version: "hezuo-cdp", chrome: this.launcher.describe() };
   }
 
   /** fill_login's reads and typing on the new engine. */

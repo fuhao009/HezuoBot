@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, it } from "vitest";
-import { runControlOmb, verificationServerArgs, verificationServerEnvironment } from "../../scripts/control-omb.ts";
+import { runControlHezuo, verificationServerArgs, verificationServerEnvironment } from "../../scripts/control-hezuo.ts";
 import { removeTempDir, waitForExit } from "./testing/cleanup.ts";
 import { readHandoffs } from "./testing/handoff-rows.ts";
 import { freePortBlock } from "./testing/ports.ts";
@@ -57,7 +57,7 @@ async function withQuotaFixture(
     return result;
   };
   const control = async (...args: string[]) => {
-    const result = await runControlOmb([...args, "--url", url]) as any;
+    const result = await runControlHezuo([...args, "--url", url]) as any;
     evidence.push({ command: args, result });
     return result;
   };
@@ -160,8 +160,8 @@ it("never moves to another sign-in of the same AI: it says once that the bot wai
   });
 }, 240_000);
 
-it("moves nothing when OMB_QUOTA_SWITCH=0 switches it off", async () => {
-  await withQuotaFixture({ env: { OMB_QUOTA_SWITCH: "0" } }, async ({ api, control, backupPrompts }) => {
+it("moves nothing when HEZUO_QUOTA_SWITCH=0 switches it off", async () => {
+  await withQuotaFixture({ env: { HEZUO_QUOTA_SWITCH: "0" } }, async ({ api, control, backupPrompts }) => {
     const { bot, threadId, messages, state } = await meetTheLimit(api, control, "NO_MOVE_WHEN_OFF_2B");
     const mine = async () => (await api("GET", "/api/notifications")).notifications.filter((entry: any) => entry.kind === "notice" && entry.botId === bot.id);
     await expect.poll(async () => (await mine()).length, { timeout: 20_000 }).toBe(1);

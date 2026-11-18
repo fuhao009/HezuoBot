@@ -1,30 +1,20 @@
 #!/usr/bin/env node
 // The only packaging entry point for the managed product build.
 //
-//   OMB_PRODUCT_SERVICE_URL=https://ai.<your-domain> \
+//   HEZUO_PRODUCT_SERVICE_URL=https://ai.<your-domain> \
 //     node scripts/package-product.mjs --platform mac --arch arm64 --dir
-//   OMB_PRODUCT_SERVICE_URL=https://ai.<your-domain> \
+//   HEZUO_PRODUCT_SERVICE_URL=https://ai.<your-domain> \
 //     node scripts/package-product.mjs --platform mac --arch arm64
-//   OMB_PRODUCT_SERVICE_URL=https://127.0.0.1:18487 \
+//   HEZUO_PRODUCT_SERVICE_URL=https://127.0.0.1:18487 \
 //     node scripts/package-product.mjs --local-origin --gateway-ca gateway-cert.pem
 //
-// The wrapper reads the checked-in electron-builder.yml as the base — server,
-// UI, browser, CUA, DuckDB and license resources stay exactly as verified —
-// then replaces the release identity as whole values instead of extending it.
-// electron-builder's `extends` concatenates arrays, which would keep the
-// upstream GitHub publisher, protocol, and artifact names. The generated
-// config and the bundled product-service.json land in
-// `.omb-scratch/product-release/`; nothing from OMB_PRODUCT_SERVICE_URL is
-// committed and no upstream-owned domain is ever a default.
-//
-// Exit codes: 0 success, 1 invalid usage/configuration or a failed build.
+// Deployment resources are injected into the canonical electron-builder.yml configuration.
 import { spawnSync } from "node:child_process";
-import { mkdir, readFile, readdir, rm, stat, writeFile, chmod } from "node:fs/promises";
+import { mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parse as parseYaml } from "yaml";
 import {
-  PRODUCT_ARTIFACT_PREFIX,
   PRODUCT_APP_ID,
   PRODUCT_NAME,
   PRODUCT_PROTOCOL,
@@ -34,14 +24,14 @@ import {
 } from "./product-release.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const BASE_CONFIG = path.join(root, "electron-builder.yml");
-const SCRATCH = path.join(root, ".omb-scratch", "product-release");
+const PRODUCT_CONFIG = path.join(root, "electron-builder.yml");
+const SCRATCH = path.join(root, ".hezuo-scratch", "product-release");
 const RELEASE_DIR = path.join(root, "release", "product");
 const PLATFORM_NAMES = { mac: "mac", win: "win", linux: "linux" };
-const PRODUCT_DESKTOP_NAME = "com.hezuo.product.desktop";
-const PRODUCT_INSTALL_ROOT = "/opt/Hezuo Product";
 
-const USAGE = `usage: OMB_PRODUCT_SERVICE_URL=https://… node scripts/package-product.mjs [options]
+
+
+const USAGE = `usage: HEZUO_PRODUCT_SERVICE_URL=https://… node scripts/package-product.mjs [options]
 
 options:
   --platform mac|win|linux   target platform (default: this host)
@@ -62,7 +52,7 @@ reserved documentation/fixture names (.example, example.com, .invalid, .test,
 operator does not control. Reserved names are accepted only with --dry-run.
 
 --local-origin is the one exception, for the local gateway this repository also
-ships: OMB_PRODUCT_SERVICE_URL may then be https://127.0.0.1:<port>,
+ships: HEZUO_PRODUCT_SERVICE_URL may then be https://127.0.0.1:<port>,
 https://localhost:<port>, or https://[::1]:<port>. Such an origin can never
 carry a publicly trusted certificate, so --local-origin also requires
 --gateway-ca: the app then verifies the gateway with that one public
@@ -70,7 +60,7 @@ certificate, bundled for exactly this origin, and nobody has to import
 anything into the operating system's trust store.
 
 --lan-origin is the same exception for a gateway on a private network:
-OMB_PRODUCT_SERVICE_URL may then be https://<10.x | 172.16-31.x | 192.168.x>:<port>.
+HEZUO_PRODUCT_SERVICE_URL may then be https://<10.x | 172.16-31.x | 192.168.x>:<port>.
 It requires --gateway-ca for the same reason, and a public IP address stays refused.
 
 --gateway-ca is a PEM file holding one public certificate (never a private
@@ -128,115 +118,37 @@ function fail(message) {
 
 /** The exact origin the desktop pins in its bundled resource. */
 export function productOrigin(environment = process.env, { dryRun = false, localOrigin = false, lanOrigin = false } = {}) {
-  const raw = environment.OMB_PRODUCT_SERVICE_URL;
+  const raw = environment.HEZUO_PRODUCT_SERVICE_URL;
   if (typeof raw !== "string" || raw.trim() === "") {
-    fail("OMB_PRODUCT_SERVICE_URL is required: an exact HTTPS origin the operator owns");
+    fail("HEZUO_PRODUCT_SERVICE_URL is required: an exact HTTPS origin the operator owns");
   }
   try {
     // A dry run validates the whole config path before the operator's DNS
     // exists; a real build must name a routable host they own, unless the
     // operator explicitly asked for the local gateway's loopback origin.
-    return operatorOrigin(raw, { allowReserved: dryRun, allowLoopback: localOrigin, allowPrivateLan: lanOrigin });
+    return operatorOrigin(raw, { allowReserved: dryRun, allowLoopback: localOrigin, allowPrivateLan: lanOrigin, allowedHosts: (environment.HEZUO_PRODUCT_SERVICE_ALLOWED_HOSTS ?? "").split(",") });
   } catch (error) {
     const reason = error?.message;
-    if (reason === "product_origin_author_domain") {
-      fail("OMB_PRODUCT_SERVICE_URL must be a domain the operator owns; the upstream open-source project's domains are refused");
+    if (reason === "product_origin_unapproved_host") {
+      fail("HEZUO_PRODUCT_SERVICE_URL must match an operator-owned gateway hostname explicitly listed in HEZUO_PRODUCT_SERVICE_ALLOWED_HOSTS (comma-separated exact DNS names)");
     }
     if (reason === "product_origin_reserved_host") {
-      fail("OMB_PRODUCT_SERVICE_URL must be a routable host the operator owns; documentation and fixture names (.example, example.com, .invalid, .test, .local) are only accepted with --dry-run");
+      fail("HEZUO_PRODUCT_SERVICE_URL must be a routable host the operator owns; documentation and fixture names (.example, example.com, .invalid, .test, .local) are only accepted with --dry-run");
     }
     if (reason === "product_origin_loopback") {
-      fail("OMB_PRODUCT_SERVICE_URL is a loopback origin; pass --local-origin for the local gateway deployment, or name the public host you own");
+      fail("HEZUO_PRODUCT_SERVICE_URL is a loopback origin; pass --local-origin for the local gateway deployment, or name the public host you own");
     }
-    if (reason === "product_origin_public_host") fail("OMB_PRODUCT_SERVICE_URL must name a public DNS host, not an IP address or loopback host; a private-network IPv4 gateway needs --lan-origin");
-    if (reason === "product_origin_port") fail("OMB_PRODUCT_SERVICE_URL must use the default HTTPS port");
-    fail("OMB_PRODUCT_SERVICE_URL must be one exact HTTPS origin (no path, credentials, query, or fragment)");
+    if (reason === "product_origin_public_host") fail("HEZUO_PRODUCT_SERVICE_URL must name a public DNS host, not an IP address or loopback host; a private-network IPv4 gateway needs --lan-origin");
+    if (reason === "product_origin_port") fail("HEZUO_PRODUCT_SERVICE_URL must use the default HTTPS port");
+    fail("HEZUO_PRODUCT_SERVICE_URL must be one exact HTTPS origin (no path, credentials, query, or fragment)");
   }
 }
 
-function substitute(text, pairs) {
-  let result = text;
-  for (const [from, to] of pairs) result = result.split(from).join(to);
-  return result;
-}
-
-/**
- * The DEB hooks and AppArmor profile are generated from the verified base
- * files. Packaging under the product identity must never repair or remove the
- * original app's install root, profile, or alternatives link, so every path
- * and profile name is replaced before electron-builder embeds the scripts.
- */
-async function linuxProductResources(scratch) {
-  const ROOT_SENTINEL = "\u0000PRODUCT_ROOT\u0000";
-  // The install root has a space, so a plain find/replace would re-substitute
-  // the root inside its own replacement. Shield it first, then rename the
-  // product's own executable, launcher, profile, and desktop identity.
-  const pairs = [
-    ["/opt/Hezuo", ROOT_SENTINEL],
-    [`${ROOT_SENTINEL}/hezuo`, `${ROOT_SENTINEL}/hezuo-product`],
-    ["update-alternatives --remove hezuo ", "update-alternatives --remove hezuo-product "],
-    ["/usr/bin/hezuo", "/usr/bin/hezuo-product"],
-    ["hezuo-browser", "hezuo-product-browser"],
-    [ROOT_SENTINEL, PRODUCT_INSTALL_ROOT],
-  ];
-  const afterInstall = substitute(await readFile(path.join(root, "desktop", "build", "linux-after-install.sh"), "utf8"), pairs)
-    // The install root contains a space, so its shell assignment must be quoted.
-    .replace(`APP_ROOT=${PRODUCT_INSTALL_ROOT}\n`, `APP_ROOT="${PRODUCT_INSTALL_ROOT}"\n`);
-  if (!afterInstall.includes(`APP_ROOT="${PRODUCT_INSTALL_ROOT}"`)) {
-    throw new Error("desktop/build/linux-after-install.sh no longer assigns APP_ROOT in the form this wrapper must rewrite");
-  }
-  const afterRemove = substitute(await readFile(path.join(root, "desktop", "build", "linux-after-remove.sh"), "utf8"), pairs)
-    // Both places pass the installed executable as a bare word; the product
-    // install root contains a space, so each must be quoted.
-    .split(`${PRODUCT_INSTALL_ROOT}/hezuo-product`).join(`"${PRODUCT_INSTALL_ROOT}/hezuo-product"`);
-  if (!afterRemove.includes(`"${PRODUCT_INSTALL_ROOT}/hezuo-product"`)) {
-    throw new Error("desktop/build/linux-after-remove.sh no longer names the installed executable in the form this wrapper must rewrite");
-  }
-  const profileSource = await readFile(path.join(root, "desktop", "build", "linux-hezuo-browser.apparmor"), "utf8");
-  // The policy line must name the product's executable with the install root
-  // quoted: AppArmor takes an unquoted path up to the first space.
-  const profile = profileSource.replace(
-    /^profile\s+hezuo-browser\s+\S+\s+flags=/m,
-    `profile hezuo-product-browser "${PRODUCT_INSTALL_ROOT}/resources/browser-engine/chrome/chrome-headless-shell-linux64/chrome-headless-shell" flags=`,
-  );
-  if (!profile.includes(`profile hezuo-product-browser "${PRODUCT_INSTALL_ROOT}/`)) {
-    throw new Error("desktop/build/linux-hezuo-browser.apparmor no longer has the browser policy line this wrapper must rewrite");
-  }
-  const afterInstallPath = path.join(scratch, "linux-after-install.sh");
-  const afterRemovePath = path.join(scratch, "linux-after-remove.sh");
-  const profilePath = path.join(scratch, "hezuo-product-browser.apparmor");
-  await writeFile(afterInstallPath, afterInstall, { mode: 0o755 });
-  await writeFile(afterRemovePath, afterRemove, { mode: 0o755 });
-  await writeFile(profilePath, profile, { mode: 0o644 });
-  await chmod(afterInstallPath, 0o755);
-  await chmod(afterRemovePath, 0o755);
-  return { afterInstallPath, afterRemovePath, profilePath };
-}
-
-/** Build the complete product configuration from the checked-in base. */
-export async function productBuildConfig({ scratch, platform, unsigned, debug = false }) {
-  const base = parseYaml(await readFile(BASE_CONFIG, "utf8"));
+/** Add deployment resources to the canonical product configuration. */
+export async function productBuildConfig({ scratch, unsigned, debug = false }) {
+  const base = parseYaml(await readFile(PRODUCT_CONFIG, "utf8"));
   if (!base || typeof base !== "object" || Array.isArray(base)) throw new Error("electron-builder.yml did not parse as a mapping");
   const config = structuredClone(base);
-
-  config.appId = PRODUCT_APP_ID;
-  config.productName = PRODUCT_NAME;
-  config.artifactName = `${PRODUCT_ARTIFACT_PREFIX}-\${version}-\${arch}.\${ext}`;
-  config.protocols = [{ name: "Hezuo Product package install", schemes: [PRODUCT_PROTOCOL] }];
-  // A product build publishes nowhere and bakes no update feed.
-  // `--publish never` alone is not enough: with an empty list, or none at all,
-  // electron-builder falls back to the `repository` field and writes a GitHub
-  // app-update.yml. `null` at the platform and target level makes
-  // getPublishConfigs return null before that fallback, so no target (dmg,
-  // zip, nsis, deb, AppImage) writes a feed at all.
-  config.publish = null;
-  config.extraMetadata = {
-    ...(typeof base.extraMetadata === "object" ? base.extraMetadata : null),
-    productName: PRODUCT_NAME,
-    desktopName: PRODUCT_DESKTOP_NAME,
-    ombProductManaged: true,
-  };
-  config.directories = { ...base.directories, output: path.relative(root, RELEASE_DIR).split(path.sep).join("/") };
 
   const productServicePath = path.join(scratch, "product-service.json");
   const extraResources = Array.isArray(base.extraResources) ? structuredClone(base.extraResources) : [];
@@ -251,54 +163,10 @@ export async function productBuildConfig({ scratch, platform, unsigned, debug = 
   }
   config.extraResources = extraResources;
 
-  const mac = { ...base.mac, publish: null };
-  const dmg = { ...base.dmg, publish: null, artifactName: `${PRODUCT_ARTIFACT_PREFIX}-\${version}-\${arch}.dmg` };
   if (unsigned) {
-    mac.identity = null;
-    dmg.sign = false;
+    config.mac = { ...config.mac, identity: null };
+    config.dmg = { ...config.dmg, sign: false };
   }
-  const win = { ...base.win, publish: null };
-  const nsis = {
-    ...base.nsis,
-    publish: null,
-    shortcutName: PRODUCT_NAME,
-    artifactName: `${PRODUCT_ARTIFACT_PREFIX}-\${version}-\${arch}-setup.\${ext}`,
-  };
-  const linux = { ...base.linux, publish: null };
-  linux.executableName = "hezuo-product";
-  linux.desktop = {
-    ...linux.desktop,
-    entry: { ...linux.desktop?.entry, Name: PRODUCT_NAME },
-  };
-  const linuxResources = Array.isArray(linux.extraResources) ? structuredClone(linux.extraResources) : [];
-  const deb = {
-    ...base.deb,
-    publish: null,
-    packageName: "hezuo-product",
-    // Fpm targets default to `${name}-${version}-${arch}.${ext}` with the
-    // package name; keep the product's artifact naming there too.
-    artifactName: `${PRODUCT_ARTIFACT_PREFIX}-\${version}-\${arch}.\${ext}`,
-  };
-
-  if (platform === "linux") {
-    const productLinux = await linuxProductResources(scratch);
-    const profileTarget = "hezuo-product-browser.apparmor";
-    const profileIndex = linuxResources.findIndex((entry) => entry && typeof entry === "object" && entry.to === "hezuo-browser.apparmor");
-    if (profileIndex < 0) throw new Error("electron-builder.yml no longer ships the browser AppArmor profile this wrapper must replace");
-    // The generated hook installs the profile under the product's own name,
-    // so the bundled resource must carry that exact filename too.
-    linuxResources[profileIndex] = { from: productLinux.profilePath, to: profileTarget };
-    deb.afterInstall = productLinux.afterInstallPath;
-    deb.afterRemove = productLinux.afterRemovePath;
-  }
-  linux.extraResources = linuxResources;
-
-  config.mac = mac;
-  config.dmg = dmg;
-  config.win = win;
-  config.nsis = nsis;
-  config.linux = linux;
-  config.deb = deb;
   return { config, productServicePath };
 }
 

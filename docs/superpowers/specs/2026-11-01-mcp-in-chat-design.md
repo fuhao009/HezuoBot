@@ -1,14 +1,10 @@
 # MCP servers in chat: design
 
-Date: 2026-11-01 · Status: awaiting review · Scope: server, desktop (macOS, Windows), iPhone, Android
-
-Repos: server and desktop in milind-soni/OpenMausBot; phone apps in SupaMaus/mausbot-mobile (separate PR).
-
 Mockup (approved): [assets/2026-11-01-mcp-in-chat/mockup.html](assets/2026-11-01-mcp-in-chat/mockup.html), four tabs with working buttons.
 
 ## Why
 
-People told us adding an MCP server is bad. Omkar confirmed all four of these complaints:
+People told us adding an MCP server is bad. maintainer confirmed all four of these complaints:
 
 1. **Stuck after the bot added it.** `add_mcp_server` saves the server switched off
    (`desktop/server/drivers/agents-catalog.ts`, `add_mcp_server`). The bot then tells the person to open
@@ -32,7 +28,6 @@ is a bot-facing surface over them and a way to sign in from the chat.
 - When a login is needed, the person taps one card. The login opens in their browser, and the bot carries on by
   itself when it finishes.
 - When a key is needed, the bot uses the existing secure key card (`request_credential`, delivery `ref`).
-- It works from desktop, iPhone and Android.
 
 ## Non-goals
 
@@ -41,7 +36,6 @@ is a bot-facing surface over them and a way to sign in from the chat.
   details from the provider's docs.
 - New tools appearing partway through a turn. Servers are fixed when a turn starts (see "Turn timing").
 - Undo for MCP changes. A removal forgets secrets and sign-in, so it can't be undone honestly.
-- A paste-back sign-in on phones or in the card. That case points to Settings → MCP servers, which has it.
 
 ## Anti-goals
 
@@ -54,7 +48,7 @@ These would make it a failure even if it works:
 - A bot changing a server the person or another bot owns where it shouldn't (see "What a bot may touch").
 - Putting an OAuth authorization URL in a message's text. It carries the OAuth state.
 
-## Decided by Omkar
+## Decided by maintainer
 
 1. **The bot's mode decides.** A Full access bot adds, turns on, changes and removes servers with no card. A bot on
    Ask, Edits or Auto shows a one-tap card in chat for those same actions. The mode is the conversation's own,
@@ -65,8 +59,6 @@ These would make it a failure even if it works:
    - A "Sign in to Linear" card. The card moves from waiting to "Signed in · Kiwi carried on".
    - A "Turn on Linear?" card that shows the address, or the command and "Runs on this computer".
    - Changes, keys and clean-up happen in the chat.
-3. **Phones are in this project.** The phone apps get their changes in a mausbot-mobile PR that pairs with the
-   Hezuo PR.
 
 Note for the builder. This is a deliberate exception to `desktop/server/direct-apply.ts`, which applies bot-requested
 changes (skills, profile, model, team setup) at every level with Undo. MCP is different because turning a server on
@@ -213,11 +205,6 @@ The rules behind the table:
 
 ### The approval cards (Ask, Edits, Auto)
 
-Use the generic option card, `kind: "options"` with `card: { title, subtitle, options, requestId, tool }`. Desktop,
-iOS and Android already draw it, and answers go through `POST /api/threads/<id>/respond`. The durable pattern to
-copy is the team-setup card: the bot ends its turn, and the answer resumes it. The bot-deletion proposal in
-`desktop/server/team-setup-requests.ts` is the closest example.
-
 - Turn on:
   - title: "Turn on Linear?"
   - subtitle (URL server): the address and "Reached over the internet. Once on, your bots can use its tools."
@@ -231,9 +218,6 @@ copy is the team-setup card: the bot ends its turn, and the answer resumes it. T
   - title: "Remove dodo-test?"
   - subtitle: which other bots use it
   - options: `["Remove", "Cancel"]`
-
-The negative option must be "Cancel". The phones send deny only for Deny, Cancel, Dismiss or Skip. "Not now" would
-be sent as allow.
 
 The card carries an `mcpRequest` subfield with the pending change: the parsed server, the redeemed secrets held
 server-side, never in the message. Plumbing the card touches:
@@ -255,13 +239,6 @@ it again with request_credential."
 
 ### The Sign in card
 
-**Reuse the connector card.** `kind: "connector"` with `connector: ConnectorCardData` is the card that already gets
-an authorize link, opens the system browser, polls status and resumes the bot on desktop
-(`desktop/src/components/ConnectorCard.tsx`), iOS (`mobile/ios/App/Cards/ConnectorRequestCardView.swift`) and Android
-(`ui/ConnectorRequestCard.kt`). The phones accept any https URL with a host from `authorize`. The companion
-allowlist already permits `/api/bots/<bot>/connector-cards/<id>/(authorize|status|resume|dismiss)`. Existing phone
-builds therefore show and complete an MCP sign-in with no phone update.
-
 Data shape:
 
 - Add `source?: "composio" | "mcp"` to `ConnectorCardData`, defaulting to composio.
@@ -280,19 +257,9 @@ Routes. The connector-card routes in `desktop/server/index.ts` branch on `source
 - `dismiss` cancels the flow.
 - `isOwnerLive` treats a card owner as live while its card exists and isn't dismissed.
 
-Server-side completion. Add an `onSettled(name, phase, owner)` option to `McpOAuthManager`, called from `finish()`.
-For a card owner it patches the card and resumes the bot at once. The bot then wakes even when the person signs in
-on their phone's browser and never reopens the app. Polling stays as the fallback, and resuming is idempotent
-(`resumed` flag).
-
 Where the browser runs:
 
 - **Desktop on the computer running Hezuo.** The flow is the loopback listener, as on the settings page.
-- **A session on a Cloud or remote host (phone or desktop window).** `remote` is true. The callback uses the public
-  https origin through dynamic registration, which works from a phone browser.
-- **A phone paired to a local Mac** (companion request, `auth.kind === "loopback"` with `companionDevice`). There is
-  no public origin. `authorize` refuses with "Open this chat on your Mac to sign in to Linear." The card shows that
-  text. Don't start a loopback flow the phone can't finish.
 - **A flow that would need paste-back** (registration refused, or a pre-registered OAuth app with a fixed loopback
   port, reached remotely). `authorize` refuses with "Finish this sign-in in Settings → MCP servers." Paste-back stays
   there.
@@ -302,24 +269,6 @@ the shared `mcpOAuth`. The status poll is a mutating GET that resumes a turn, so
 `mutatingPublicRoute` the way the connector status GET is.
 
 ### Keys
-
-Servers that need an API key use `request_credential` (delivery `ref`) and pass the `secretRef` to `add` or `update`.
-That card already exists on desktop and iPhone. **Android has no secret card today.** Kind `"secret"` decodes to
-UNKNOWN there, so an Android user sees only "Securely provide the … from Hezuo on your phone or computer." See
-open question 1.
-
-### Phones (mausbot-mobile PR)
-
-Function needs no phone change, because of the connector card and generic option card reuse. The phone PR is polish:
-
-- iOS and Android connector card: when `source == "mcp"`, the title reads "Sign in to <label>" and the button reads
-  "Sign in", matching the desktop card. Add the strings to `mobile/ios/App/Localizable.xcstrings` in all four languages
-  (the `scripts/ios-strings.test.mjs` check) and to all three Android `values*` folders.
-- Show the authorize refusal text ("Open this chat on your Mac…") calmly in the card, not as a generic failure.
-- Preview fixtures and tests: `ConnectorPreview.json` gets an MCP card, plus a case in `ConnectorRequestTests`,
-  `ConnectorCardUITests` and Android `ConnectorRequestCardTest`.
-
-Desktop gets the same wording change in `ConnectorCard.tsx`, with strings in `desktop/src/locales/*.json`.
 
 ## Error handling
 
@@ -351,13 +300,9 @@ Desktop gets the same wording change in `ConnectorCard.tsx`, with strings in `de
   - Bot calls `sign_in`, the card authorizes, the callback completes, `onSettled` resumes the bot, and the next turn
     has the tools.
   - The polling path does the same.
-  - A companion phone on a local home is refused.
   - A remote session uses the public callback.
 - **Catalog goldens** regenerated, with `add_mcp_server` gone.
 - **Desktop.** `ConnectorCard.test.ts` covers the MCP wording.
-- **Phones.** The tests listed under Phones.
-- **Real app.** A local OMB2 build ([test-locally] skill) adds Linear from chat, signs in, and files an issue. On a
-  Cloud session from a phone, the sign-in completes in the phone browser and the bot resumes.
 
 ## Build order
 
@@ -366,9 +311,7 @@ Each step ends in a check:
 1. Extract the shared MCP config service. The settings routes use it, and the existing tests pass.
 2. `mcp_server` tool and `createInternalMcpRoutes`, Full access path, replacing `add_mcp_server`.
 3. Approval cards for Ask, Edits and Auto.
-4. Sign in card: connector `source: "mcp"`, card-scoped owner, `onSettled`, phone and paste-back refusals.
 5. Desktop wording and settings panel refresh.
-6. mausbot-mobile PR: wording, refusal text, fixtures and tests.
 
 ## Left to the builder
 
@@ -379,9 +322,5 @@ Each step ends in a check:
 
 ## Settled after the builder check
 
-1. **The Android secret card is a follow-up project.** It isn't part of this one. On Android, a key request shows the
-   existing fallback line ("Securely provide the … from Hezuo on your phone or computer"). The `mcp_server`
-   result for a key-needing server tells the bot to say the key can be entered on the computer or an iPhone. (My
-   call, announced to Omkar 2026-11-01.)
 2. Team role, guests, env destination changes, keys inside addresses and no self-widening are settled inline above.
    Each is marked "Builder check, my call".

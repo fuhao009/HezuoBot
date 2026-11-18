@@ -9,7 +9,7 @@ import type { ResolvedSender } from "../../../packages/shared/wire.ts";
 export interface LineLabelDeps {
   sharedChat(threadId: string): boolean;
   userName(threadId: string): PersonName;
-  teamRole(personKey: string | undefined): string | undefined;
+  teamRole?(personKey: string | undefined): string | undefined;
   /** The routine whose run this conversation is, by name. */
   routineName(threadId: string): string | undefined;
 }
@@ -19,7 +19,7 @@ const ROUTINE_RUNS: ReadonlySet<RoutineRunTrigger | undefined> = new Set<Routine
 export function createLineLabels(deps: LineLabelDeps) {
   const lineLabels = (threadId: string): LineLabels => {
     const name = deps.userName(threadId);
-    return { shared: deps.sharedChat(threadId), name: (line) => speakerOf(name, line), role: (line) => deps.teamRole(line.sender?.id) };
+    return { shared: deps.sharedChat(threadId), name: (line) => speakerOf(name, line), ...(deps.teamRole ? { role: (line) => deps.teamRole!(line.sender?.id) } : {}) };
   };
   return {
     lineLabels,

@@ -1,4 +1,4 @@
-// window.ogb.productAccount's main half. Every call and every pushed state is
+// window.hezuo.productAccount's main half. Every call and every pushed state is
 // checked against the exact document main approved for that window.
 import {
   PRODUCT_ACCOUNT_CHANNELS,

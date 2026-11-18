@@ -5,6 +5,9 @@ import type {
 } from "../../../packages/shared/product-account";
 import { HTTPError } from "./http";
 import { calculateTaskCharge, calculateTaskReservation, type BillingUsage, type TaskBillingSnapshot } from "./task-billing";
+import { cursorClause, decodeLedgerCursor, encodeCursor, pageLimit } from "./ai-wallet-helpers";
+
+export { decodeLedgerCursor } from "./ai-wallet-helpers";
 
 /**
  * Account-funded AI ledger: balances, per-request reservations, settlement,
@@ -27,13 +30,11 @@ const MICRO_POINTS_PER_MILLION = 1_000_000n;
 /** A reservation older than this is surfaced for review, never auto-charged
  * or auto-refunded. */
 const STALE_RESERVATION_MS = 10 * 60 * 1_000;
-const LEDGER_PAGE_LIMIT = 50;
 const RECOVERY_BATCH_LIMIT = 100;
 const MAX_SETTLEMENT_REASON = 200;
 const MAX_MODEL_ID = 128;
 const MAX_PRICING_VERSION = 64;
 
-const CURSOR_PATTERN = /^[A-Za-z0-9_-]+$/;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export type RequestState = "reserved" | "streaming" | "review" | "settled";
@@ -136,11 +137,6 @@ interface AdmissionProbeRow {
   token_live: number;
 }
 
-interface CursorValue {
-  createdAt: number;
-  id: string;
-}
-
 function requireSafeCount(value: unknown, label: string): number {
   if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0) {
     throw new RangeError(`${label} must be a nonnegative safe integer`);
@@ -206,74 +202,6 @@ export function chargeMicroPoints(
       + BigInt(cachedCount) * cached
       + BigInt(outputTokens) * output,
   );
-}
-
-function base64URLEncode(value: string): string {
-  const bytes = new TextEncoder().encode(value);
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
-}
-
-function base64URLDecode(value: string): string {
-  const padded = value.replaceAll("-", "+").replaceAll("_", "/") + "=".repeat((4 - (value.length % 4)) % 4);
-  let binary: string;
-  try {
-    binary = atob(padded);
-  } catch {
-    throw new HTTPError(400, "invalid_cursor");
-  }
-  const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
-  try {
-    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-  } catch {
-    throw new HTTPError(400, "invalid_cursor");
-  }
-}
-
-function encodeCursor(cursor: CursorValue): string {
-  return base64URLEncode(JSON.stringify({ createdAt: cursor.createdAt, id: cursor.id }));
-}
-
-/** A ledger cursor is opaque, but strictly validated: a malformed one is a
- * client error, never a silent restart from the beginning. */
-export function decodeLedgerCursor(cursor: string): CursorValue {
-  if (cursor.length === 0 || cursor.length > 256 || !CURSOR_PATTERN.test(cursor)) {
-    throw new HTTPError(400, "invalid_cursor");
-  }
-  let value: unknown;
-  try {
-    value = JSON.parse(base64URLDecode(cursor));
-  } catch (error) {
-    if (error instanceof HTTPError) throw error;
-    throw new HTTPError(400, "invalid_cursor");
-  }
-  if (typeof value !== "object" || value === null) throw new HTTPError(400, "invalid_cursor");
-  if (!("createdAt" in value) || !("id" in value)) throw new HTTPError(400, "invalid_cursor");
-  const { createdAt, id } = value;
-  if (typeof createdAt !== "number" || !Number.isSafeInteger(createdAt) || createdAt < 0) {
-    throw new HTTPError(400, "invalid_cursor");
-  }
-  if (typeof id !== "string" || id.length === 0 || id.length > 128) throw new HTTPError(400, "invalid_cursor");
-  return { createdAt, id };
-}
-
-function pageLimit(limit: number | undefined): number {
-  if (limit === undefined) return LEDGER_PAGE_LIMIT;
-  if (!Number.isSafeInteger(limit) || limit < 1) return LEDGER_PAGE_LIMIT;
-  return Math.min(limit, LEDGER_PAGE_LIMIT);
-}
-
-function cursorClause(
-  table: string,
-  idColumn: string,
-  cursor: CursorValue | null,
-): { sql: string; values: unknown[] } {
-  if (!cursor) return { sql: "", values: [] };
-  return {
-    sql: ` AND (${table}.created_at < ? OR (${table}.created_at = ? AND ${table}.${idColumn} < ?))`,
-    values: [cursor.createdAt, cursor.createdAt, cursor.id],
-  };
 }
 
 function requestEntry(row: RequestRow): RequestEntry {

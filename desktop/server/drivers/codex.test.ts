@@ -26,6 +26,9 @@ import { startFakeHttpMcp, type FakeHttpMcp } from "../testing/fake-http-mcp-ser
 import * as procs from "../procs.ts";
 import { autoVerdict } from "../auto-approve.ts";
 import { formatQuestionAnswers } from "../../../packages/shared/ask-question.ts";
+import { serializeConnectorAllowedTools, serializeConnectorServiceSlugs } from "../connector-advertisement.ts";
+import { composioSystemPrompt } from "../system-prompt.ts";
+import { scopeHint } from "../connector-scope-hint.ts";
 
 vi.mock("./codex-release.ts", async (importOriginal) => ({
   ...await importOriginal<typeof import("./codex-release.ts")>(),
@@ -44,8 +47,8 @@ function processIsAlive(pid: number): boolean {
 }
 
 const CONTROL_PLANE_FIXTURE = {
-  OMB_CLOUD_READY_TOKEN: "ready-should-not-leak", OMB_CLOUD_BOOTSTRAP: "bootstrap-should-not-leak",
-  OMB_LICENSE_KEY: "license-should-not-leak", OMB_INSTALLATION_CREDENTIAL: "fleet-should-not-leak",
+  HEZUO_CLOUD_READY_TOKEN: "ready-should-not-leak", HEZUO_CLOUD_BOOTSTRAP: "bootstrap-should-not-leak",
+  HEZUO_LICENSE_KEY: "license-should-not-leak", HEZUO_INSTALLATION_CREDENTIAL: "fleet-should-not-leak",
 };
 
 describe("CodexDriver.decodeConfig", () => {
@@ -150,11 +153,11 @@ describe("CodexDriver turns (fake app-server)", () => {
     recorder = recordEvents(instance.adapter);
   };
 
-  const record = (mount: string) => `OMB_REMOTE_MCP_CONFIG_${createHash("sha256").update(mount).digest("hex")}`;
+  const record = (mount: string) => `HEZUO_REMOTE_MCP_CONFIG_${createHash("sha256").update(mount).digest("hex")}`;
 
   beforeEach(() => {
     chmodSync(FAKE_CLI, 0o755);
-    scratch = mkdtempSync(join(tmpdir(), "omb-codex-test-"));
+    scratch = mkdtempSync(join(tmpdir(), "hezuo-codex-test-"));
   });
 
   it("says once when its team tools did not start", async () => {
@@ -197,7 +200,7 @@ describe("CodexDriver turns (fake app-server)", () => {
     await recorder.until((event) => event.type === "turn.completed");
     const seen = JSON.parse(readFileSync(dump, "utf8"));
     expect(seen.argv).toContain("mcp_servers.notes.enabled=false");
-    expect(JSON.stringify(seen.argv)).toContain("OMB_GATE_CONFIG_");
+    expect(JSON.stringify(seen.argv)).toContain("HEZUO_GATE_CONFIG_");
     expect(JSON.stringify(seen.argv)).not.toContain("https://example.test/notes");
     const before = seen.calls.filter((call: { method: string }) => call.method === "turn/start").length;
     expect(before).toBe(1);
@@ -248,9 +251,9 @@ describe("CodexDriver turns (fake app-server)", () => {
       const seen = JSON.parse(readFileSync(dump, "utf8"));
       expect(seen.argv).toContain("features.shell_snapshot=false");
       const thread = seen.calls.find((call: { method: string }) => call.method === (resumeCursor ? "thread/resume" : "thread/start"));
-      expect(thread.params.config["shell_environment_policy.exclude"]).toEqual([...policy.exclude, "OMB_GATE_CONFIG_*", "ELECTRON_RUN_AS_NODE"]);
+      expect(thread.params.config["shell_environment_policy.exclude"]).toEqual([...policy.exclude, "HEZUO_GATE_CONFIG_*", "ELECTRON_RUN_AS_NODE"]);
       expect(thread.params.config).not.toHaveProperty("shell_environment_policy");
-      expect(Object.keys(seen.env).some(name => name.startsWith("OMB_GATE_CONFIG_"))).toBe(true);
+      expect(Object.keys(seen.env).some(name => name.startsWith("HEZUO_GATE_CONFIG_"))).toBe(true);
       expect(JSON.stringify({ argv: seen.argv, calls: seen.calls })).not.toContain("synthetic-fixture-credential");
     }
   });
@@ -268,14 +271,14 @@ describe("CodexDriver turns (fake app-server)", () => {
       expect(completed).toMatchObject({ ok: true });
       const seen = JSON.parse(readFileSync(dump, "utf8"));
       const config = seen.calls.find((call: { method: string }) => call.method === (resumeCursor ? "thread/resume" : "thread/start")).params.config;
-      expect(config["shell_environment_policy.exclude"]).toEqual(["OMB_GATE_CONFIG_*", "ELECTRON_RUN_AS_NODE"]);
+      expect(config["shell_environment_policy.exclude"]).toEqual(["HEZUO_GATE_CONFIG_*", "ELECTRON_RUN_AS_NODE"]);
       expect(Object.keys(config).filter(key => key.startsWith("shell_environment_policy"))).toEqual(["shell_environment_policy.exclude"]);
     }
   });
 
   it("keeps a person's shell filters and adds the gate pattern as an exclude filter", async () => {
     const dump = join(scratch, "shell-filters.json"); process.env.FAKE_CODEX_DUMP = dump;
-    const policy = { inherit: "all", filters: { "USER_SECRET_*": "exclude", "KEEP_*": "include", "omb_gate_config_*": "include" } };
+    const policy = { inherit: "all", filters: { "USER_SECRET_*": "exclude", "KEEP_*": "include", "hezuo_gate_config_*": "include" } };
     await create({ mode: "resume", environment: { HOME: scratch, CODEX_HOME: join(scratch, ".codex"),
       FAKE_CODEX_MCP_OVERRIDES: "1", FAKE_CODEX_SHELL_ENVIRONMENT_POLICY: JSON.stringify(policy) } });
     for (const resumeCursor of [undefined, "old-session"]) {
@@ -287,7 +290,7 @@ describe("CodexDriver turns (fake app-server)", () => {
       expect(completed).toMatchObject({ ok: true });
       const seen = JSON.parse(readFileSync(dump, "utf8"));
       const config = seen.calls.find((call: { method: string }) => call.method === (resumeCursor ? "thread/resume" : "thread/start")).params.config;
-      expect(config["shell_environment_policy.filters"]).toEqual({ "USER_SECRET_*": "exclude", "KEEP_*": "include", "OMB_GATE_CONFIG_*": "exclude", ELECTRON_RUN_AS_NODE: "exclude" });
+      expect(config["shell_environment_policy.filters"]).toEqual({ "USER_SECRET_*": "exclude", "KEEP_*": "include", "HEZUO_GATE_CONFIG_*": "exclude", ELECTRON_RUN_AS_NODE: "exclude" });
       expect(Object.keys(config).filter(key => key.startsWith("shell_environment_policy"))).toEqual(["shell_environment_policy.filters"]);
     }
   });
@@ -333,7 +336,7 @@ describe("CodexDriver turns (fake app-server)", () => {
 createInterface({input:process.stdin}).on('line',line=>{const m=JSON.parse(line);if(m.id===undefined)return;let result={};
 if(m.method==='initialize')result={protocolVersion:m.params.protocolVersion,capabilities:{tools:{}},serverInfo:{name:process.env.IDENTITY,version:'1'}};
 if(m.method==='tools/list')result={tools:[process.env.TOOL,'forbidden'].map(name=>({name,inputSchema:{type:'object'}}))};
-if(m.method==='tools/call'){appendFileSync(process.env.RECEIPT,process.env.IDENTITY+':'+m.params.name+'\\n');result={content:[{type:'text',text:Object.keys(process.env).some(key=>key.startsWith('OMB_GATE_'))?'private-config-leak':process.env.IDENTITY}]};}
+if(m.method==='tools/call'){appendFileSync(process.env.RECEIPT,process.env.IDENTITY+':'+m.params.name+'\\n');result={content:[{type:'text',text:Object.keys(process.env).some(key=>key.startsWith('HEZUO_GATE_'))?'private-config-leak':process.env.IDENTITY}]};}
 process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`);
     await create({ mode: "resume", environment: { HOME: scratch, CODEX_HOME: join(scratch, ".codex"), FAKE_CODEX_MCP_OVERRIDES: "1" } });
     const turn = { threadId: "multi-scope", text: "Fixture", toolScope: { allow: ["native:*", "mcp:agents:list_bots", "mcp:notes:read_notes"] }, integrations: {
@@ -407,7 +410,7 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
     delete process.env.FAKE_CODEX_INTERRUPT_GRACE_MS;
     delete process.env.OPENAI_API_KEY;
     delete process.env.BOX_TOKEN;
-    delete process.env.OMB_TTS_KEY;
+    delete process.env.HEZUO_TTS_KEY;
     for (const name of Object.keys(CONTROL_PLANE_FIXTURE)) delete process.env[name];
     recorder?.stop();
     await instance?.dispose();
@@ -583,7 +586,7 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
     process.env.FAKE_CODEX_DUMP = dump;
     process.env.OPENAI_API_KEY = "sk-should-not-leak";
     process.env.BOX_TOKEN = "box-should-not-leak";
-    process.env.OMB_TTS_KEY = "tts-should-not-leak";
+    process.env.HEZUO_TTS_KEY = "tts-should-not-leak";
     Object.assign(process.env, CONTROL_PLANE_FIXTURE);
 
     const { turnId } = await instance.adapter.sendTurn({
@@ -636,7 +639,7 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
     expect(processIsAlive(seen.pid)).toBe(false);
     expect(seen.env.OPENAI_API_KEY).toBeUndefined();
     expect(seen.env.BOX_TOKEN).toBeUndefined();
-    expect(seen.env.OMB_TTS_KEY).toBeUndefined();
+    expect(seen.env.HEZUO_TTS_KEY).toBeUndefined();
     for (const name of Object.keys(CONTROL_PLANE_FIXTURE)) expect(seen.env[name]).toBeUndefined();
     const methods = seen.calls.map((c: { method: string }) => c.method);
     expect(methods).toEqual(["initialize", "initialized", "config/read", "thread/start", "turn/start"]);
@@ -686,6 +689,40 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
     const fourth = await send("split-4.json", "fourth", "Memory: moved to Toronto.", "codex-thread-1", true);
     expect(turnText(fourth)).toContain("Memory: moved to Toronto.");
     expect(turnText(fourth)).toContain("fourth");
+  });
+
+  it("preserves the verification skill index and Google scope guidance on new and resumed turns", async () => {
+    await create({ mode: "resume" });
+    const skillPath = join(scratch, "skills", "create-verification-skill", "SKILL.md");
+    const stable = `Imported skills:\n- create-verification-skill: Use only when the user explicitly asks for a verification skill. Read ${JSON.stringify(skillPath)}.`;
+    const permission = scopeHint(["GMAIL_CREATE_EMAIL_FILTER"]);
+    for (const [index, volatile] of ["", permission].entries()) {
+      const dump = join(scratch, `skill-google-${index}.json`);
+      process.env.FAKE_CODEX_DUMP = dump;
+      const { turnId } = await instance.adapter.sendTurn({
+        threadId: "t-skill-google",
+        text: index ? "Explain the missing Google permission." : "Create a verification skill for this project.",
+        system: stable + volatile,
+        systemStable: stable,
+        systemVolatile: volatile,
+        ...(index ? { resumeCursor: "codex-thread-1" } : {}),
+      });
+      await recorder.until((event) => event.type === "turn.completed" && event.turnId === turnId);
+      const seen = JSON.parse(readFileSync(dump, "utf8"));
+      const thread = seen.calls.find((call: { method: string }) => call.method === (index ? "thread/resume" : "thread/start"));
+      expect(thread.params.developerInstructions).toBe(stable);
+      const turn = seen.calls.find((call: { method: string }) => call.method === "turn/start");
+      expect(turn.params.input).toEqual([{ type: "text", text: index
+        ? `Context from Hezuo updated since this conversation started; it replaces any earlier copy:\n\n${permission}\n\nExplain the missing Google permission.`
+        : "Create a verification skill for this project." }]);
+      expect(JSON.stringify(turn.params.input)).not.toContain(skillPath);
+      if (index) {
+        expect(turn.params.input[0].text).toContain("https://www.googleapis.com/auth/gmail.settings.basic");
+        expect(turn.params.input[0].text).toContain("Reconnecting will not add it");
+        expect(turn.params.input[0].text).toContain("Do not retry this call");
+      }
+      expect(recorder.events.filter((event) => event.turnId === turnId && event.type === "request.opened")).toEqual([]);
+    }
   });
 
   it("ignores requests received after turn completion", async () => {
@@ -1072,33 +1109,87 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
     const dump = join(scratch, "composio.json");
     process.env.FAKE_CODEX_DUMP = dump;
     expect(instance.adapter.capabilities.composioMcp).toBe(true);
+    const grants = { gmail: { tools: ["GMAIL_FETCH_EMAILS"] } };
+    const allowedTools = serializeConnectorAllowedTools(grants).env!;
+    const serviceSlugs = serializeConnectorServiceSlugs(["gmail", "googlecalendar"]).env!;
+    const headers = JSON.stringify({ authorization: "Bearer per-turn-connector-token" });
 
     await instance.adapter.sendTurn({
       threadId: "t-composio",
       text: "check mail",
+      system: composioSystemPrompt(grants),
       integrations: {
         composio: {
           command: process.execPath,
           args: ["/tmp/connector-proxy.js"],
           env: {
-            OMB_CONNECTOR_UPSTREAM_URL: "http://127.0.0.1:8799/api/internal/connectors/mcp",
-            OMB_CONNECTOR_TOKEN: "per-turn-connector-token",
+            HEZUO_CONNECTOR_UPSTREAM_URL: "http://127.0.0.1:8799/api/internal/connectors/mcp",
+            HEZUO_CONNECTOR_TOKEN: "per-turn-connector-token",
+            HEZUO_CONNECTOR_UPSTREAM_HEADERS: headers,
+            HEZUO_HARNESS_URL: "http://127.0.0.1:8799",
+            HEZUO_BOT_ID: "connector-fixture-bot",
+            HEZUO_THREAD_ID: "t-composio",
+            HEZUO_CONNECTOR_ALLOWED_TOOLS: allowedTools,
+            HEZUO_CONNECTOR_SERVICE_SLUGS: serviceSlugs,
           },
         },
         agents: {
           command: process.execPath,
           args: ["/tmp/agents-proxy.js"],
-          env: { OMB_COMMS_TOKEN: "peer-comms-secret" },
+          env: { HEZUO_COMMS_TOKEN: "peer-comms-secret" },
         },
       },
     });
     await recorder.until((event) => event.type === "turn.completed");
     const seen = JSON.parse(readFileSync(dump, "utf8"));
     expect(seen.argv.join(" ")).toContain("mcp_servers.hezuo_connectors.command");
-    expect(seen.argv.join(" ")).toContain("OMB_CONNECTOR_TOKEN");
+    expect(seen.argv.join(" ")).toContain("HEZUO_CONNECTOR_TOKEN");
     expect(seen.argv.join(" ")).not.toContain("per-turn-connector-token");
-    expect(seen.env.OMB_CONNECTOR_TOKEN).toBe("per-turn-connector-token");
-    expect(seen.env.OMB_COMMS_TOKEN).toBe("peer-comms-secret");
+    expect(seen.env.HEZUO_CONNECTOR_TOKEN).toBe("per-turn-connector-token");
+    expect(seen.env.HEZUO_COMMS_TOKEN).toBe("peer-comms-secret");
+    expect(seen.env.HEZUO_CONNECTOR_UPSTREAM_HEADERS).toBe(headers);
+    expect(JSON.parse(seen.env.HEZUO_CONNECTOR_ALLOWED_TOOLS)).toEqual(grants);
+    expect(JSON.parse(seen.env.HEZUO_CONNECTOR_SERVICE_SLUGS)).toEqual(["gmail", "googlecalendar"]);
+    expect(seen.argv.join(" ")).not.toContain(allowedTools);
+    expect(seen.argv.join(" ")).not.toContain(serviceSlugs);
+    const thread = seen.calls.find((call: { method: string }) => call.method === "thread/start");
+    expect(thread.params.developerInstructions).toBe(composioSystemPrompt(grants));
+    expect(thread.params.developerInstructions).not.toContain("Googlecalendar");
+    expect(thread.params.config["shell_environment_policy.exclude"]).toEqual(expect.arrayContaining([
+      "HEZUO_CONNECTOR_TOKEN", "HEZUO_CONNECTOR_UPSTREAM_HEADERS",
+      "HEZUO_CONNECTOR_ALLOWED_TOOLS", "HEZUO_CONNECTOR_SERVICE_SLUGS", "HEZUO_COMMS_TOKEN",
+    ]));
+  });
+
+  it.each([undefined, {}])("preserves absent versus empty connector grants: %j", async (grants) => {
+    await create();
+    const dump = join(scratch, "connector-grants.json");
+    process.env.FAKE_CODEX_DUMP = dump;
+    const allowedTools = grants === undefined ? undefined : serializeConnectorAllowedTools(grants).env;
+    await instance.adapter.sendTurn({
+      threadId: "t-connector-grants",
+      text: "Which apps can you use?",
+      system: composioSystemPrompt(grants),
+      integrations: { composio: {
+        command: process.execPath,
+        args: ["/tmp/connector-proxy.js"],
+        env: {
+          HEZUO_CONNECTOR_TOKEN: "connector-grants-token",
+          ...(allowedTools === undefined ? {} : { HEZUO_CONNECTOR_ALLOWED_TOOLS: allowedTools }),
+        },
+      } },
+    });
+    await recorder.until((event) => event.type === "turn.completed");
+    const seen = JSON.parse(readFileSync(dump, "utf8"));
+    expect(seen.env.HEZUO_CONNECTOR_ALLOWED_TOOLS).toBe(allowedTools);
+    expect(seen.env.HEZUO_CONNECTOR_SERVICE_SLUGS).toBeUndefined();
+    const thread = seen.calls.find((call: { method: string }) => call.method === "thread/start");
+    expect(thread.params.developerInstructions).toBe(composioSystemPrompt(grants));
+    if (grants !== undefined) {
+      expect(thread.params.developerInstructions).toContain("No connected apps are assigned to this bot");
+      expect(thread.params.developerInstructions).toContain("COMPOSIO_MANAGE_CONNECTIONS");
+    }
+    expect(seen.argv.join(" ")).not.toContain("connector-grants-token");
   });
 
   it("mounts custom MCP servers on-request while built-ins stay pre-quieted", async () => {
@@ -1117,7 +1208,7 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
         composio: {
           command: process.execPath,
           args: ["/tmp/connector-proxy.js"],
-          env: { OMB_COMMS_TOKEN: "per-boot-token" },
+          env: { HEZUO_COMMS_TOKEN: "per-boot-token" },
         },
       },
     });
@@ -1195,14 +1286,14 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
     expect(argv).not.toContain("tok-docs");
     expect(argv).not.toContain("docs.example");
     const settings = JSON.parse(seen.env[record("docs")]);
-    expect(JSON.parse(settings.OMB_REMOTE_MCP_SERVER)).toEqual(docs);
-    expect(settings.OMB_REMOTE_MCP_DIRECTORY).toBeUndefined();
-    expect(Object.keys(seen.env).filter((name) => name.startsWith("OMB_MCP_HEADER_"))).toEqual([]);
-    expect(JSON.parse(seen.env[record("legacy")]).OMB_REMOTE_MCP_SERVER).toBe(JSON.stringify(legacy));
+    expect(JSON.parse(settings.HEZUO_REMOTE_MCP_SERVER)).toEqual(docs);
+    expect(settings.HEZUO_REMOTE_MCP_DIRECTORY).toBeUndefined();
+    expect(Object.keys(seen.env).filter((name) => name.startsWith("HEZUO_MCP_HEADER_"))).toEqual([]);
+    expect(JSON.parse(seen.env[record("legacy")]).HEZUO_REMOTE_MCP_SERVER).toBe(JSON.stringify(legacy));
     expect(argv).not.toContain("mcp_servers.docs.default_tools_approval_mode");
     expect(seen.argv).toContain("features.shell_snapshot=false");
     const thread = seen.calls.find((call: { method: string }) => call.method === "thread/start");
-    expect(thread.params.config["shell_environment_policy.exclude"]).toEqual(["OMB_REMOTE_MCP_CONFIG_*", "ELECTRON_RUN_AS_NODE"]);
+    expect(thread.params.config["shell_environment_policy.exclude"]).toEqual(["HEZUO_REMOTE_MCP_CONFIG_*", "ELECTRON_RUN_AS_NODE"]);
   });
 
   it("mounts app servers through their observers and leaves the others as they were", async () => {
@@ -1212,22 +1303,22 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
     const board = { command: "board-mcp", args: ["--stdio"], env: { BOARD_KEY: "board-secret" } };
     const notes = { command: "notes-mcp", args: [], env: {} };
     const draw = { type: "http" as const, url: "https://draw.example/mcp", headers: {} };
-    const agents = { command: process.execPath, args: ["agents-proxy.js"], env: { OMB_HARNESS_URL: "http://127.0.0.1:8799", OMB_COMMS_TOKEN: "comms-fixture" } };
+    const agents = { command: process.execPath, args: ["agents-proxy.js"], env: { HEZUO_HARNESS_URL: "http://127.0.0.1:8799", HEZUO_COMMS_TOKEN: "comms-fixture" } };
     await instance.adapter.sendTurn({ threadId: "t-app-mcp", text: "go", integrations: { agents, custom: { board, notes, draw }, mcpApps: { board: { extension: true }, draw: { extension: false } } } });
     await recorder.until((event) => event.type === "turn.completed");
     const seen = JSON.parse(readFileSync(dump, "utf8"));
     const argv = seen.argv.join(" ");
     const mount = { harnessUrl: "http://127.0.0.1:8799", token: "comms-fixture" };
-    const gate = JSON.parse(seen.env[`OMB_GATE_CONFIG_${createHash("sha256").update("board").digest("hex")}`]);
-    expect(JSON.parse(gate.OMB_GATE_APPS)).toEqual({ server: "board", ...mount, extension: true });
-    expect(JSON.parse(gate.OMB_GATE_UPSTREAM)).toEqual(board);
-    expect(gate).not.toHaveProperty("OMB_GATE_TOOL_SCOPE");
+    const gate = JSON.parse(seen.env[`HEZUO_GATE_CONFIG_${createHash("sha256").update("board").digest("hex")}`]);
+    expect(JSON.parse(gate.HEZUO_GATE_APPS)).toEqual({ server: "board", ...mount, extension: true });
+    expect(JSON.parse(gate.HEZUO_GATE_UPSTREAM)).toEqual(board);
+    expect(gate).not.toHaveProperty("HEZUO_GATE_TOOL_SCOPE");
     expect(argv).not.toContain("board-secret");
-    expect(JSON.parse(JSON.parse(seen.env[record("draw")]).OMB_REMOTE_MCP_APPS)).toEqual({ server: "draw", ...mount, extension: false });
+    expect(JSON.parse(JSON.parse(seen.env[record("draw")]).HEZUO_REMOTE_MCP_APPS)).toEqual({ server: "draw", ...mount, extension: false });
     expect(argv).toContain('mcp_servers.notes.command="notes-mcp"');
     expect(seen.argv).toContain("features.shell_snapshot=false");
     const thread = seen.calls.find((call: { method: string }) => call.method === "thread/start");
-    expect(thread.params.config["shell_environment_policy.exclude"]).toEqual(expect.arrayContaining(["OMB_GATE_CONFIG_*", "OMB_REMOTE_MCP_CONFIG_*"]));
+    expect(thread.params.config["shell_environment_policy.exclude"]).toEqual(expect.arrayContaining(["HEZUO_GATE_CONFIG_*", "HEZUO_REMOTE_MCP_CONFIG_*"]));
   });
 
   // The fake starts each mount as codex-cli 0.160.1 does, whose handshake a strict server refuses.
@@ -1301,7 +1392,7 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
       expect(await recorder.until((event) => event.type === "turn.completed" && event.turnId === turnId)).toMatchObject({ ok: true });
       const seen = JSON.parse(readFileSync(dump, "utf8"));
       const thread = seen.calls.find((call: { method: string }) => call.method === (resumeCursor ? "thread/resume" : "thread/start"));
-      expect(thread.params.config["shell_environment_policy.exclude"]).toEqual(["USER_SECRET_*", "OMB_REMOTE_MCP_CONFIG_*", "ELECTRON_RUN_AS_NODE"]);
+      expect(thread.params.config["shell_environment_policy.exclude"]).toEqual(["USER_SECRET_*", "HEZUO_REMOTE_MCP_CONFIG_*", "ELECTRON_RUN_AS_NODE"]);
     }
     const { turnId } = await instance.adapter.sendTurn({ threadId: "no-header-shell", text: "go" });
     await recorder.until((event) => event.type === "turn.completed" && event.turnId === turnId);
@@ -1317,9 +1408,8 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
       // already here before any mount: one passed along unchanged, one a mount overrides
       SHARED_SETTING: "same", OVERRIDDEN: "person", ELECTRON_RUN_AS_NODE: "1" } });
     await instance.adapter.sendTurn({ threadId: "mount-env-shell", text: "go", integrations: {
-      agents: { command: process.execPath, args: ["/tmp/agents-proxy.js"], env: { ELECTRON_RUN_AS_NODE: "1", OMB_COMMS_TOKEN: "agents-capability" } },
-      composio: { command: process.execPath, args: ["/tmp/connector-proxy.js"], env: { OMB_CONNECTORS_TOKEN: "connector-capability" } },
-      phone: { command: process.execPath, args: ["/tmp/phone-proxy.js"], env: { OMB_PHONE_TOKEN: "phone-capability" } },
+      agents: { command: process.execPath, args: ["/tmp/agents-proxy.js"], env: { ELECTRON_RUN_AS_NODE: "1", HEZUO_COMMS_TOKEN: "agents-capability" } },
+      composio: { command: process.execPath, args: ["/tmp/connector-proxy.js"], env: { HEZUO_CONNECTOR_TOKEN: "connector-capability" } },
       custom: {
         // TZ is a variable no shell should lose, whoever set it
         notes: { command: "npx", args: ["-y", "@x/notes-mcp"], env: { GITHUB_PERSONAL_ACCESS_TOKEN: "ghp-synthetic", SHARED_SETTING: "same", OVERRIDDEN: "server", TZ: "UTC" } },
@@ -1330,8 +1420,8 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
     const seen = JSON.parse(readFileSync(dump, "utf8"));
     expect(seen.argv).toContain("features.shell_snapshot=false");
     expect(seen.calls.find((call: { method: string }) => call.method === "thread/start").params.config["shell_environment_policy.exclude"]).toEqual([
-      "USER_SECRET_*", "OMB_REMOTE_MCP_CONFIG_*",
-      "ELECTRON_RUN_AS_NODE", "GITHUB_PERSONAL_ACCESS_TOKEN", "OMB_COMMS_TOKEN", "OMB_CONNECTORS_TOKEN", "OMB_PHONE_TOKEN", "OVERRIDDEN",
+      "USER_SECRET_*", "HEZUO_REMOTE_MCP_CONFIG_*",
+      "ELECTRON_RUN_AS_NODE", "GITHUB_PERSONAL_ACCESS_TOKEN", "HEZUO_COMMS_TOKEN", "HEZUO_CONNECTOR_TOKEN", "OVERRIDDEN",
     ]);
   });
 
@@ -1343,7 +1433,7 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
     } } });
     expect(await recorder.until((event) => event.type === "turn.completed")).toMatchObject({ ok: true });
     const thread = JSON.parse(readFileSync(dump, "utf8")).calls.find((call: { method: string }) => call.method === "thread/start");
-    expect(thread.params.config["shell_environment_policy.exclude"]).toEqual(["OMB_REMOTE_MCP_CONFIG_*", "ELECTRON_RUN_AS_NODE"]);
+    expect(thread.params.config["shell_environment_policy.exclude"]).toEqual(["HEZUO_REMOTE_MCP_CONFIG_*", "ELECTRON_RUN_AS_NODE"]);
   });
 
   it("reads an MCP tool's name to the closing quote, so a lookalike is not auto-approved as web search", async () => {
@@ -1387,13 +1477,13 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
       expect(argv).not.toContain("mcp_servers.whop.url");
       expect(argv).not.toContain("tok-whop");
       const settings = JSON.parse(seen.env[record("whop")]);
-      expect(JSON.parse(settings.OMB_REMOTE_MCP_SERVER)).toEqual(whop);
-      expect(JSON.parse(settings.OMB_REMOTE_MCP_DIRECTORY)).toEqual({ name: "whop" });
+      expect(JSON.parse(settings.HEZUO_REMOTE_MCP_SERVER)).toEqual(whop);
+      expect(JSON.parse(settings.HEZUO_REMOTE_MCP_DIRECTORY)).toEqual({ name: "whop" });
       expect(envVars("legacy")).toEqual(expect.arrayContaining(["ELECTRON_RUN_AS_NODE", record("legacy")]));
       expect(seen.argv).toContain('mcp_servers.notes.command="npx"');
       expect(seen.argv).toContain("features.shell_snapshot=false");
       const thread = seen.calls.find((call: { method: string }) => call.method === "thread/start");
-      expect(thread.params.config["shell_environment_policy.exclude"]).toEqual(["HEZUO_CHATGPT_TOKEN", "OMB_REMOTE_MCP_CONFIG_*", "ELECTRON_RUN_AS_NODE"]);
+      expect(thread.params.config["shell_environment_policy.exclude"]).toEqual(["HEZUO_CHATGPT_TOKEN", "HEZUO_REMOTE_MCP_CONFIG_*", "ELECTRON_RUN_AS_NODE"]);
       expect(argv).not.toContain("mcp_servers.whop.default_tools_approval_mode");
     });
 
@@ -1439,7 +1529,7 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
 
     it("refuses the turn when Codex's shell exclusions cannot be confirmed", async () => {
       plan();
-      await create({ authMode: "chatgpt-plan", environment: { FAKE_CODEX_SHELL_ENVIRONMENT_POLICY: JSON.stringify({ filters: { "OMB_*": "maybe" } }) } });
+      await create({ authMode: "chatgpt-plan", environment: { FAKE_CODEX_SHELL_ENVIRONMENT_POLICY: JSON.stringify({ filters: { "HEZUO_*": "maybe" } }) } });
       const dump = join(scratch, "plan-bad-policy.json");
       process.env.FAKE_CODEX_DUMP = dump;
       await instance.adapter.sendTurn({ threadId: "t-plan-policy", text: "go", model: "gpt-6.1-sol", integrations: { custom: { whop } } });
@@ -1469,9 +1559,9 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
       await recorder.until((event) => event.type === "turn.completed");
       expect(recorder.events.at(-1)).toMatchObject({ ok: true });
       const seen = JSON.parse(readFileSync(dump, "utf8"));
-      const gate = JSON.parse(seen.env[`OMB_GATE_CONFIG_${createHash("sha256").update("whop").digest("hex")}`]);
-      expect(gate.OMB_GATE_DIRECTORY).toBe("1");
-      expect(JSON.parse(JSON.parse(gate.OMB_GATE_UPSTREAM).env.OMB_REMOTE_MCP_DIRECTORY)).toEqual({ name: "whop", toolScope: { allow: ["native:*", "mcp:whop:*"], deny: ["mcp:whop:payments_create"] } });
+      const gate = JSON.parse(seen.env[`HEZUO_GATE_CONFIG_${createHash("sha256").update("whop").digest("hex")}`]);
+      expect(gate.HEZUO_GATE_DIRECTORY).toBe("1");
+      expect(JSON.parse(JSON.parse(gate.HEZUO_GATE_UPSTREAM).env.HEZUO_REMOTE_MCP_DIRECTORY)).toEqual({ name: "whop", toolScope: { allow: ["native:*", "mcp:whop:*"], deny: ["mcp:whop:payments_create"] } });
       expect(seen.argv.join(" ")).not.toContain("tok-whop");
     });
 
@@ -1541,17 +1631,17 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
         agents: {
           command: process.execPath,
           args: ["/tmp/agents-proxy.js"],
-          env: { OMB_COMMS_TOKEN: "fresh-turn-bearer" },
+          env: { HEZUO_COMMS_TOKEN: "fresh-turn-bearer" },
         },
         custom: {
           hostile: {
             command: "hostile-mcp",
             args: [],
-            env: { OMB_HARNESS_URL: "https://attacker.invalid" },
+            env: { HEZUO_HARNESS_URL: "https://attacker.invalid" },
           },
         },
       },
-    })).rejects.toThrow(/reserved environment variable.*OMB_HARNESS_URL/i);
+    })).rejects.toThrow(/reserved environment variable.*HEZUO_HARNESS_URL/i);
   });
 
   it("lets a custom server run as node, and only with the harness's own value", async () => {
@@ -1608,11 +1698,11 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
           args: ["/tmp/agents-proxy.js"],
           env: {
             ELECTRON_RUN_AS_NODE: "1",
-            OMB_HARNESS_URL: "http://127.0.0.1:8799",
-            OMB_BOT_ID: "captain",
-            OMB_THREAD_ID: "t-agents",
-            OMB_COMMS_TOKEN: "peer-comms-secret",
-            OMB_TURN_DEPTH: "0",
+            HEZUO_HARNESS_URL: "http://127.0.0.1:8799",
+            HEZUO_BOT_ID: "captain",
+            HEZUO_THREAD_ID: "t-agents",
+            HEZUO_COMMS_TOKEN: "peer-comms-secret",
+            HEZUO_TURN_DEPTH: "0",
           },
         },
       },
@@ -1624,9 +1714,9 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
     expect(seen.argv).toContain('mcp_servers.agents.default_tools_approval_mode="approve"');
     expect(seen.argv).toContain("mcp_servers.agents.tool_timeout_sec=960");
     expect(seen.argv.join(" ")).toContain("/tmp/agents-proxy.js");
-    expect(seen.argv.join(" ")).toContain("OMB_COMMS_TOKEN");
+    expect(seen.argv.join(" ")).toContain("HEZUO_COMMS_TOKEN");
     expect(seen.argv.join(" ")).not.toContain("peer-comms-secret");
-    expect(seen.env.OMB_COMMS_TOKEN).toBe("peer-comms-secret");
+    expect(seen.env.HEZUO_COMMS_TOKEN).toBe("peer-comms-secret");
     expect(instance.adapter.capabilities.agentsMcp).toBe(true);
   });
 
@@ -1644,8 +1734,8 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
           command: process.execPath,
           args: ["/tmp/harness-mcp-proxy.js"],
           env: {
-            OMB_HARNESS_URL: "http://127.0.0.1:8799",
-            OMB_MCP_TOKEN_BROWSER: "browser-capability-secret",
+            HEZUO_HARNESS_URL: "http://127.0.0.1:8799",
+            HEZUO_MCP_TOKEN_BROWSER: "browser-capability-secret",
           },
         },
       },
@@ -1663,7 +1753,7 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
     expect(seen.argv).not.toContain('mcp_servers.browser.default_tools_approval_mode="approve"');
     expect(seen.argv.join(" ")).toContain("/tmp/harness-mcp-proxy.js");
     expect(seen.argv.join(" ")).not.toContain("browser-capability-secret");
-    expect(seen.env.OMB_MCP_TOKEN_BROWSER).toBe("browser-capability-secret");
+    expect(seen.env.HEZUO_MCP_TOKEN_BROWSER).toBe("browser-capability-secret");
     for (const method of ["thread/start", "turn/start"]) {
       expect(seen.calls.find((call: { method: string }) => call.method === method)?.params).toMatchObject({
         approvalPolicy: "on-request",
@@ -1685,7 +1775,7 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
         localComputer: {
           command: process.execPath,
           args: ["/tmp/container-mcp.js", "podman", "hezuo-computer", "/run/cua.sock"],
-          env: { ELECTRON_RUN_AS_NODE: "1", OMB_VM_TOKEN: "vm-secret" },
+          env: { ELECTRON_RUN_AS_NODE: "1", HEZUO_VM_TOKEN: "vm-secret" },
         },
       },
     });
@@ -1694,9 +1784,9 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
     const seen = JSON.parse(readFileSync(dump, "utf8"));
     expect(seen.argv.join(" ")).toContain("mcp_servers.computer.command");
     expect(seen.argv.join(" ")).toContain("/tmp/container-mcp.js");
-    expect(seen.argv.join(" ")).toContain("OMB_VM_TOKEN");
+    expect(seen.argv.join(" ")).toContain("HEZUO_VM_TOKEN");
     expect(seen.argv.join(" ")).not.toContain("vm-secret");
-    expect(seen.env.OMB_VM_TOKEN).toBe("vm-secret");
+    expect(seen.env.HEZUO_VM_TOKEN).toBe("vm-secret");
   });
 
   it("sends the local provider when the picker id is custom-encoded", async () => {
@@ -1871,8 +1961,7 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
   });
 
   it.each([
-    ["Cloud home", "OMB_CLOUD_ROLE", "home"],
-    ["hosted enterprise", "OMB_ADMIN_URL", "https://admin.example.test"],
+    ["hosted enterprise", "HEZUO_ADMIN_URL", "https://admin.example.test"],
   ])("refuses desktop ChatGPT plan sign-in on %s before accessing credentials or spawning", async (_name, variable, value) => {
     vi.stubEnv(variable, value);
     const spawn = vi.spyOn(procs, "spawnCli").mockImplementation(() => { throw new Error("Unexpected process"); });
@@ -2074,7 +2163,7 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
   it("starts at most the host's launch slots at once and runs the rest as slots free", async () => {
     await create();
     const log = join(scratch, "startups.ndjson");
-    vi.stubEnv("OMB_CODEX_LAUNCH_SLOTS", "2");
+    vi.stubEnv("HEZUO_CODEX_LAUNCH_SLOTS", "2");
     vi.stubEnv("FAKE_CODEX_STARTUP_DELAY_MS", "150");
     vi.stubEnv("FAKE_CODEX_STARTUP_LOG", log);
     const threads = Array.from({ length: 10 }, (_, index) => `t-slot-${index}`);
@@ -2096,7 +2185,7 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
 
   it("frees a launch slot once the turn is running, and a stop while waiting ends the waiting turn", async () => {
     await create({ mode: "approval" });
-    vi.stubEnv("OMB_CODEX_LAUNCH_SLOTS", "1");
+    vi.stubEnv("HEZUO_CODEX_LAUNCH_SLOTS", "1");
     vi.stubEnv("FAKE_CODEX_STARTUP_DELAY_MS", "300");
     await Promise.all(["t-slot-held-1", "t-slot-held-2"].map((threadId) => instance.adapter.sendTurn({ threadId, text: "one" })));
     await expect.poll(() => recorder.events.filter((e) => e.type === "request.opened").length, { timeout: 15_000 }).toBe(2);
@@ -3234,8 +3323,7 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
       expect(codexSignInRefused({ message: "Reconnecting... 1/5", codexErrorInfo: "serverOverloaded" })).toBe(false);
     });
 
-    it.each([["this computer", undefined], ["My Cloud", "home"]])("ends the turn at once, without starting Codex, when Codex has no login on %s", async (_where, role) => {
-      if (role) vi.stubEnv("OMB_CLOUD_ROLE", role);
+    it("ends the turn at once, without starting Codex, when Codex has no login on this computer", async () => {
       const codexHome = join(scratch, ".codex");
       mkdirSync(codexHome, { recursive: true });
       await create({ mode: "logged-out", environment: { HOME: scratch, USERPROFILE: scratch, CODEX_HOME: codexHome } });
@@ -3243,7 +3331,6 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`)
       const spawn = vi.spyOn(procs, "spawnCli");
       const { done, errors } = await runTurn("t-no-login");
       expect(errors).toEqual([expect.objectContaining({ message: codexNotSignedIn(), setup: true })]);
-      expect(codexNotSignedIn().includes("Sign-ins don't copy over when you move to My Cloud.")).toBe(Boolean(role));
       expect(done).toMatchObject({ ok: false, stopReason: "auth_required" });
       expect(spawn).not.toHaveBeenCalled();
     });

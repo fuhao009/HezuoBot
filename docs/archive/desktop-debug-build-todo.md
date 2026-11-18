@@ -60,8 +60,6 @@
 
 主进程改用私有日志工作线程，仅按有界快照排队，不执行正文脱敏或磁盘写入。默认最多排队 64 MiB 估算数据和 4096 条记录；超限明确停止接收并报告诊断失败，排空已接受记录，不静默丢弃、不回退到同步写入。正常退出等待排空，5 秒未完成则明确报告失败。工作线程阻塞时能力确认仍可完成的回归测试已通过；确认期限仍为 15 秒。
 
-
-
 ## 已找到的接入点
 
 | 类别 | 位置 |
@@ -93,11 +91,11 @@
 ## 构建与隐私
 
 ```sh
-OMB_PRODUCT_SERVICE_URL=https://192.168.66.193:18487 \
+HEZUO_PRODUCT_SERVICE_URL=https://192.168.66.193:18487 \
 CSC_NAME='Hezuo Local Signing' \
 pnpm exec node scripts/package-product.mjs \
   --platform mac --arch arm64 --debug --lan-origin \
-  --gateway-ca .omb-scratch/remote-gateway-193/gateway-cert.pem
+  --gateway-ca .hezuo-scratch/remote-gateway-193/gateway-cert.pem
 ```
 
 `--debug` 将 `product-debug.json` 打进资源目录；只有安装包读取到该标记才启用日志，无需启动参数或环境变量。不带 `--debug` 的构建不包含该标记，并拒绝残留标记混入正式产物。
@@ -107,7 +105,6 @@ pnpm exec node scripts/package-product.mjs \
 流式 SSE 以完整事件为最小安全打码单位增量记录，事件内跨网络分块的凭据不会提前写出。
 
 服务进程的出网响应随业务读取记录并传递取消，避免诊断副本提前拉取。主进程账户客户端仍使用响应副本，慢消费者可能增加内存占用；该开销只存在于 debug 包。
-
 
 ## 相关遗留（不属于 debug 包，但还没收尾）
 

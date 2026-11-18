@@ -23,7 +23,7 @@ async function until(check, label) {
 if (process.versions.electron) {
   console.log("[desktop-only] ESM fixture entered");
   assert.ok(process.argv.includes(flag));
-  const [output, home, url] = process.argv.slice(process.argv.indexOf(flag) + 1);
+  const [output, , url] = process.argv.slice(process.argv.indexOf(flag) + 1);
   const token = process.env.HEZUO_FIXTURE_OWNER;
   delete process.env.HEZUO_FIXTURE_OWNER;
   assert.match(token ?? "", /^[A-Za-z0-9_-]{43}$/);
@@ -41,7 +41,7 @@ if (process.versions.electron) {
     const window = new BrowserWindow({ width: 1280, height: 900, show: true,
       webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true,
         preload: join(root, "desktop/electron/preload.cjs"),
-        additionalArguments: [`--omb-local-origin=${url}`, "--omb-app-version=desktop-only-fixture"] } });
+        additionalArguments: [`--hezuo-local-origin=${url}`, "--hezuo-app-version=desktop-only-fixture"] } });
     const failures = [];
     window.webContents.on("did-fail-load", (_event, code, description, failedUrl) => {
       failures.push({ code, description, url: failedUrl });
@@ -54,7 +54,7 @@ if (process.versions.electron) {
       const api = await fetch('/api/bots');
       const bots = await api.json();
       return { title: document.title, text: document.body.innerText, apiStatus: api.status,
-        botCount: bots.bots.length, ownPage: window.ogb?.app?.ownPage,
+        botCount: bots.bots.length, ownPage: window.hezuo?.app?.ownPage,
         resources: performance.getEntriesByType('resource').map(item => item.name),
         scripts: [...document.scripts].map(item => item.src).filter(Boolean),
         styles: [...document.querySelectorAll('link[rel=stylesheet]')].map(item => item.href),
@@ -81,10 +81,10 @@ if (process.versions.electron) {
 } else {
   const output = mkdtempSync(join(tmpdir(), "hezuo-desktop-only-evidence-"));
   const home = mkdtempSync(join(tmpdir(), "hdo-"));
-  process.env.OMB_DATA_DIR = join(home, "module-data");
-  const { launchVerificationServer } = await import("./control-omb.ts");
+  process.env.HEZUO_DATA_DIR = join(home, "module-data");
+  const { launchVerificationServer } = await import("./control-hezuo.ts");
   const { waitForExit, removeTempDir } = await import("../desktop/server/testing/cleanup.ts");
-  const { ensureUiBrowser, agentBrowser, sessionEnv } = await import("./testing/control-omb-ui.ts");
+  const { ensureUiBrowser, agentBrowser, sessionEnv } = await import("./testing/control-hezuo-ui.ts");
   const { closeBrowserSession } = await import("../desktop/server/browser-engine.ts");
   const staticDir = join(root, "dist");
   const token = randomBytes(32).toString("base64url");
@@ -102,7 +102,7 @@ if (process.versions.electron) {
     assert.ok(existsSync(join(staticDir, "index.html")), "Build the actual UI first: pnpm exec vite build desktop");
     browser = await ensureUiBrowser();
     if (startup.signal.aborted) throw new Error("Verification cancelled");
-    fixture = await launchVerificationServer({ ...process.env, OMB_TEST_DESKTOP_OWNER_TOKEN: token },
+    fixture = await launchVerificationServer({ ...process.env, HEZUO_TEST_DESKTOP_OWNER_TOKEN: token },
       startup.signal, undefined, undefined, undefined, undefined, [], undefined, staticDir);
     const url = fixture.info.url;
     mkdirSync(join(home, "electron"), { recursive: true });

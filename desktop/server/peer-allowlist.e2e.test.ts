@@ -44,7 +44,7 @@ const fixture = (displayName: string, dump?: string) => ({
 });
 
 beforeAll(async () => {
-  home = mkdtempSync(join(tmpdir(), "omb-peer-allowlist-"));
+  home = mkdtempSync(join(tmpdir(), "hezuo-peer-allowlist-"));
   const data = join(home, ".hezuo");
   const staticDir = join(home, "static");
   mkdirSync(data, { recursive: true });
@@ -76,10 +76,10 @@ beforeAll(async () => {
       ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}),
       HOME: home,
       USERPROFILE: home,
-      OMB_PORT: String(port),
-      OMB_WEBHOOK_PORT: String(port + 1),
-      OMB_STATIC_DIR: staticDir,
-      OMB_TEST_INTERNAL_CAPABILITY_KEY: TEST_CAPABILITY_KEY,
+      HEZUO_PORT: String(port),
+      HEZUO_WEBHOOK_PORT: String(port + 1),
+      HEZUO_STATIC_DIR: staticDir,
+      HEZUO_TEST_INTERNAL_CAPABILITY_KEY: TEST_CAPABILITY_KEY,
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -273,7 +273,7 @@ describe("peer allow-list", () => {
       expect(systemPrompt).not.toContain("create_bot");
       expect(systemPrompt).toContain("[/TEAM ROSTER] If a supported API key is missing");
 
-      const providerToken = String(dump.mcpConfig?.mcpServers?.agents?.env?.OMB_COMMS_TOKEN ?? "");
+      const providerToken = String(dump.mcpConfig?.mcpServers?.agents?.env?.HEZUO_COMMS_TOKEN ?? "");
       expect(providerToken).toMatch(/^[a-f0-9]{48}$/);
       await expect.poll(() => botBusy(asker.id)).toBe(false);
       const token = await mintCapability(asker.id, asker.threadId);
@@ -366,7 +366,7 @@ describe("peer allow-list", () => {
       rmSync(askerDump, { force: true });
       await warmUp(asker.id);
       await expect.poll(() => readDump(askerDump)()?.mcpConfig, { timeout: 10_000 }).toBeTruthy();
-      const providerToken = String(readDump(askerDump)()!.mcpConfig?.mcpServers?.agents?.env?.OMB_COMMS_TOKEN ?? "");
+      const providerToken = String(readDump(askerDump)()!.mcpConfig?.mcpServers?.agents?.env?.HEZUO_COMMS_TOKEN ?? "");
       expect(providerToken).toMatch(/^[a-f0-9]{48}$/);
       const token = await mintCapability(asker.id, asker.threadId);
       expect((await api("PATCH", `/api/bots/${asker.id}`, { approvePeerComms: true, approvalMode: "ask" })).status).toBe(200);
@@ -423,6 +423,7 @@ describe("peer allow-list", () => {
     const browser = async (path: string, body: unknown) => api("PATCH", path, body, { origin: base });
 
     try {
+      expect((await api("POST", "/api/sidebar-sections", { name: "Engineering" })).status).toBe(200);
       expect((await api("PATCH", `/api/bots/${bound.id}`, { peers: [peer.id], approvePeerComms: true, section: "Ops" })).status).toBe(200);
       expect((await api("POST", `/api/bots/${held.id}/messages`, { text: "hold the line" })).status).toBe(202);
       await expect.poll(async () => (await botState(held.id))?.busy, { timeout: 20_000 }).toBe(true);

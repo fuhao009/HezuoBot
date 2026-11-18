@@ -42,8 +42,8 @@ async function start() {
     env: {
       ...(process.env.PATH ? { PATH: process.env.PATH } : {}),
       ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}),
-      HOME: home, USERPROFILE: home, OMB_PORT: String(port), OMB_WEBHOOK_PORT: String(port + 1),
-      OMB_TEST_INTERNAL_CAPABILITY_KEY: CAPABILITY_KEY,
+      HOME: home, USERPROFILE: home, HEZUO_PORT: String(port), HEZUO_WEBHOOK_PORT: String(port + 1),
+      HEZUO_TEST_INTERNAL_CAPABILITY_KEY: CAPABILITY_KEY,
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -137,7 +137,7 @@ const settledReply = (threadId: string, text: string) => waitFor(async () => {
 posixOnly("per-bot visibility on a shared workspace", () => {
   beforeAll(async () => {
     chmodSync(FAKE_CLI, 0o755);
-    home = mkdtempSync(join(tmpdir(), "omb-bot-visibility-"));
+    home = mkdtempSync(join(tmpdir(), "hezuo-bot-visibility-"));
     const data = join(home, ".hezuo");
     mkdirSync(data, { recursive: true });
     writeFileSync(join(data, "config.json"), JSON.stringify({
@@ -475,6 +475,28 @@ posixOnly("per-bot visibility on a shared workspace", () => {
     }
     expect((await api("PATCH", `/api/bots/${ids.hr}`, { pinned: false }, BOSS)).body.bot).toMatchObject({ visibility: { people: [ADA] }, peers: [ids.board, ids.pub] });
     expect((await api("PATCH", `/api/bots/${ids.hr}`, { peers: null, acknowledgePeerScope: true }, BOSS)).status).toBe(200);
+  });
+
+  it("routes active internal credentials only through their dedicated capability handler", async () => {
+    const minted = await fetch(`${BASE}/api/testing/internal-capability`, {
+      method: "POST", headers: { "content-type": "application/json", "x-hezuo-test-capability": CAPABILITY_KEY },
+      body: JSON.stringify({ botId: ids.pub, threadId: ids.pubThread }),
+    });
+    expect(minted.status).toBe(201);
+    const { token } = await minted.json() as { token: string };
+    const headers = { authorization: `Bearer ${token}` };
+    const search = await fetch(`${BASE}/api/internal/session-search?fromBotId=${ids.pub}&q=auth-ordering-regression`, { headers });
+    expect(search.status, await search.text()).toBe(200);
+    const wrongKind = await fetch(`${BASE}/api/internal/browser/mcp`, {
+      method: "POST", headers: { ...headers, "content-type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
+    });
+    expect(wrongKind.status).toBe(403);
+    expect(await wrongKind.json()).toEqual({ error: "this internal capability cannot access that service" });
+    expect((await fetch(`${BASE}/api/internal/session-search?q=test`, { headers: { authorization: `Bearer ${token}invalid` } })).status).toBe(401);
+    expect((await fetch(`${BASE}/api/bots`, { headers })).status).toBe(401);
+    expect((await fetch(`${BASE}/api/bots`, { headers: { authorization: "Bearer invalid-public-token" } })).status).toBe(401);
+    expect((await api("GET", "/api/internal/session-search?q=test", undefined, BOB)).status).toBe(401);
   });
 
   it("keeps a room fewer people can see out of a visible bot's recall, and refuses to mix audiences in a room", async () => {

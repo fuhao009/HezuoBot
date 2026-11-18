@@ -8,11 +8,11 @@ actions transactional, nor authorize a deployment.
 
 ```sh
 pnpm exec vitest run desktop/server/digest-control.e2e.test.ts
-pnpm exec vitest run desktop/server/commands.test.ts desktop/server/store.test.ts desktop/server/message-db.test.ts desktop/server/digest.test.ts desktop/server/checkpoints.test.ts desktop/server/hooks/omb-hook.test.ts desktop/server/hooks.e2e.test.ts desktop/server/digest.e2e.test.ts
+pnpm exec vitest run desktop/server/commands.test.ts desktop/server/store.test.ts desktop/server/message-db.test.ts desktop/server/digest.test.ts desktop/server/checkpoints.test.ts desktop/server/hooks/hezuo-hook.test.ts desktop/server/hooks.e2e.test.ts desktop/server/digest.e2e.test.ts
 ```
 
 The first test starts `launchVerificationServer`, then uses the shared
-`control:omb` surface to create two bots, send consecutive direct turns,
+`control:hezuo` surface to create two bots, send consecutive direct turns,
 wait for settlement, create a room, send to it, and read both transcripts.
 It checks per-turn hook results (including reused tool IDs), unique persisted
 receipts and the room speaker. Commands, wait results and transcripts are
@@ -38,7 +38,7 @@ detached, or to use `mdfind`/a scoped folder instead of `find /`.
 ```sh
 pnpm exec vitest run desktop/server/shell-timeout-hint.test.ts desktop/server/hooks.e2e.test.ts
 FAKE_CLAUDE_HOOKS=1 FAKE_CLAUDE_TOOL_CALLS='[{"name":"Bash","input":{"command":"find / -name x"},"ok":false,"output":"Exit code 143\nCommand timed out after 2m 0s"}]' \
-  node --experimental-strip-types scripts/control-omb.ts launch
+  node --experimental-strip-types scripts/control-hezuo.ts launch
 ```
 
 Send one direct turn and one channel turn, then wait for each to settle. The fake echoes each
@@ -49,17 +49,13 @@ and the `PostToolUseFailure` hook registration. Last exercised 2026-10-13
 
 ## Replies with no recorded work
 
-Android and desktop omit empty receipts. Both mobile parsers stop at the
-trailing `reply:` field, including when the reply contains ` · ` separators.
-Recorded tools, files, memory changes, truncation notices and unknown work
-sections remain visible; the stored digest is not deleted.
+Desktop omits empty receipts. Recorded tools, files, memory changes, truncation
+notices and unknown work sections remain visible; the stored digest is not deleted.
 
 Regression checks:
 
 ```sh
 pnpm exec vitest run desktop/src/components/DigestChip.test.ts
-(cd ios && swift test --filter RoutineRunDigestTests)
-(cd android && ./gradlew :core:test --tests '*TurnDigestTest' --tests '*ChatPreferencesTest' :app:testDebugUnitTest --tests '*TranscriptPresentationTest')
 ```
 
 For the real desktop renderer, follow [the chat UI recipe](chat-ui.md), launching
@@ -68,8 +64,7 @@ and wait for settlement: the reply remains visible and the transcript contains
 no `[data-testid="digest-chip"]`. Repeat in a new disposable fixture with
 `--tool-calls '[{"name":"Bash","input":{"command":"echo hi"},"ok":true}]'`:
 the work receipt must now remain visible. Keep both wait results and DOM
-snapshots. Android's transcript suite opens a useful receipt after checking
-that the empty receipt is absent, and saves `digest-only-recorded-work.png`.
+snapshots.
 
 ## Boundaries
 
@@ -86,6 +81,6 @@ that the empty receipt is absent, and saves `digest-only-recorded-work.png`.
 - `full` means every recorded tool row delivered an untruncated result through
   the hook. It does not mean tests passed. Otherwise evidence is `preview` or
   `none`. Hooks have their own four-second timeout, a bounded input and no
-  redirects. `OMB_HOOKS=0` disables them.
-- Desktop chips and native mobile presentation need their respective renderer
-  checks. These server tests do not prove layout or a real provider's hooks.
+  redirects. `HEZUO_HOOKS=0` disables them.
+- Desktop chips need renderer checks. These server tests do not prove layout
+  or a real provider's hooks.

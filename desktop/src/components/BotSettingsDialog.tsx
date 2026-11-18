@@ -22,11 +22,6 @@ import { HistorySection } from "./bot-settings/HistorySection";
 import { UsageSection } from "./bot-settings/UsageSection";
 import { VisibilitySection } from "./bot-settings/VisibilitySection";
 import { t } from "@/lib/i18n";
-import { useAdvancedMode } from "@/lib/interface-mode";
-import { BotPanel } from "./bot-panel/PanelShell";
-import type { PanelTab } from "./bot-panel/page-registry";
-import { BOT_PANEL_ID, sidePanelCls } from "./bot-panel/side-panel";
-import { WorkspaceResizeEdge } from "./WorkspaceResizeEdge";
 import { HistoryRollbackDialog, useBotHistory, useBotOverview } from "./bot-settings/useBotOverview";
 import { useOwnerOrAdmin } from "@/lib/use-owner-or-admin";
 import { ShareBotButton, useTeamName } from "./bot-access/ShareBotButton";
@@ -39,11 +34,7 @@ function sectionMatches(entry: (typeof BOT_SECTIONS)[number], query: string): bo
   return [entry.label, sectionLabel(entry), ...entry.keywords].some((part) => part.toLowerCase().includes(query));
 }
 
-export function BotSettingsDialog({ bot, overlay = false, onOpenVmWorkspace }: {
-  bot: Bot;
-  overlay?: boolean;
-  onOpenVmWorkspace?: (botId: string) => void;
-}) {
+export function BotSettingsDialog({ bot }: { bot: Bot }) {
   const { state, dispatch } = useStore();
   const section = state.botSettingsSection;
   const derived = useBotSettingsDerived(bot);
@@ -52,31 +43,21 @@ export function BotSettingsDialog({ bot, overlay = false, onOpenVmWorkspace }: {
   const [query, setQuery] = useState("");
   const collapsed = !state.botSettingsExpandAccordion;
   const q = query.trim().toLowerCase();
-  const advanced = useAdvancedMode();
   const product = isProductWorkspace(state.config?.productManaged);
-  const simpleView = product || !advanced;
-  const [panelTab, setPanelTab] = useState<PanelTab>(() => state.computerOpen ? "computer" : state.activityOpen ? "activity" : "details");
-  const wide = simpleView && panelTab === "computer";
-  const closeAll = () => {
-    dispatch({ type: "toggleSettings", open: false });
-    dispatch({ type: "toggleComputer", open: false });
-    dispatch({ type: "toggleActivity", open: false });
-  };
-  const linkedSection = !collapsed && !state.botSettingsExpandRemembered ? section : null;
   const slackUrl = useSlackManagementUrl(bot.id);
   const ownerOrAdmin = useOwnerOrAdmin();
   const teamName = useTeamName();
   const sections = BOT_SECTIONS
     .filter((entry) => !product || (entry.id !== "model" && entry.id !== "usage"))
     .filter((entry) => entry.id !== "slack" || slackUrl !== null)
-    .filter((entry) => entry.id !== "visibility" || (!window.ogb && ownerOrAdmin === true && !teamName));
+    .filter((entry) => entry.id !== "visibility" || (!window.hezuo && ownerOrAdmin === true && !teamName));
   const visibleSections = sections.filter((entry) => sectionMatches(entry, q));
 
   const { overview, overviewError, prompt, promptError } = useBotOverview(bot, {
-    overview: section === "overview" && !simpleView,
-    prompt: section === "overview" && !simpleView,
+    overview: section === "overview",
+    prompt: section === "overview",
   });
-  const history = useBotHistory(bot, section === "history" && !simpleView);
+  const history = useBotHistory(bot, section === "history");
 
   useEffect(() => {
     if (collapsed) return;
@@ -99,10 +80,6 @@ export function BotSettingsDialog({ bot, overlay = false, onOpenVmWorkspace }: {
       if (event.key === "Escape" && !event.defaultPrevented) {
         event.preventDefault();
         dispatch({ type: "toggleSettings", open: false });
-        if (simpleView) {
-          dispatch({ type: "toggleComputer", open: false });
-          dispatch({ type: "toggleActivity", open: false });
-        }
       }
     };
 
@@ -111,7 +88,7 @@ export function BotSettingsDialog({ bot, overlay = false, onOpenVmWorkspace }: {
       window.removeEventListener("keydown", onKey);
       previousFocus?.focus();
     };
-  }, [dispatch, simpleView]);
+  }, [dispatch]);
 
   const renderSectionBody = (id: (typeof BOT_SECTIONS)[number]["id"]) => {
     switch (id) {
@@ -183,25 +160,13 @@ export function BotSettingsDialog({ bot, overlay = false, onOpenVmWorkspace }: {
     <>
       <aside
         ref={dialogRef}
-        id={simpleView ? BOT_PANEL_ID : undefined}
-        data-bot-panel={simpleView ? "" : undefined}
-        data-tab={simpleView ? panelTab : undefined}
         role="dialog"
+        aria-modal="true"
         data-product-bot-details={product ? "" : undefined}
         aria-labelledby="bot-settings-title"
         tabIndex={-1}
-        className={sidePanelCls(overlay, simpleView, wide)}
+        className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-hairline bg-app shadow-xl"
       >
-        {simpleView ? (
-          <BotPanel
-            bot={bot}
-            derived={derived}
-            linkedSection={linkedSection}
-            onClose={closeAll}
-            onOpenVmWorkspace={onOpenVmWorkspace}
-            onTabChange={setPanelTab}
-          />
-        ) : <>
         <div {...dragProps} className="flex shrink-0 items-center justify-between px-4 py-3">
           <span id="bot-settings-title" className="truncate text-[15px] font-semibold text-ink">
             {bot.name}
@@ -295,8 +260,6 @@ export function BotSettingsDialog({ bot, overlay = false, onOpenVmWorkspace }: {
             );
           })}
         </div>
-        </>}
-        {wide && <WorkspaceResizeEdge target={dialogRef} side="left" storageKey="omb-bot-panel-computer-width" minimum={360} maximum={720} label={t("computer.resizeAria")} />}
       </aside>
       <HistoryRollbackDialog history={history} returnFocusRef={dialogRef} />
     </>

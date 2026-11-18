@@ -125,13 +125,13 @@ describe("canonical thread links", () => {
 
   it("copies and parses one spelling, and rejects near-misses", () => {
     const link = threadRefUrl({ botId: "scout", threadId: uuid });
-    expect(link).toBe(`hezuo://thread/${uuid}?bot=scout`);
+    expect(link).toBe(`hezuobot://thread/${uuid}?bot=scout`);
     expect(parseThreadRefUrl(link)).toEqual({ threadId: uuid, botId: "scout" });
-    expect(parseThreadRefUrl(`hezuo://thread/${uuid}`)).toEqual({ threadId: uuid });
+    expect(parseThreadRefUrl(`hezuobot://thread/${uuid}`)).toEqual({ threadId: uuid });
     for (const miss of [
-      `hezuo://thread/${uuid}/extra?bot=scout`,
-      `hezuo://thread/${uuid}?bot=scout&x=1`,
-      `hezuo://thread/${uuid}?bot=`,
+      `hezuobot://thread/${uuid}/extra?bot=scout`,
+      `hezuobot://thread/${uuid}?bot=scout&x=1`,
+      `hezuobot://thread/${uuid}?bot=`,
       `omb://thread/${uuid}?bot=scout`,
       "https://thread/" + uuid,
     ]) {
@@ -139,15 +139,15 @@ describe("canonical thread links", () => {
     }
   });
 
-  it("reads saved legacy links but emits only the current scheme", () => {
-    const historical = `openmausbot://thread/${uuid}?bot=scout`;
-    expect(parseThreadRefUrl(historical)).toEqual({ threadId: uuid, botId: "scout" });
-    expect(parseBotRefUrl("openmausbot://bot/scout")).toEqual({ botId: "scout" });
-    expect(threadTokenFromPaste(`[QA PR 245](${historical})`, uuidThreads)?.token).toBe("#QA PR 245");
-    expect(looksLikeThreadRefUrl(historical + "&unknown=1")).toBe(true);
-    expect(parseThreadRefUrl(historical + "&unknown=1")).toBeNull();
-    expect(parseBotRefUrl("openmausbot://bot/scout?unknown=1")).toBeNull();
-    expect(threadRefUrl({ botId: "scout", threadId: uuid })).toBe(`hezuo://thread/${uuid}?bot=scout`);
+  it("reads saved current links and rejects unknown parameters", () => {
+    const saved = `hezuobot://thread/${uuid}?bot=scout`;
+    expect(parseThreadRefUrl(saved)).toEqual({ threadId: uuid, botId: "scout" });
+    expect(parseBotRefUrl("hezuobot://bot/scout")).toEqual({ botId: "scout" });
+    expect(threadTokenFromPaste(`[QA PR 245](${saved})`, uuidThreads)?.token).toBe("#QA PR 245");
+    expect(looksLikeThreadRefUrl(saved + "&unknown=1")).toBe(true);
+    expect(parseThreadRefUrl(saved + "&unknown=1")).toBeNull();
+    expect(parseBotRefUrl("hezuobot://bot/scout?unknown=1")).toBeNull();
+    expect(threadRefUrl({ botId: "scout", threadId: uuid })).toBe(`hezuobot://thread/${uuid}?bot=scout`);
   });
 
   it("turns a pasted link or raw UUID into the title token, and leaves unknown ids plain", () => {
@@ -155,7 +155,7 @@ describe("canonical thread links", () => {
     expect(threadTokenFromPaste(link, uuidThreads)).toEqual({ token: "#QA PR 245", ref: expect.objectContaining({ threadId: uuid, botId: "scout" }) });
     expect(threadTokenFromPaste(`[QA PR 245](${link})`, uuidThreads)?.token).toBe("#QA PR 245");
     expect(threadTokenFromPaste(uuid, uuidThreads)?.ref).toMatchObject({ threadId: uuid });
-    expect(threadTokenFromPaste("hezuo://thread/" + crypto.randomUUID(), uuidThreads)).toBeNull();
+    expect(threadTokenFromPaste("hezuobot://thread/" + crypto.randomUUID(), uuidThreads)).toBeNull();
     expect(threadTokenFromPaste("not a uuid", uuidThreads)).toBeNull();
     expect(threadTokenFromPaste("see " + uuid, uuidThreads)).toBeNull();
   });
@@ -163,10 +163,10 @@ describe("canonical thread links", () => {
   it("sends resolvable titles as canonical markdown and passes everything else through", () => {
     const link = threadRefUrl({ botId: "ada", threadId: "release" });
     expect(serializeThreadRefs("Done in #Release notes today", threads)).toBe(`Done in [Release notes](${link}) today`);
-    const sent = `Already [Release notes](${link}) and [Gone](hezuo://thread/dead?bot=ada)`;
+    const sent = `Already [Release notes](${link}) and [Gone](hezuobot://thread/dead?bot=ada)`;
     expect(serializeThreadRefs(sent + " plus #Nothing", threads)).toBe(sent + " plus #Nothing");
     const bracketed = [scout("b", "QA [PR] 245")];
-    expect(serializeThreadRefs("see #QA [PR] 245", bracketed)).toBe("see [QA \\[PR\\] 245](hezuo://thread/b?bot=scout)");
+    expect(serializeThreadRefs("see #QA [PR] 245", bracketed)).toBe("see [QA \\[PR\\] 245](hezuobot://thread/b?bot=scout)");
   });
 
   it("displays canonical links as title chips and dead links as raw text", () => {
@@ -177,8 +177,8 @@ describe("canonical thread links", () => {
       { text: " and " },
       { text: "#QA PR 245", ref: expect.objectContaining({ threadId: "qa" }) },
     ]);
-    expect(splitThreadRefsForDisplay("[Gone](hezuo://thread/dead?bot=ada)", threads))
-      .toEqual([{ text: "[Gone](hezuo://thread/dead?bot=ada)" }]);
+    expect(splitThreadRefsForDisplay("[Gone](hezuobot://thread/dead?bot=ada)", threads))
+      .toEqual([{ text: "[Gone](hezuobot://thread/dead?bot=ada)" }]);
   });
 
   it("resolves an address by its own bot first, then the mention preferences", () => {

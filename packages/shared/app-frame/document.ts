@@ -30,15 +30,10 @@ export function stripDocumentPreamble(html: string): string {
   }
 }
 
-/** Read adapter for pre-Hezuo persisted HTML; newly authored pages only expose hezuo. */
-function legacyPageHelper(html: string): string {
-  return /\bmausbot\b/.test(html) ? 'Object.defineProperty(window,"mausbot",{value:window.hezuo});' : "";
-}
-
 /** `base`: where a folder page's relative URLs resolve, ahead of anything of the page's. */
 export function buildSrcdoc(input: { html: string; csp: string; botHelper?: boolean; base?: string }): string {
   const head = `${CSP_META_PREFIX}${escapeAttribute(input.csp)}">`;
-  const helper = input.botHelper ? `<style>${APP_THEME_STYLE}</style><script>${APP_HELPER_SOURCE}${legacyPageHelper(input.html)}</script><script>${APP_POINT_SOURCE}</script>` : "";
+  const helper = input.botHelper ? `<style>${APP_THEME_STYLE}</style><script>${APP_HELPER_SOURCE}</script><script>${APP_POINT_SOURCE}</script>` : "";
   const base = input.base ? `<base href="${escapeAttribute(input.base)}">` : "";
   return `${head}${base}${helper}${stripDocumentPreamble(input.html)}`;
 }
@@ -50,7 +45,7 @@ const PUBLISHED_HEZUO = "window.hezuo={theme:matchMedia(\"(prefers-color-scheme:
 
 /** A bot's HTML page as a published page serves it: the theme colours the chat would give it, and a quiet hezuo. */
 export function publishedBotHtml(html: string): string {
-  return `<!DOCTYPE html><style>${APP_THEME_STYLE}</style><script>${PUBLISHED_HEZUO}${legacyPageHelper(html)}</script>${stripDocumentPreamble(html)}`;
+  return `<!DOCTYPE html><style>${APP_THEME_STYLE}</style><script>${PUBLISHED_HEZUO}</script>${stripDocumentPreamble(html)}`;
 }
 
 export const BOT_HTML_CAN: AppCan = { serverTools: false, serverResources: false, message: true, openLinks: true, modelContext: true };

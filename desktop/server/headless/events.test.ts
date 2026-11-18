@@ -1,4 +1,4 @@
-import "../testing/scrub-ambient-omb-env.ts";
+import "../testing/scrub-ambient-hezuo-env.ts";
 
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -77,7 +77,7 @@ describe("events against a server", () => {
     asked.length = 0;
     answer = (_req, res) => { res.writeHead(401, { "content-type": "application/json" }); res.end(JSON.stringify({ error: "unauthorized: this session has expired or was revoked" })); };
     const { io, out } = capture();
-    const code = await runHeadless(["events", "--json"], { io, env: { HEZUO_URL: origin, HEZUO_TOKEN: "omb_sess_expired" } });
+    const code = await runHeadless(["events", "--json"], { io, env: { HEZUO_URL: origin, HEZUO_TOKEN: "hezuo_sess_expired" } });
     expect(code).toBe(5);
     expect(JSON.parse(out.join("\n"))).toMatchObject({ ok: false, exitCode: 5, error: "this server needs a credential and did not accept the one given" });
     expect(asked).toHaveLength(1);

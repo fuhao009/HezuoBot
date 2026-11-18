@@ -11,6 +11,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { WireMessage as Message } from "../../packages/shared/wire.ts";
 import type { AppConfig } from "./config.ts";
 import type { McpServerSpec } from "./contracts.ts";
+import * as composio from "./composio.ts";
 import { createMcpSignInCards, isCardOwnerLive } from "./host/mcp-sign-in-cards.ts";
 import { resumableCards } from "./host/resumable-cards.ts";
 import { createTeamConnectionsHost } from "./host/team-connections-host.ts";
@@ -49,7 +50,7 @@ afterEach(async () => {
 
 async function setup(options: { team?: boolean; origins?: string[]; lifetimeMs?: number } = {}) {
   const provider: FakePostiz = await startFakePostiz({ signInPage: SIGN_IN_PAGE });
-  const dataDir = mkdtempSync(join(tmpdir(), "omb-mcp-sign-in-card-"));
+  const dataDir = mkdtempSync(join(tmpdir(), "hezuo-mcp-sign-in-card-"));
   const url = `${provider.url}/mcp-oauth-dynamic`;
   const cfg = { mcpServers: { linear: { type: "http", url, headers: {}, enabled: true } } } as unknown as AppConfig;
 
@@ -90,8 +91,7 @@ async function setup(options: { team?: boolean; origins?: string[]; lifetimeMs?:
       return [name, { type: "http", url: server.url, headers: server.headers } as McpServerSpec];
     })),
     isOwnerLive, onSettled,
-    brokerUrl: () => null,
-    composio: { configured: () => false } as never,
+    composio,
   });
   const cards = createMcpSignInCards({
     store, cfg: () => cfg, mcpOAuth,
@@ -298,7 +298,7 @@ describe("the Sign in card", () => {
     expect(await f.approve(onTheMac.body.url as string)).toBe(200);
 
     const preRegistered = await setup({ origins: ["https://omb.example.com"] });
-    (preRegistered.cfg.mcpServers!.linear as { oauth?: unknown }).oauth = { clientId: "omb-app" };
+    (preRegistered.cfg.mcpServers!.linear as { oauth?: unknown }).oauth = { clientId: "hezuo-app" };
     const other = (await preRegistered.signIn()).card;
     const away = { host: "omb.example.com", origin: "https://omb.example.com", "x-forwarded-proto": "https" };
     expect(await preRegistered.authorize(other, olive, away)).toEqual({ status: 409, body: { error: "Finish this sign-in in Settings → MCP servers." } });

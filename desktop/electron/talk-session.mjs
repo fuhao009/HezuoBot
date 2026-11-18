@@ -4,15 +4,15 @@ import { TalkServerError } from "./talk-server.mjs";
 export const TALK_TIMING = Object.freeze({ replyHideMs: 12_000, noticeHideMs: 4_000, stillWorkingMs: 120_000, hoverRecheckMs: 500, maxListenMs: 60_000 });
 
 export const TALK_TEXT = Object.freeze({
-  busy: "Voice is in use in Hezuo",
-  serverDown: "Open Hezuo to talk",
-  starting: "Hezuo is still starting. Try again in a moment.",
-  noHezuo: "Set up Hezuo first, then try again.",
-  moved: "Hezuo lives on My Cloud now — talk to it there",
+  busy: "Voice is in use in HezuoBot",
+  serverDown: "Open HezuoBot to talk",
+  starting: "HezuoBot is still starting. Try again in a moment.",
+  noHezuo: "Set up HezuoBot first, then try again.",
+  moved: "HezuoBot lives on My Cloud now — talk to it there",
   permission: "Talking needs Microphone + Speech Recognition access — System Settings → Privacy & Security.",
   dictationOff: "Turn on Dictation in System Settings → Keyboard, then try again.",
   unavailable: "Talking couldn't start. Try again.",
-  failed: "Hezuo couldn't take that · Open chat",
+  failed: "HezuoBot couldn't take that · Open chat",
 });
 
 const SPEECH_PROBLEMS = new Map([

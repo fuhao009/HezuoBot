@@ -1,19 +1,19 @@
 // Full server + built viewer + synthetic Docker/RFB, in disposable homes.
-// Build first, then run with explicit OMB_AGENT_BROWSER_PATH and
+// Build first, then run with explicit HEZUO_AGENT_BROWSER_PATH and
 // AGENT_BROWSER_EXECUTABLE_PATH if reusing installed browser binaries.
 import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { launchVerificationServer, runControlOmb, type VerificationServer } from "./control-omb.ts";
-import { agentBrowser, ensureUiBrowser, sessionEnv } from "./testing/control-omb-ui.ts";
+import { launchVerificationServer, runControlHezuo, type VerificationServer } from "./control-hezuo.ts";
+import { agentBrowser, ensureUiBrowser, sessionEnv } from "./testing/control-hezuo-ui.ts";
 import { fixtureApi } from "./testing/preview-fixture.ts";
 import { fakeVnc } from "./testing/fake-vnc.ts";
 import { BASE_IMAGE_DIGEST, CUA_DRIVER_VERSION, IMAGE, IMAGE_LAYER_VERSION } from "../desktop/server/container-computer.ts";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
-const scratch = mkdtempSync(join(tmpdir(), "omb-viewer-fixture-"));
+const scratch = mkdtempSync(join(tmpdir(), "hezuo-viewer-fixture-"));
 const bin = join(scratch, "bin");
 mkdirSync(bin);
 mkdirSync(join(scratch, "tmp"));
@@ -97,7 +97,7 @@ process.on('SIGTERM',()=>{fs.appendFileSync(log,'close ');process.exit(0)});
   assert.equal(status.viewer_url.includes("password"), false);
   const matchingBackgrounds = "getComputedStyle(document.querySelector('#screen > div')).backgroundColor === getComputedStyle(document.querySelector('main')).backgroundColor";
   assert.equal(await evaluate(matchingBackgrounds), true);
-  const evidenceDir = process.env.OMB_UI_EVIDENCE_DIR ? resolve(root, process.env.OMB_UI_EVIDENCE_DIR) : dirname(fixture.info.logPath);
+  const evidenceDir = process.env.HEZUO_UI_EVIDENCE_DIR ? resolve(root, process.env.HEZUO_UI_EVIDENCE_DIR) : dirname(fixture.info.logPath);
   mkdirSync(evidenceDir, { recursive: true });
   const desktopScreenshot = join(evidenceDir, `viewer-${process.pid}-desktop.png`);
   await command("wait", "--fn", "document.getAnimations().every(a => a.playState !== 'running')");
@@ -235,7 +235,7 @@ process.on('SIGTERM',()=>{fs.appendFileSync(log,'close ');process.exit(0)});
   await nextConnection;
   await command("wait", "--fn", "document.getElementById('status').textContent === 'Desktop connected'");
   // Exercise the real VPS join route, SSH process lifecycle and the same UI.
-  await runControlOmb(["new-bot", "--name", "VPS fixture", "--url", fixture.info.url]);
+  await runControlHezuo(["new-bot", "--name", "VPS fixture", "--url", fixture.info.url]);
   const { bots } = await api("GET", "/api/bots?messages=0");
   const vpsBot = bots.find((bot: { name: string }) => bot.name === "VPS fixture");
   await api("PATCH", "/api/config", { vps: { sshAlias: "viewer-fixture" } });

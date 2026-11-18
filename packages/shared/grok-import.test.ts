@@ -117,6 +117,31 @@ describe("parseGrokExport", () => {
     expect(document.package.requirements.apps).toEqual([{ slug: "slack", label: "slack", reason: "Posts the note" }]);
   });
 
+  it("does not recognize or parse an explicit old identity, without changing the input", () => {
+    const legacy = { ...structuredClone(reply), format: "openmaus.grok/1" };
+    const before = structuredClone(legacy);
+    for (const input of [legacy, JSON.stringify(legacy), `Here is the export:\n\`\`\`json\n${JSON.stringify(legacy)}\n\`\`\``]) {
+      expect(isGrokExport(input)).toBe(false);
+      expect(() => parseGrokExport(input)).toThrow(GrokImportError);
+      expect(() => grokExportToPackage(parseGrokExport(input))).toThrow(GrokImportError);
+    }
+    expect(legacy).toEqual(before);
+  });
+
+  it("keeps format-less replies, including fences and old identity text in content, without mutating them", () => {
+    const { format: _format, ...unmarked } = structuredClone(reply);
+    unmarked.instructions += "\nReference: openmaus.grok/1";
+    const before = structuredClone(unmarked);
+    for (const input of [unmarked, JSON.stringify(unmarked), `\`\`\`json\n${JSON.stringify(unmarked)}\n\`\`\``]) {
+      expect(isGrokExport(input)).toBe(false);
+      const parsed = parseGrokExport(input);
+      expect(parsed.format).toBe("hezuo.grok/1");
+      expect(parsed.instructions).toBe(unmarked.instructions);
+      expect(() => parsePackageDocument(grokExportToPackage(parsed).document)).not.toThrow();
+    }
+    expect(unmarked).toEqual(before);
+  });
+
   it("refuses garbage with a sentence that says what to paste", () => {
     for (const input of ["", "hello there", "```json\n{not json}\n```", "[1,2,3]", 42, null, ["x"]]) {
       expect(() => parseGrokExport(input), String(input)).toThrow(GrokImportError);

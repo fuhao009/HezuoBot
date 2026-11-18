@@ -8,14 +8,14 @@ export const CHATGPT_USAGE_URL = "https://chatgpt.com/settings/usage";
 
 export function ManageUsageLink({ href, className, children }: { href: string; className: string; children?: ReactNode }) {
   return <a href={href} target="_blank" rel="noopener noreferrer" className={className} onClick={(event) => {
-    if (window.ogb?.openExternal) { event.preventDefault(); void openExternalLink(href); }
+    if (window.hezuo?.openExternal) { event.preventDefault(); void openExternalLink(href); }
   }}>{t("engineSetup.chatgpt.manageUsage")}{children}</a>;
 }
 
 /** Security: this marker only dismisses a welcome message; no sign-in data lives in the renderer. Settings passes
  * `welcome={false}`: its account rows stay mounted inside closed cards, where a modal would block the page unseen. */
 export function ChatGptPlanStatus({ instanceId, welcome = true }: { instanceId: string; welcome?: boolean }) {
-  const key = `omb:chatgpt-plan-welcome:${instanceId}`;
+  const key = `hezuo:chatgpt-plan-welcome:${instanceId}`;
   const [acknowledged, setAcknowledged] = useState(() => {
     if (!welcome) return true;
     try { return localStorage.getItem(key) === "1"; } catch { return false; }

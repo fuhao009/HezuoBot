@@ -60,7 +60,7 @@ beforeEach(() => {
   f.dispatch.mockReset();
   f.row = null;
   f.fail = false;
-  vi.stubGlobal("ogb", undefined);
+  vi.stubGlobal("hezuo", undefined);
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
@@ -215,15 +215,15 @@ describe("connecting an AI on the first screen", () => {
     await show();
     await otherWays();
     expect(f.row).toBeNull();
-    vi.stubGlobal("ogb", { organization: bridge });
-    window.ogb = { organization: bridge } as unknown as typeof window.ogb;
+    vi.stubGlobal("hezuo", { organization: bridge });
+    window.hezuo = { organization: bridge } as unknown as typeof window.hezuo;
     await show({ hosted: true });
     expect(f.row).toBeNull();
     await show();
     expect(f.row?.bridge).toBe(bridge);
     f.row!.onOpenSettings();
     expect(f.dispatch).toHaveBeenCalledWith({ type: "toggleAppSettings", open: true, section: "organization" });
-    delete window.ogb;
+    delete window.hezuo;
   });
 
   it("opens as the Connect an AI dialog, which Escape and a click outside close", async () => {

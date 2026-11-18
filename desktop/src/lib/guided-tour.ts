@@ -4,8 +4,6 @@ import type { LocaleKey } from "@/locales";
 export type TourStepId =
   | "tour.composer"
   | "tour.model"
-  | "tour.computer"
-  | "tour.computer-browser"
   | "tour.tools"
   | "tour.apps"
   | "tour.apps-panel"
@@ -14,8 +12,6 @@ export type TourStepId =
   | "tour.done";
 
 export type TourEffect =
-  | "openComputer"
-  | "closeComputer"
   | "openTools"
   | "openApps"
   | "closeApps"
@@ -23,7 +19,7 @@ export type TourEffect =
   | "backToChat";
 
 /** Effects the anchor's own click already performs, so a click instead of Next must not repeat them. */
-export const ANCHOR_EFFECTS: ReadonlySet<TourEffect> = new Set<TourEffect>(["openComputer", "openTools", "openApps", "openAutomations"]);
+export const ANCHOR_EFFECTS: Partial<Record<TourEffect, true>> = { openTools: true, openApps: true, openAutomations: true };
 
 export interface TourStep {
   id: TourStepId;
@@ -40,8 +36,6 @@ export interface TourStep {
 export const TOUR_STEPS: TourStep[] = [
   { id: "tour.composer", anchor: "composer", placement: "above" },
   { id: "tour.model", anchor: "model", placement: "below" },
-  { id: "tour.computer", anchor: "computer", placement: "below", onExit: "openComputer" },
-  { id: "tour.computer-browser", anchor: "computer-browser", fallbackAnchor: "computer-tabs", skipIfMissing: true, placement: "below", onEnter: "openComputer", onExit: "closeComputer" },
   { id: "tour.tools", anchor: "tools", skipIfMissing: true, placement: "right", onExit: "openTools" },
   { id: "tour.apps", anchor: "nav-apps", skipIfMissing: true, placement: "right", onEnter: "openTools", onExit: "openApps" },
   { id: "tour.apps-panel", anchor: "apps-panel", placement: "below", onEnter: "openApps", onExit: "closeApps" },
@@ -50,11 +44,8 @@ export const TOUR_STEPS: TourStep[] = [
   { id: "tour.done", anchor: "composer", placement: "above" },
 ];
 
-// Simple mode's chat header holds only the bot: the model chip and the Computer button moved into the bot panel its
-// pill opens. Those steps point at the pill there, and give up rather than wait if even that is missing (a group chat).
 const SIMPLE_STEPS: Partial<Record<TourStepId, Partial<TourStep>>> = {
   "tour.model": { anchor: "bot-pill", skipIfMissing: true, copy: "onboarding.tour.model-simple" },
-  "tour.computer": { anchor: "bot-pill", skipIfMissing: true, copy: "onboarding.tour.computer-simple" },
 };
 
 const SIMPLE_TOUR_STEPS: TourStep[] = TOUR_STEPS.map((step) => ({ ...step, ...SIMPLE_STEPS[step.id] }));

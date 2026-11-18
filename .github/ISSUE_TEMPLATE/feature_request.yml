@@ -15,8 +15,9 @@ body:
         - Chat UI (desktop/src/)
         - Harness server / API (desktop/server/)
         - Provider drivers (new provider or driver behavior)
-        - Computer use (cloud box / local)
-        - Connected apps (Composio)
+        - Computer use (remote / local)
+        - Connected apps
+        - Gateway / accounts / companion relay (gateway/)
         - Desktop shell / packaging (desktop/electron/)
         - Docs
         - Not sure

@@ -7,7 +7,7 @@ const RESOURCES = path.join("/tmp", "resources");
 const APP = path.join("/tmp", "app");
 const PACKAGED = path.join(RESOURCES, "companion", "index.js");
 const BUILT = path.join(APP, "dist-companion", "index.js");
-const SOURCE = path.join(APP, "companion", "src", "index.ts");
+const SOURCE = path.join(APP, "desktop", "companion", "src", "index.ts");
 
 const resolve = (isPackaged, present) =>
   resolveCompanionEntry({
@@ -37,5 +37,9 @@ describe("companion entry resolution", () => {
 
   it("dev: a checkout with neither is a null, not a spawn error", () => {
     expect(resolve(false, [])).toBeNull();
+  });
+
+  it("dev: does not resolve the companion source outside desktop", () => {
+    expect(resolve(false, [path.join(APP, "companion", "src", "index.ts")])).toBeNull();
   });
 });

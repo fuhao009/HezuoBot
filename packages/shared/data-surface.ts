@@ -33,7 +33,7 @@ export const DATA_LIMITS = {
 
 /** Where materialised results live inside a bot's database. DuckDB temp tables
  * are per connection; a real schema is visible to both and survives a restart. */
-export const DATA_RESULTS_SCHEMA = "omb_results";
+export const DATA_RESULTS_SCHEMA = "hezuo_results";
 
 export type DataErrorCode =
   | "invalid_input"

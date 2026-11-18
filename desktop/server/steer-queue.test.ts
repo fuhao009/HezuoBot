@@ -74,7 +74,7 @@ describe("steer-queue module", () => {
   it("keeps readable citation prompts byte-for-byte through queue, hold, and drain", () => {
     const bot = fakeBot("bot-citation-queue", "thread-citation-queue", true);
     const store = fakeStore([bot]);
-    const prompt = '<!--omb-citation-v1:fixture-->\n> Quoted message:\n> const café = "🐭";\n\nComment:\nExplain this';
+    const prompt = '<!--hezuo-citation-v1:fixture-->\n> Quoted message:\n> const café = "🐭";\n\nComment:\nExplain this';
     const queued = queueSteeredMessage(bot.id, bot.threadId, prompt);
     const held = holdSteeredQueue(bot.id, bot.threadId, queued.id)!;
     expect(held.items[0]).toMatchObject({ text: prompt, prompt });
@@ -733,7 +733,7 @@ describe("steer-queue e2e (fake ACP fleet)", () => {
 
   beforeAll(async () => {
     chmodSync(FAKE_CLI, 0o755);
-    home = mkdtempSync(join(tmpdir(), "omb-steer-test-"));
+    home = mkdtempSync(join(tmpdir(), "hezuo-steer-test-"));
     mkdirSync(join(home, ".hezuo"), { recursive: true });
     mkdirSync(join(home, "gates"), { recursive: true });
     drainGate = join(home, "gates", "drain.gate");
@@ -744,7 +744,7 @@ describe("steer-queue e2e (fake ACP fleet)", () => {
     dispatchGate = join(home, "gates", "early-dispatch.gate");
     roomGate = join(home, "gates", "room.gate");
     roomRpcAppend = join(home, "gates", "room.rpc-append");
-    evidencePath = join(tmpdir(), `omb-steer-evidence-${Date.now()}-${process.pid}.json`);
+    evidencePath = join(tmpdir(), `hezuo-steer-evidence-${Date.now()}-${process.pid}.json`);
     // Delay only the adapter's returned acknowledgment, reproducing completion before sendTurn resolves.
     const prelude = join(home, "delayed-dispatch.mjs");
     writeFileSync(prelude, [
@@ -832,7 +832,7 @@ describe("steer-queue e2e (fake ACP fleet)", () => {
     const env: NodeJS.ProcessEnv = {
       HOME: home,
       USERPROFILE: home,
-      OMB_PORT: String(port),
+      HEZUO_PORT: String(port),
     };
     if (process.env.PATH) env.PATH = process.env.PATH;
     // Without SystemRoot, winsock fails to initialize in the child.

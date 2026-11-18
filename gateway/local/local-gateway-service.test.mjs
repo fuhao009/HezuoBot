@@ -15,7 +15,7 @@ import { d1DatabaseFiles, findAccountByEmail } from "./local-gateway/operator-bo
 const temporary = [];
 
 function scratch() {
-  const directory = mkdtempSync(path.join(tmpdir(), "omb-service-"));
+  const directory = mkdtempSync(path.join(tmpdir(), "hezuo-service-"));
   temporary.push(directory);
   return directory;
 }
@@ -45,7 +45,7 @@ describe("gatewayPlist", () => {
     expect(plist).toContain(`<key>StandardOutPath</key>\n\t<string>${spec.logPath}</string>`);
     // Private files: launchd would create a missing log as 0644 without this.
     expect(plist).toContain("<key>Umask</key>\n\t<integer>63</integer>");
-    expect(plist).toContain("<key>OMB_LOCAL_LOG_FILE</key>");
+    expect(plist).toContain("<key>HEZUO_LOCAL_LOG_FILE</key>");
   });
 
   it("carries paths only: no secret, token, or password variable", () => {
@@ -55,7 +55,7 @@ describe("gatewayPlist", () => {
     expect(plist.match(/<key>[A-Z_]+<\/key>/g)).toEqual([
       "<key>HOME</key>",
       "<key>PATH</key>",
-      "<key>OMB_LOCAL_LOG_FILE</key>",
+      "<key>HEZUO_LOCAL_LOG_FILE</key>",
     ]);
   });
 
@@ -76,7 +76,7 @@ describe("gatewayPlist", () => {
     expect(parsed.EnvironmentVariables).toEqual({
       HOME: spec.home,
       PATH: "/usr/bin:/bin:/usr/sbin:/sbin",
-      OMB_LOCAL_LOG_FILE: spec.logPath,
+      HEZUO_LOCAL_LOG_FILE: spec.logPath,
     });
   });
 });
@@ -135,7 +135,6 @@ describe("stageNode", () => {
     expect(candidates).toEqual([
       "/opt/custom/node",
       "/Users/example/.local/share/hezuo-runtime/node_modules/node/bin/node",
-      "/Users/example/.local/share/openmausbot-runtime/node_modules/node/bin/node",
       "/opt/homebrew/bin/node",
       "/usr/local/bin/node",
       "/tmp/node-v24/bin/node",

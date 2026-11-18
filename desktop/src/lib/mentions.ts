@@ -2,7 +2,6 @@ import { t } from "./i18n";
 import { HEZUO_COLORS, type HezuoColor } from "./mascot";
 import { isMentionBoundary, isMentionNameContinuation } from "../../../packages/shared/mention-boundary";
 import { personTagAt, personTagNames } from "../../../packages/shared/person-mention";
-import { devsTagAt } from "../../../packages/shared/devs-mention";
 
 /** A name the @ list offers: a bot's, or (`person`) a teammate's on a Team Cloud. */
 export type MentionPeer = { name: string; hidden?: boolean; color?: HezuoColor; person?: true };
@@ -75,7 +74,7 @@ export function mentionRanges(text: string, peers: readonly MentionPeer[], every
       at += you;
       continue;
     }
-    const length = all ? 8 : peer?.name.length ?? devsTagAt(rest, botNames);
+    const length = all ? 8 : peer?.name.length;
     if (length === undefined) continue;
     // Only palette values enter CSS.
     const color = !all && peer?.color && Object.hasOwn(HEZUO_COLORS, peer.color) ? HEZUO_COLORS[peer.color] : undefined;

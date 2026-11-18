@@ -51,7 +51,7 @@ let SIDECAR_PORT = 0;
 let HARNESS = "";
 let SIDECAR = "";
 
-const TOKEN = "omb_test_token";
+const TOKEN = "hezuo_test_token";
 let harness: ChildProcess;
 let sidecar: Server;
 let home: string;
@@ -119,7 +119,7 @@ beforeAll(async () => {
       ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}),
       HOME: home,
       USERPROFILE: home,
-      OMB_PORT: String(HARNESS_PORT),
+      HEZUO_PORT: String(HARNESS_PORT),
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -232,7 +232,7 @@ describe("the sidecar in front of an unmodified harness", () => {
     expect(unauthenticated.status).toBe(401);
     expect(unauthenticated.headers.get("cache-control")).toContain("no-store");
     expect(unauthenticated.headers.get("cloudflare-cdn-cache-control")).toBe("no-store");
-    expect((await device("GET", "/api/bots", { token: "omb_wrong" })).status).toBe(401);
+    expect((await device("GET", "/api/bots", { token: "hezuo_wrong" })).status).toBe(401);
     expect((await device("GET", "/api/bots")).status).toBe(200);
   });
 
@@ -299,7 +299,7 @@ describe("the sidecar in front of an unmodified harness", () => {
     const bot = body.bots[0];
     const path = `/api/bots/${bot.id}`;
     const appearance = { color: "coral", mascotBody: "diamond", mascotExpression: "sleeping" };
-    for (const token of [null, "omb_wrong"]) {
+    for (const token of [null, "hezuo_wrong"]) {
       expect((await device("PATCH", path, { token, body: appearance })).status).toBe(401);
     }
     for (const protectedPatch of [
@@ -774,7 +774,7 @@ describe("pairing, end to end", () => {
       devices: registry,
       controlToken: () => CONTROL_TOKEN,
       companionPort: port,
-      discovery: () => ({ advertising: false, name: "Hezuo" }),
+      discovery: () => ({ advertising: false, name: "HezuoBot" }),
       connectedDeviceIds: connections.ids,
       disconnectDevice: connections.disconnect,
     });
@@ -791,7 +791,7 @@ describe("pairing, end to end", () => {
         token: string;
       };
       expect(opened.code).toMatch(/^\d{6}$/);
-      expect(opened.token).toMatch(/^omb_pair_[A-Za-z0-9_-]{43}$/);
+      expect(opened.token).toMatch(/^hezuo_pair_[A-Za-z0-9_-]{43}$/);
 
       const wrong = await fetch(`${base}/api/pair`, {
         method: "POST",
@@ -819,7 +819,7 @@ describe("pairing, end to end", () => {
         endpoints: Array<{ url: string; kind: string; priority: number }>;
       };
       expect(body.serverName).toBe("Ada's computer");
-      expect(body.token).toMatch(/^omb_/);
+      expect(body.token).toMatch(/^hezuo_/);
       expect(body.hosts).toEqual(["macbook.tail1234.ts.net", "192.168.1.42", "hezuo-abcd1234.local"]);
       expect(body.endpoints).toEqual([
         { url: "https://device-123.companion.example", kind: "hosted", priority: 0 },
@@ -879,7 +879,7 @@ describe("pairing, end to end", () => {
       devices: new DeviceRegistry(),
       controlToken: () => CONTROL_TOKEN,
       companionPort: 8800,
-      discovery: () => ({ advertising: false, name: "Hezuo" }),
+      discovery: () => ({ advertising: false, name: "HezuoBot" }),
     });
     await new Promise<void>((r) => control.listen(0, "127.0.0.1", r));
     const port = (control.address() as { port: number }).port;
@@ -904,7 +904,7 @@ describe("pairing, end to end", () => {
       devices: new DeviceRegistry(),
       controlToken: () => CONTROL_TOKEN,
       companionPort: 8800,
-      discovery: () => ({ advertising: false, name: "Hezuo" }),
+      discovery: () => ({ advertising: false, name: "HezuoBot" }),
     });
     await new Promise<void>((r) => control.listen(0, "127.0.0.1", r));
     const port = (control.address() as { port: number }).port;
@@ -928,7 +928,7 @@ describe("pairing, end to end", () => {
       devices: registry,
       controlToken: () => CONTROL_TOKEN,
       companionPort: 8800,
-      discovery: () => ({ advertising: false, name: "Hezuo" }),
+      discovery: () => ({ advertising: false, name: "HezuoBot" }),
     });
     await new Promise<void>((r) => control.listen(0, "127.0.0.1", r));
     const port = (control.address() as { port: number }).port;
@@ -972,7 +972,7 @@ describe("pairing, end to end", () => {
       devices: registry,
       controlToken: () => CONTROL_TOKEN,
       companionPort: 8800,
-      discovery: () => ({ advertising: false, name: "Hezuo" }),
+      discovery: () => ({ advertising: false, name: "HezuoBot" }),
     });
     await new Promise<void>((r) => control.listen(0, "127.0.0.1", r));
     const port = (control.address() as { port: number }).port;

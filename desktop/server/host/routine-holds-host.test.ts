@@ -15,7 +15,7 @@ type Line = { threadId: string; name: string };
 
 /** A Cloud home's routines and bots: the owner's Chief, a teammate's later one, and a bot that is no Chief. */
 function world(dataDir?: string) {
-  const dir = dataDir ?? mkdtempSync(join(tmpdir(), "omb-routine-holds-host-"));
+  const dir = dataDir ?? mkdtempSync(join(tmpdir(), "hezuo-routine-holds-host-"));
   if (!dataDir) dirs.push(dir);
   let now = START;
   let mcp = 0;

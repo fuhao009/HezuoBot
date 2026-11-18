@@ -1169,7 +1169,7 @@ export function containerComputerMcp(
     // The control pair rides in env, not argv, which `ps` shows for the bridge's whole life.
     env: {
       ELECTRON_RUN_AS_NODE: "1",
-      ...(control ? { OMB_CONTROL_URL: control.url, OMB_CONTROL_TOKEN: control.token } : {}),
+      ...(control ? { HEZUO_CONTROL_URL: control.url, HEZUO_CONTROL_TOKEN: control.token } : {}),
     },
   };
 }

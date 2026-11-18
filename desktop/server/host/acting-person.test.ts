@@ -16,7 +16,7 @@ const ask = (id: string, at: number): ActingLine => ({ id, at, role: "user", pee
 const userOrigin = (person?: string): WorkOrigin => ({ kind: "user", request: "File the notes in Notion", ...(person ? { person } : {}) });
 
 function world(options: { threads?: Record<string, ActingLine[]>; rooms?: string[]; direct?: Record<string, DirectRequest>; runs?: Record<string, RoomRun> } = {}) {
-  const dir = mkdtempSync(join(tmpdir(), "omb-acting-person-"));
+  const dir = mkdtempSync(join(tmpdir(), "hezuo-acting-person-"));
   const handed = new HandedPeople(join(dir, "handed-people.json"));
   const people = createActingPeople({
     store: { groupByThread: (threadId) => (options.rooms ?? []).includes(threadId) || undefined, messagesFor: (threadId) => options.threads?.[threadId] ?? [] },
@@ -147,7 +147,7 @@ describe("the record of handed-on work", () => {
   });
 
   it("forgets work handed on more than thirty days ago", () => {
-    const dir = mkdtempSync(join(tmpdir(), "omb-acting-person-"));
+    const dir = mkdtempSync(join(tmpdir(), "hezuo-acting-person-"));
     let now = 1_000;
     const handed = new HandedPeople(join(dir, "handed-people.json"), () => now);
     handed.record("old", ADA);

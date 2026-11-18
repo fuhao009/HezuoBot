@@ -11,9 +11,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { removeTempDir, waitForExit } from "./testing/cleanup.ts";
 import { freePortBlock } from "./testing/ports.ts";
 
-const ROOT = fileURLToPath(new URL("../..", import.meta.url));
+const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const FAKE_CLAUDE = join(ROOT, "server/testing/fake-claude-cli.ts");
-const INCLUDED = `box_omb_${randomUUID()}`;
+const INCLUDED = `box_hezuo_${randomUUID()}`;
 const FRAME = Buffer.from("/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAMCAgMCAgMDAwMEAwMEBQgFBQQEBQoHBwYIDAoMDAsKCwsNDhIQDQ4RDgsLEBYQERMUFRUVDA8XGBYUGBIUFRT/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==", "base64");
 /** One computer call waits this long on a start; the whole start, this long. */
 const CALL_WAIT_MS = 1_500;
@@ -68,9 +68,9 @@ describe("a slow cloud computer start", () => {
   };
   const screenshot = async (sent: any) => {
     const env = sent.mcpConfig.mcpServers.computer.env;
-    const response = await fetch(new URL("/api/internal/computer/mcp", env.OMB_HARNESS_URL), {
+    const response = await fetch(new URL("/api/internal/computer/mcp", env.HEZUO_HARNESS_URL), {
       method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${env.OMB_MCP_TOKEN_COMPUTER}` },
+      headers: { "content-type": "application/json", authorization: `Bearer ${env.HEZUO_MCP_TOKEN_COMPUTER}` },
       body: JSON.stringify({ method: "tools/call", params: { name: "screenshot", arguments: {} } }),
     });
     const body = await response.json() as any;
@@ -131,7 +131,7 @@ describe("a slow cloud computer start", () => {
     await new Promise<void>(resolve => relay.listen(0, "127.0.0.1", resolve));
     const relayBase = `http://127.0.0.1:${(relay.address() as { port: number }).port}`;
 
-    home = mkdtempSync(join(tmpdir(), "omb-cloud-slow-"));
+    home = mkdtempSync(join(tmpdir(), "hezuo-cloud-slow-"));
     const data = join(home, "data");
     dumpFile = join(home, "dump.json");
     finishFile = join(home, "finish");
@@ -148,13 +148,13 @@ describe("a slow cloud computer start", () => {
       cwd: ROOT,
       env: {
         PATH: process.env.PATH, ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}),
-        HOME: home, USERPROFILE: home, OMB_DATA_DIR: data, TEMP: home, TMP: home, TMPDIR: home,
-        OMB_PORT: String(port), OMB_WEBHOOK_PORT: String(port + 1),
-        OMB_BOAT_API: `${relayBase}/own-key-must-not-be-used`,
-        OMB_CLOUD_BOAT_URL: `${relayBase}/relay/api/box/v1`,
-        OMB_CLOUD_BOAT_TOKEN: INCLUDED,
-        OMB_COMPUTER_CALL_WAIT_MS: String(CALL_WAIT_MS),
-        OMB_CLOUD_COMPUTER_START_BUDGET_MS: String(START_BUDGET_MS),
+        HOME: home, USERPROFILE: home, HEZUO_DATA_DIR: data, TEMP: home, TMP: home, TMPDIR: home,
+        HEZUO_PORT: String(port), HEZUO_WEBHOOK_PORT: String(port + 1),
+        HEZUO_BOAT_API: `${relayBase}/own-key-must-not-be-used`,
+        HEZUO_CLOUD_BOAT_URL: `${relayBase}/relay/api/box/v1`,
+        HEZUO_CLOUD_BOAT_TOKEN: INCLUDED,
+        HEZUO_COMPUTER_CALL_WAIT_MS: String(CALL_WAIT_MS),
+        HEZUO_CLOUD_COMPUTER_START_BUDGET_MS: String(START_BUDGET_MS),
       },
       stdio: ["ignore", "pipe", "pipe"],
     });

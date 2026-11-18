@@ -42,7 +42,7 @@ export const THEME_SKINS = { light: "daylight", dark: "midnight" } as const sati
 export const DEFAULT_SKIN_CHOICE: SkinChoice = "system";
 export const PRIOR_INSTALL_SKIN: SkinId = "midnight";
 
-const KEY = "omb-skin";
+const KEY = "hezuo-skin";
 const DARK_QUERY = "(prefers-color-scheme: dark)";
 
 function isSkinId(value: unknown): value is SkinId {
@@ -105,7 +105,7 @@ function paintSkin(id: SkinId): void {
   for (const listener of listeners) listener();
   // On Windows the caption buttons sit in a native overlay the main process paints, out of CSS's reach.
   try {
-    void window.ogb?.applySkin?.(id)?.catch(() => undefined);
+    void window.hezuo?.applySkin?.(id)?.catch(() => undefined);
   } catch {
   }
 }

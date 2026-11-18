@@ -2,6 +2,8 @@
 // A bot's page inline in the chat, with its tools. happy-dom runs no script in the frame, so the page is played by
 // message events from the frame's window.
 import { act, createElement } from "react";
+import { readFileSync } from "node:fs";
+import { URL as NodeURL } from "node:url";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -15,6 +17,15 @@ import { createAppPool, type AppPool } from "./app-pool";
 import { AppMessage, forgetAppRows } from "./AppMessage";
 import { PAGE_HEIGHT } from "./PageTools";
 
+it("keeps page publication tools without a cloud purchase action", () => {
+  const source = readFileSync(new NodeURL("./PageTools.tsx", import.meta.url), "utf8");
+  expect(source).not.toContain("openCloudAdd");
+  expect(source).not.toContain("CLOUD_LINK_SETTINGS");
+  expect(source).toContain("publishAppPage");
+  expect(source).toContain("unpublishPage");
+  expect(source).toContain("state.text");
+});
+
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const payload = (more: Partial<AppPayload> = {}): AppPayload => ({
@@ -27,7 +38,7 @@ const json = (status: number, body: unknown) => new Response(JSON.stringify(body
 const fetchMock = vi.fn<(path: string, init?: RequestInit) => Promise<Response>>();
 const openExternal = vi.fn(async () => true);
 const store = { state: {}, dispatch: vi.fn(), flushBotPatches: vi.fn(async () => null) } as unknown as ReturnType<typeof useStore>;
-const LINK = "https://page000000000000000000001.mausbot.page/";
+const LINK = "https://page000000000000000000001.hezuobot.page/";
 const LIVE: PublishedPageCard = { state: "live", title: "Pricing", pageId: "page000000000000000000001", url: LINK, usage: { pages: 1, limit: 5 } };
 
 let host: HTMLDivElement;
@@ -74,7 +85,7 @@ beforeEach(() => {
     return json(200, botHtmlDocument({ messageId: "a1", rev: rev === null ? 0 : Number(rev), html: `<p>${rev === null ? "newest" : `version ${Number(rev) + 1}`}</p>` }));
   });
   vi.stubGlobal("fetch", fetchMock);
-  vi.stubGlobal("ogb", { openExternal });
+  vi.stubGlobal("hezuo", { openExternal });
   vi.stubGlobal("IntersectionObserver", undefined);
   pool = createAppPool({ limit: 3 });
   forgetAppRows();

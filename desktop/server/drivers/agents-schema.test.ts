@@ -10,8 +10,8 @@ const record = (value: unknown): value is Json => value !== null && typeof value
 
 /** Every switch on: each tool the catalog can list, in the form tools/list sends it. */
 const LISTED = availableTools(catalogProfileFromEnv({
-  OMB_BOT_ID: WATCHER_OPTIONS_CARD_BOT_ID, OMB_CHIEF_OF_STAFF: "1", OMB_SKILL_AUTHORING_ENABLED: "1", OMB_SHARED_COMPUTERS_ENABLED: "1",
-  OMB_VOICE_NOTES: "1", OMB_X_RESEARCH: "1", OMB_RESEARCH: "1", OMB_ESCALATIONS: "1", OMB_TEAM_PEOPLE: "1", OMB_HEZUO: "1",
+  HEZUO_BOT_ID: WATCHER_OPTIONS_CARD_BOT_ID, HEZUO_CHIEF_OF_STAFF: "1", HEZUO_SKILL_AUTHORING_ENABLED: "1", HEZUO_SHARED_COMPUTERS_ENABLED: "1",
+  HEZUO_VOICE_NOTES: "1", HEZUO_X_RESEARCH: "1", HEZUO_RESEARCH: "1", HEZUO_ESCALATIONS: "1", HEZUO_TEAM_PEOPLE: "1", HEZUO_HEZUO: "1",
 }));
 
 /** Each keyword the advertised node lacks, with where it sat in the full one. */

@@ -1,9 +1,8 @@
-// The secure credential cards request_credential adds: the card on the conversation's visible branch, settling it,
-// resuming the turn it paused, and the value a paired phone sealed for this computer. No card, message or log holds the value.
+// The secure credential cards request_credential adds: the card on the conversation's visible branch,
+// settling it and resuming the turn it paused. No card, message or log holds the value.
 import { randomUUID } from "node:crypto";
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
-import { z } from "zod";
 
 import {
   CREDENTIAL_TARGETS,
@@ -25,36 +24,15 @@ import { perBotLocalVmTarget, poolLocalVmTarget, SHARED_LOCAL_VM_TARGET, VM_WORK
 import { HOSTED_PROVIDER_SETTINGS_ERROR } from "../hosted-models.ts";
 import { addHeldSecretScrubber } from "../redact.ts";
 import { SECRET_VALUE_MAX_BYTES, SecretVault, type SavedSecret, type SecretFileHome } from "../secret-vault.ts";
-import {
-  PHONE_SECRET_PROTOCOL_VERSION,
-  PhoneSecretError,
-  assertPhoneSecretRequestMatches,
-  phoneSecretOperationId,
-  type PhoneSecretBridge,
-  type PhoneSecretContext,
-  type PhoneSecretSubmissionRegistry,
-} from "../phone-secret.ts";
 import type { BotLogins } from "../bot-logins.ts";
 import type { BotRecord, GroupRecord, Message, Store } from "../store.ts";
 import { serverLine } from "../server-lines.ts";
 
-export const phoneSecretEnvelopeSchema = z.object({
-  version: z.literal(PHONE_SECRET_PROTOCOL_VERSION),
-  threadId: z.string().regex(/^[\w-]{1,128}$/),
-  keyId: z.string().regex(/^[A-Za-z0-9_-]{22}$/),
-  deviceId: z.string().regex(/^[\w-]{1,128}$/),
-  target: z.string().regex(/^[A-Za-z][A-Za-z0-9]{0,63}$/),
-  requestKey: z.string().regex(/^[\w-]{1,128}$/),
-  encapsulatedKey: z.string().regex(/^[A-Za-z0-9_-]{87}$/),
-  ciphertext: z.string().regex(/^[A-Za-z0-9_-]{23,5483}$/),
-}).strict();
 
 export interface SecretCardsDeps {
   store: Pick<Store, "activePath" | "appendMessage" | "patchMessage" | "messagesFor" | "botByThread" | "groupByThread" | "onChange">;
   cfg: AppConfig;
   botLogins: Pick<BotLogins, "credentialConfig">;
-  phoneSecrets: Pick<PhoneSecretBridge, "provide" | "open">;
-  phoneSecretSubmissions: PhoneSecretSubmissionRegistry;
   connectorThread(botId: string, threadId: string): { bot: BotRecord; group: GroupRecord | undefined } | null;
   answerCardNode(threadId: string, messageId: string, text: string): boolean;
   dataDir: string;
@@ -113,7 +91,7 @@ function customRequest(body: Record<string, unknown>): { label: string; reason: 
 }
 
 export function createSecretCards(deps: SecretCardsDeps) {
-  const { store, cfg, botLogins, phoneSecrets, phoneSecretSubmissions, connectorThread, answerCardNode } = deps;
+  const { store, cfg, botLogins, connectorThread, answerCardNode } = deps;
   const vault = new SecretVault();
   addHeldSecretScrubber((text) => vault.scrub(text));
 
@@ -174,9 +152,6 @@ export function createSecretCards(deps: SecretCardsDeps) {
     if (!message?.secret) return { status: 404, body: { error: "no such credential request" } };
     const secret = message.secret;
     if (!custom(secret)) return { status: 400, body: { error: "this card saves a key in Settings" } };
-    if (phoneSecretSubmissions.has(phoneSecretSubmissionKey(threadId, message.id, secret.requestKey))) {
-      return { status: 409, body: { error: "this secret is currently being saved from a phone" } };
-    }
     if (secret.dismissed) return { status: 409, body: { error: "this request was declined" } };
     if (secret.superseded) return { status: 409, body: { error: "this request was replaced by a newer one" } };
     if (secret.stopped) return { status: 409, body: { error: "this request stopped with its task" } };
@@ -202,9 +177,6 @@ export function createSecretCards(deps: SecretCardsDeps) {
     "mcp_server's env, headers and oauth.clientSecret");
   }
 
-  function phoneSecretSubmissionKey(threadId: string, messageId: string, requestKey: string): string {
-    return `${threadId}:${messageId}:${requestKey}`;
-  }
 
   function credentialDesktopHandoff(label: string, language: string | undefined): string {
     return serverLine(language, "server.connect.secretHandoff", { label });
@@ -244,103 +216,6 @@ export function createSecretCards(deps: SecretCardsDeps) {
     return true;
   }
 
-  async function provideSecretFromPhone(
-    context: PhoneSecretContext,
-    authenticatedDeviceId: string,
-  ): Promise<{ provided: boolean; resumed: boolean }> {
-    const owner = connectorThread(context.botId, context.threadId);
-    const message = secretMessage(context.botId, context.threadId, context.messageId);
-    if (!owner || !message?.secret) throw new PhoneSecretError("No such credential request", 404);
-    if (message.secret.dismissed) throw new PhoneSecretError("This credential request was dismissed", 409);
-    if (message.secret.superseded) throw new PhoneSecretError("This credential request was superseded by a newer one", 409);
-    assertPhoneSecretRequestMatches(context, authenticatedDeviceId, {
-      target: message.secret.target,
-      requestKey: message.secret.requestKey,
-    });
-    const operationId = phoneSecretOperationId(context);
-    if (message.secret.phoneOperationId && message.secret.phoneOperationId !== operationId) {
-      throw new PhoneSecretError(
-        "This credential request was already completed by another submission",
-        409,
-      );
-    }
-    // Recording the winning operation precedes completing the card, so an exact retry repairs a crash without writing the credential again.
-    if (message.secret.phoneOperationId === operationId && !message.secret.provided) {
-      if (!secretSaved(message.secret)) {
-        throw new PhoneSecretError(`${message.secret.label} is no longer configured`, 409);
-      }
-      if (!resumeSecretCard(context.botId, context.threadId, context.messageId, "provided")) {
-        throw new PhoneSecretError("This credential request is no longer available", 409);
-      }
-      const recovered = currentSecretState(context.botId, context.threadId, context.messageId);
-      if (!recovered) throw new PhoneSecretError("This credential request is no longer available", 409);
-      return recovered;
-    }
-    if (message.secret.provided) {
-      if (message.secret.phoneOperationId !== operationId) {
-        throw new PhoneSecretError(
-          "This credential request was already completed by another submission",
-          409,
-        );
-      }
-      if (!secretSaved(message.secret)) {
-        throw new PhoneSecretError(`${message.secret.label} is no longer configured`, 409);
-      }
-      if (!message.secret.resumed && !resumeSecretCard(
-        context.botId,
-        context.threadId,
-        context.messageId,
-        "provided",
-      )) {
-        throw new PhoneSecretError("This credential request is no longer available", 409);
-      }
-      const recovered = currentSecretState(context.botId, context.threadId, context.messageId);
-      if (!recovered) throw new PhoneSecretError("This credential request is no longer available", 409);
-      return recovered;
-    }
-
-    const submissionKey = phoneSecretSubmissionKey(context.threadId, context.messageId, context.requestKey);
-    await phoneSecretSubmissions.run({
-      cardKey: submissionKey,
-      botId: context.botId,
-      threadId: context.threadId,
-      ...(owner.group ? { groupId: owner.group.id } : {}),
-    }, operationId, async () => {
-      // A custom secret is opened here and kept behind its card; a named key goes to the desktop's store and settings.
-      const opened = custom(message.secret!) ? await phoneSecrets.open(context) : null;
-      if (opened === null) await phoneSecrets.provide(context);
-      const current = secretMessage(context.botId, context.threadId, context.messageId);
-      if (!current?.secret || current.secret.requestKey !== context.requestKey) {
-        throw new PhoneSecretError("This credential request is no longer available", 409);
-      }
-      if (current.secret.dismissed) {
-        throw new PhoneSecretError("This credential request was dismissed", 409);
-      }
-      // The card may have been superseded during the save: completing it would leave two cards resolved.
-      if (current.secret.superseded) {
-        throw new PhoneSecretError("This credential request was superseded by a newer one", 409);
-      }
-      if (opened !== null) {
-        if (current.secret.stopped) throw new PhoneSecretError("This request stopped with its task", 409);
-        storeCustomSecret(current, context.botId, context.threadId, opened);
-      }
-      const saved = secretMessage(context.botId, context.threadId, context.messageId) ?? current;
-      // Electron acknowledges only after credentials.bin and the config update both commit; keep this assertion so no handler resumes first.
-      if (!saved.secret || !secretSaved(saved.secret)) {
-        throw new PhoneSecretError(`${current.secret.label} was not saved yet`, 409);
-      }
-      // Persist the winning envelope id before completing the card, so a new sealed value is never reported as the saved one.
-      store.patchMessage(context.threadId, current.id, {
-        secret: { ...saved.secret, phoneOperationId: operationId },
-      });
-      if (!resumeSecretCard(context.botId, context.threadId, context.messageId, "provided")) {
-        throw new PhoneSecretError("This credential request is no longer available", 409);
-      }
-    });
-    const settled = currentSecretState(context.botId, context.threadId, context.messageId);
-    if (!settled) throw new PhoneSecretError("This credential request is no longer available", 409);
-    return settled;
-  }
 
   /** request_credential's card: the id is the whole authority, and a newer request supersedes the pending ones. */
   function requestCredential(from: BotRecord, fromThreadId: string, body: Record<string, unknown>): { status: number; body: Record<string, unknown> } {
@@ -420,7 +295,7 @@ export function createSecretCards(deps: SecretCardsDeps) {
   }
 
   return {
-    phoneSecretSubmissionKey, secretMessage, currentSecretState, resumeSecretCard, provideSecretFromPhone, requestCredential, saveCustomSecret,
+    secretMessage, currentSecretState, resumeSecretCard, requestCredential, saveCustomSecret,
     secretSaved, updateText, redeemMcpServer,
   };
 }

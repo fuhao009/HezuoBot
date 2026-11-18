@@ -12,7 +12,7 @@ import { PASS, type RouteHandler } from "./table.ts";
 /** Small enough for a wall of live screens; the bot's own turn frames stay full size. */
 export const MAP_FRAME_WIDTH = 480;
 const MAP_FRAME_QUALITY = 60;
-const MAP_FRAME_PATH = "/tmp/ogb-map-frame.jpg";
+const MAP_FRAME_PATH = "/tmp/hezuo-map-frame.jpg";
 
 export interface ComputerFramesRouteDeps {
   cfg: AppConfig;
@@ -89,7 +89,7 @@ export function createComputerFramesRoutes(deps: ComputerFramesRouteDeps, frames
   };
   const cache = frames ?? createComputerFrames({
     listMachines: async () => {
-      const inventory = await boat.listManagedBoats(cfg, deps.managedBoatOwners(), { adoptLegacy: false });
+      const inventory = await boat.listManagedBoats(cfg, deps.managedBoatOwners(), { reconcileRecords: false });
       if (!inventory.available) return null;
       return inventory.instances.flatMap((instance) => instance.ownerBotId && instance.state !== "removing"
         ? [{ owner: instance.ownerBotId, boxId: instance.boxId, state: instance.state }] : []);

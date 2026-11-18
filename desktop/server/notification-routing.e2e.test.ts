@@ -88,7 +88,7 @@ const cleanup = async (groupIds: Array<string | undefined>, botIds: string[]) =>
 beforeAll(async () => {
   chmodSync(FAKE_CLAUDE, 0o755);
   chmodSync(FAKE_ACP, 0o755);
-  home = mkdtempSync(join(tmpdir(), "omb-notification-routing-"));
+  home = mkdtempSync(join(tmpdir(), "hezuo-notification-routing-"));
   const data = join(home, ".hezuo");
   mkdirSync(data, { recursive: true });
   dumpFile = join(home, "quick-dump.json");
@@ -144,9 +144,9 @@ beforeAll(async () => {
       ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}),
       HOME: home,
       USERPROFILE: home,
-      OMB_PORT: String(port),
-      OMB_WEBHOOK_PORT: String(port + 1),
-      OMB_TEST_INTERNAL_CAPABILITY_KEY: TEST_CAPABILITY_KEY,
+      HEZUO_PORT: String(port),
+      HEZUO_WEBHOOK_PORT: String(port + 1),
+      HEZUO_TEST_INTERNAL_CAPABILITY_KEY: TEST_CAPABILITY_KEY,
     },
     stdio: ["ignore", "pipe", "pipe"],
   });

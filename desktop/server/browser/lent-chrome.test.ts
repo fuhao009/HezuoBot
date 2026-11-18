@@ -205,8 +205,8 @@ describe("LentChromeDoors", () => {
   });
 
   it("guidance names the computer and what to do", () => {
-    const text = lentChromeGuidance("offline", { name: "Omkar's MacBook", device: "Mac", online: false });
-    expect(text).toContain("Omkar's MacBook");
+    const text = lentChromeGuidance("offline", { name: "Morgan's MacBook", device: "Mac", online: false });
+    expect(text).toContain("Morgan's MacBook");
     expect(text).toContain("open Hezuo on that Mac");
     expect(lentChromeGuidance("no-chrome", null)).toContain("chrome://inspect/#remote-debugging");
     const notLent = lentChromeGuidance("not-lent", null);

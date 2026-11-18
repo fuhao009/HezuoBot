@@ -18,9 +18,6 @@ export interface ControlOptions {
   /** Null until the launching app has sent it: every route but the page answers 403. */
   controlToken: () => string | null;
   companionPort: number;
-  /** HPKE recipient public key shown in pairing QRs; the private key never
-   * leaves Electron's encrypted store. */
-  secretPublicKey?: () => string | null;
   hostedUrl?: () => string | null;
   /** Electron publishes a route after its connector health check succeeds
    * and withdraws it on connector loss. */
@@ -63,10 +60,10 @@ export function originIsLoopback(origin: string | undefined): boolean {
 }
 
 /** Null when the desktop app launched this sidecar: it sends the token over its private port, and the control port
- * opens only then. Standing alone, the token is OMB_CONTROL_TOKEN when a script chose one, else random. */
+ * opens only then. Standing alone, the token is HEZUO_CONTROL_TOKEN when a script chose one, else random. */
 export function initialControlToken(env: NodeJS.ProcessEnv, launchedByApp: boolean): string | null {
   if (launchedByApp) return null;
-  const chosen = env.OMB_CONTROL_TOKEN ?? "";
+  const chosen = env.HEZUO_CONTROL_TOKEN ?? "";
   return /^[A-Za-z0-9_-]{43}$/.test(chosen) ? chosen : randomBytes(32).toString("base64url");
 }
 
@@ -156,7 +153,6 @@ export function companionState(options: Omit<ControlOptions, "controlToken">) {
   const publicNetwork = pairing && lead && (options.publicNetworks ?? publicNetworks)().has(lead.name)
     ? lead.name
     : null;
-  const secretPublicKey = options.secretPublicKey?.() ?? null;
   return {
     // Lets a parent tell this sidecar from an unrelated process on the control port.
     pid: process.pid,
@@ -174,7 +170,6 @@ export function companionState(options: Omit<ControlOptions, "controlToken">) {
       name,
       currentHostedUrl(options),
     ),
-    ...(secretPublicKey ? { secretPublicKey } : {}),
     pairing: pairing ? { code: pairing.code, token: pairing.token, expiresAt: pairing.expiresAt } : null,
     devices: options.devices.list(),
     // An empty list from an unreadable file must not read as "nothing paired".
@@ -300,7 +295,7 @@ function page(): string {
   return `<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Hezuo Companion</title>
+<title>HezuoBot Companion</title>
 <style>
   :root { color-scheme: light dark; --fg: #111; --dim: #666; --line: #0002; --bg: #fff; --card: #fafafa; }
   @media (prefers-color-scheme: dark) {
@@ -326,7 +321,7 @@ function page(): string {
   .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 </style>
 <main>
-  <h1>Hezuo Companion</h1>
+  <h1>HezuoBot Companion</h1>
   <p class="sub">Your phone reaches this computer through here. Only pair a device you trust.</p>
   <section id="where"></section>
   <section id="pair"></section>
@@ -356,7 +351,7 @@ history.replaceState(null, "", location.pathname);
 async function api(path, method) {
   const res = await fetch(path, { method: method ?? "GET", headers: { "x-hezuo-control-token": token } });
   if (res.status === 403) {
-    document.querySelector("main").innerHTML = "<h1>Hezuo Companion</h1><p class=sub>Open this page from the link the companion printed when it started.</p>";
+    document.querySelector("main").innerHTML = "<h1>HezuoBot Companion</h1><p class=sub>Open this page from the link the companion printed when it started.</p>";
     throw new Error("control token required");
   }
   return res.json();

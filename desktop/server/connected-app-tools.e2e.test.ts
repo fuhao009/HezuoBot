@@ -1,12 +1,15 @@
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { spawn, type ChildProcess, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { closeSync, existsSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { expect, it } from "vitest";
 
-import { launchVerificationServer } from "../../scripts/control-omb.ts";
+import { launchVerificationServer, verificationServerArgs, verificationServerEnvironment } from "../../scripts/control-hezuo.ts";
 import { startFakeConnectedApps } from "./testing/fake-connected-apps.ts";
+import { waitForExit } from "./testing/cleanup.ts";
 
 type Bridge = { command: string; args: string[]; env: Record<string, string> };
 
@@ -35,15 +38,64 @@ async function ask(bridge: Bridge, call: { name: string; arguments: Record<strin
 const acpBridge = (entry: { command: string; args: string[]; env: Array<{ name: string; value: string }> }): Bridge =>
   ({ command: entry.command, args: entry.args, env: Object.fromEntries(entry.env.map(({ name, value }) => [name, value])) });
 
+interface DirectComposio {
+  env: Record<string, string>;
+  close(): Promise<void>;
+}
+
+/** Direct project API, with the existing fake supplying only the upstream MCP responses. */
+async function startDirectComposio(mcpUrl: string): Promise<DirectComposio> {
+  let config: Record<string, unknown> = {};
+  const server = createServer(async (req, res) => {
+    const path = new URL(req.url ?? "/", "http://fixture").pathname;
+    let raw = "";
+    for await (const chunk of req) raw += chunk;
+    const reply = (status: number, body: unknown) => {
+      res.writeHead(status, { "content-type": "application/json" });
+      res.end(JSON.stringify(body));
+    };
+    if (path === "/mcp") {
+      const upstream = await fetch(mcpUrl, { method: req.method, headers: { "content-type": "application/json" }, body: raw || undefined });
+      res.writeHead(upstream.status, Object.fromEntries(upstream.headers));
+      return res.end(await upstream.text());
+    }
+    if (req.headers["x-api-key"] !== "ak_app_tools_fixture") return reply(401, { error: "invalid project key" });
+    if (path === "/api/v3.1/auth_configs" || path === "/api/v3/toolkits") return reply(200, { items: [] });
+    if (path === "/api/v3.1/connected_accounts") return reply(200, { items: ["gmail", "googlecalendar"].map((slug) => ({ id: `ca_${slug}`, status: "ACTIVE", toolkit: { slug } })) });
+    if (path === "/api/v3.1/tool_router/session/trs_app_tools/toolkits") return reply(200, { items: ["gmail", "googlecalendar"].map((slug) => ({ slug, connected_account: { id: `ca_${slug}`, status: "ACTIVE" } })) });
+    if (path === "/api/v3.1/tool_router/session" || path === "/api/v3.1/tool_router/session/trs_app_tools") {
+      if (raw) config = { ...config, ...JSON.parse(raw) };
+      return reply(req.method === "POST" ? 201 : 200, { session_id: "trs_app_tools", mcp: { type: "http", url: `${origin}/mcp` }, config });
+    }
+    return reply(404, { error: `Unexpected direct Composio request: ${req.method} ${path}` });
+  });
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  return {
+    env: { HEZUO_COMPOSIO_API: `${origin}/api/v3.1`, HEZUO_COMPOSIO_TOOLKITS_API: `${origin}/api/v3` },
+    close: async () => {
+      await new Promise<void>((resolve) => {
+        server.closeAllConnections();
+        server.close(() => resolve());
+      });
+    },
+  };
+}
+
 it("a bot given Gmail by its app switch reaches gmail.search_emails by name on Claude and on an ACP engine alike", async () => {
   const apps = await startFakeConnectedApps();
   apps.emails.push({ messageId: "m-ada", threadId: "t-ada", messageTimestamp: new Date().toISOString(), subject: "Q3 numbers", sender: "Ada <ada@example.test>", preview: { body: "Here they are" } });
-  const scratch = mkdtempSync(join(tmpdir(), "omb-app-tools-"));
+  const scratch = mkdtempSync(join(tmpdir(), "hezuo-app-tools-"));
   const gate = join(scratch, "finish");
   const fixture = await launchVerificationServer({
-    ...process.env, OMB_COMPOSIO_BROKER_URL: apps.url, OMB_COMPOSIO_BROKER_TOKEN: apps.token,
+    ...process.env,
     FAKE_CLAUDE_MODE: "slow", FAKE_CLAUDE_SLOW_FINISH_GATE: gate, FAKE_ACP_HANG_ON: "Find Ada's mail again",
   }, undefined, undefined, undefined, undefined, undefined, ["cline"]);
+  let restarted: ChildProcess | undefined;
+  let direct: DirectComposio | undefined;
   const api = async (method: string, path: string, body?: unknown, expected = 200) => {
     const response = await fetch(fixture.info.url + path, {
       method, headers: { "content-type": "application/json", origin: fixture.info.url },
@@ -54,6 +106,21 @@ it("a bot given Gmail by its app switch reaches gmail.search_emails by name on C
     return result;
   };
   try {
+    direct = await startDirectComposio(`${apps.url}/v1/mcp`);
+    // The launcher intentionally strips backend overrides; restart the owned fixture with explicit loopback endpoints.
+    await waitForExit(fixture.child, { signal: "SIGTERM" });
+    const env = { ...verificationServerEnvironment(process.env, fixture.info.dataDir, Number(new URL(fixture.info.url).port)),
+      ...direct.env, FAKE_CLAUDE_MODE: "slow", FAKE_CLAUDE_SLOW_FINISH_GATE: gate, FAKE_ACP_HANG_ON: "Find Ada's mail again" };
+    const log = openSync(fixture.info.logPath, "a", 0o600);
+    try {
+      restarted = spawn(process.execPath, verificationServerArgs(env), { env, stdio: ["ignore", log, log] });
+    } finally {
+      closeSync(log);
+    }
+    await expect.poll(async () => {
+      try { return (await fetch(`${fixture.info.url}/api/health`, { signal: AbortSignal.timeout(1_000) })).ok; } catch { return false; }
+    }, { timeout: 30_000 }).toBe(true);
+    await api("PUT", "/api/config", { composio: { apiKey: "ak_app_tools_fixture" } });
     const bot = (await api("POST", "/api/bots", { name: "Paul" }, 201)).bot;
     // The record an Apps switch left before it also wrote the tool list: Gmail on by scope, no tool granted.
     await api("PATCH", `/api/bots/${bot.id}`, { composio: true, connectorTools: {}, connectorScopes: { apps: { gmail: "read", googlecalendar: "read" } } });
@@ -87,7 +154,9 @@ it("a bot given Gmail by its app switch reaches gmail.search_emails by name on C
     expect(onAcp.names).toContain("gmail_search_emails");
     expect(JSON.parse(onAcp.answer.result.content[0].text).messages[0]).toMatchObject({ messageId: "m-ada" });
   } finally {
+    if (restarted) await waitForExit(restarted, { signal: "SIGTERM" });
     await fixture.close();
+    await direct?.close();
     await apps.close();
     rmSync(scratch, { recursive: true, force: true });
   }

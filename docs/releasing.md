@@ -15,7 +15,7 @@ reruns and recovery. It
 builds macOS (arm64 + x64, signed, notarized, stapled), Windows, and Ubuntu
 from a single pinned commit, verifies every artifact the way a user would
 receive it, and assembles the canonical draft in
-[Hezuo releases](https://github.com/milind-soni/OpenMausBot/releases).
+Hezuo releases.
 The exact same assets are also staged in the public legacy releases repo so
 installed builds from 0.1.46 and earlier can update across the repository
 migration.
@@ -52,23 +52,13 @@ Configure the optional Vercel hook below to rebuild the docs immediately after
 publication; otherwise the live cache or the next normal docs deployment
 refreshes it.
 
-## Updater migration invariant
+## Updater publication
 
-`app-update.yml` is baked into every packaged desktop app. Builds through
-0.1.46 point to `milind-soni/openmausbot-releases`; newer builds point to
-`milind-soni/OpenMausBot`. For that reason:
-
-1. Every new release is published byte-for-byte to both repositories during
-   the bridge period.
-2. `hezuo-releases` must stay public. Do not delete its final bridge
-   release, feeds, or assets.
-3. README and docs downloads point at the canonical repo, while the legacy
-   mirror exists only for installed updater clients and historical releases.
-
-The npm package is published separately and its versioned `.tgz` is attached
-only to the canonical release. It is not a desktop updater artifact; the
-mirror checks permit that one extra file while still verifying the complete,
-byte-identical desktop asset set.
+`app-update.yml` is baked into every packaged desktop app. Configure an
+operator-owned release destination before distributing builds. Publication,
+signing credentials, and migration support for already-installed clients
+require operator decisions; historical upstream release mirroring is not a
+Hezuo release procedure.
 
 ## Why the gates exist
 
@@ -104,7 +94,7 @@ The Developer ID Application certificate, exported from the Mac that
 currently signs releases:
 
 ```sh
-# Keychain Access → My Certificates → "Developer ID Application: Milind Soni
+# Keychain Access → My Certificates → your Developer ID Application certificate.
 # (993D98NH4J)" → right-click → Export… → .p12 with a strong password, then:
 base64 -i DeveloperID.p12 | pbcopy   # → MAC_CERT_P12_BASE64
 # the export password             → MAC_CERT_PASSWORD

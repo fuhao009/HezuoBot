@@ -12,10 +12,11 @@ EMAIL_FROM=noreply@hezuo.test
 ALLOWED_ORIGINS=https://app.hezuo.test
 CLOUDFLARE_ACCOUNT_ID=00000000000000000000000000000000
 CLOUDFLARE_ZONE_ID=00000000000000000000000000000000
-COMPANION_HOST_SUFFIX=hezuo.test
+# Required: set the actual project DNS suffix (no provisioning fallback).
+COMPANION_HOST_SUFFIX=
 # Further Cloudflare accounts (README "Several Cloudflare accounts") cannot be
 # set here: wrangler dev reads from this file only the names wrangler.jsonc
-# declares (its vars and secrets.required). To try one locally, uncomment
+# declares (its vars and secrets.required). To try one locally, populate
 # CLOUDFLARE_ENDPOINT_ACCOUNTS in wrangler.jsonc without committing it, with
 # test IDs and "apiTokenSecret": "CLOUDFLARE_API_TOKEN".
 

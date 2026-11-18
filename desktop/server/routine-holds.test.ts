@@ -20,7 +20,7 @@ function harness(file?: string) {
   const started: string[] = [];
   const emitted: Array<Record<string, unknown>> = [];
   if (!file) {
-    const dir = mkdtempSync(join(tmpdir(), "omb-routine-holds-"));
+    const dir = mkdtempSync(join(tmpdir(), "hezuo-routine-holds-"));
     dirs.push(dir);
     file = join(dir, "routines.json");
   }

@@ -30,7 +30,7 @@ let manager: WebhookManager;
 const queued: Array<Record<string, unknown>> = [];
 
 beforeAll(async () => {
-  dir = mkdtempSync(join(tmpdir(), "omb-webhook-ingress-"));
+  dir = mkdtempSync(join(tmpdir(), "hezuo-webhook-ingress-"));
   manager = new WebhookManager({
     file: join(dir, "webhooks.json"),
     botState: () => "ready",
@@ -104,7 +104,7 @@ describe("webhook-only ingress", () => {
   it("awaits a room delivery and answers 202 only after the post lands; a failing sink is not 2xx", async () => {
     let finish: () => void = () => {};
     let gate = new Promise<void>((resolve) => (finish = resolve));
-    const roomDir = mkdtempSync(join(tmpdir(), "omb-webhook-room-"));
+    const roomDir = mkdtempSync(join(tmpdir(), "hezuo-webhook-room-"));
     const roomQueued: unknown[] = [];
     const posts: Array<{ payload: Record<string, unknown> }> = [];
     let sinkFails = true;
@@ -241,7 +241,7 @@ describe("requests with a wrong secret", () => {
   });
 
   it("neither evicts real deliveries nor rewrites the file for each request", async () => {
-    const floodDir = mkdtempSync(join(tmpdir(), "omb-webhook-flood-"));
+    const floodDir = mkdtempSync(join(tmpdir(), "hezuo-webhook-flood-"));
     const file = join(floodDir, "webhooks.json");
     const emitted = new Set<string>();
     let runs = 0;

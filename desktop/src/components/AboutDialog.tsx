@@ -2,12 +2,7 @@ import { useEffect, useRef } from "react";
 
 import {
   APP_NAME,
-  APP_REPOSITORY,
-  DOCS_URL,
-  LICENSE_URL,
-  RELEASES_URL,
   appVersion,
-  openExternalLink,
   platformLabel,
 } from "@/lib/app-links";
 import { productName } from "@/lib/brand";
@@ -46,7 +41,7 @@ export function AboutDialog({ open, onClose }: { open: boolean; onClose: () => v
 
   if (!open) return null;
 
-  const [version, connected] = aboutVersionLines({ app: window.ogb?.app, bundle: appVersion(), platform: platformLabel(window.ogb?.platform), server });
+  const [version, connected] = aboutVersionLines({ app: window.hezuo?.app, bundle: appVersion(), platform: platformLabel(window.hezuo?.platform), server });
 
   return (
     <div
@@ -66,14 +61,8 @@ export function AboutDialog({ open, onClose }: { open: boolean; onClose: () => v
         <p className="mt-1 text-[13px] text-ink-secondary">{version}</p>
         {connected && <p className="mt-0.5 text-[13px] text-ink-secondary">{connected}</p>}
         <p className="mt-3 text-[13px] leading-relaxed text-ink-secondary">
-          A desktop home for your agents, built on {APP_NAME}: open source, Apache 2.0 licensed.
+          {APP_NAME} is a desktop home for your agents. Open source, Apache 2.0 licensed.
         </p>
-        <div className="mt-4 flex flex-wrap justify-center gap-x-4 gap-y-1.5 text-[13px]">
-          <AboutLink href={APP_REPOSITORY} label="GitHub" />
-          <AboutLink href={DOCS_URL} label="Docs" />
-          <AboutLink href={RELEASES_URL} label="Releases" />
-          <AboutLink href={LICENSE_URL} label="License" />
-        </div>
         <button
           ref={closeRef}
           type="button"
@@ -84,17 +73,5 @@ export function AboutDialog({ open, onClose }: { open: boolean; onClose: () => v
         </button>
       </div>
     </div>
-  );
-}
-
-function AboutLink({ href, label }: { href: string; label: string }) {
-  return (
-    <button
-      type="button"
-      onClick={() => void openExternalLink(href)}
-      className="text-accent hover:underline"
-    >
-      {label}
-    </button>
   );
 }

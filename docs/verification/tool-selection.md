@@ -10,7 +10,7 @@ pnpm exec vitest run packages/shared/tool-scope.test.ts desktop/server/mcp-gate.
 pnpm exec vitest run desktop/server/store.test.ts desktop/server/tool-scope.e2e.test.ts desktop/server/drivers/tool-scope-coverage.test.ts desktop/server/drivers/acp/tool-scope.test.ts
 pnpm exec vitest run desktop/server/drivers/pi.test.ts desktop/server/drivers/pi-mcp-extension.test.ts desktop/server/drivers/chat-mcp-tools.test.ts desktop/server/drivers/openai-chat.test.ts desktop/server/openai-tools.e2e.test.ts
 pnpm exec vitest run desktop/src/components/bot-settings/AccessSection.test.ts desktop/src/state/store.test.ts desktop/src/lib/create-configured-bot.test.ts desktop/src/lib/bot-creation-draft.test.ts
-OMB_UI_E2E=1 pnpm exec vitest run scripts/testing/tool-selection-ui.e2e.test.ts
+HEZUO_UI_E2E=1 pnpm exec vitest run scripts/testing/tool-selection-ui.e2e.test.ts
 ```
 
 The UI check opens the actual bot settings and saves, clears, rejects invalid
@@ -152,7 +152,7 @@ the disposable agent data removed afterward.
 Run `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm check:electron` and
 `pnpm i18n:check`. On a Mac with Node installed outside standard locations,
 the installer tests' fake PATH may not find Node. A temporary link to Node
-in pnpm's existing `node_modules/.bin` can supply it through `OMB_EXTRA_PATH`.
+in pnpm's existing `node_modules/.bin` can supply it through `HEZUO_EXTRA_PATH`.
 First verify that directory contains no npm executable, so the fixture's fake
 npm remains selected. Use the same leading directory in the test process's
 inherited PATH; the PATH contract test intentionally checks that order.
@@ -175,7 +175,7 @@ all 13 spawned proxy paths. Optional browser fixtures absent from the managed
 checkout are not counted as tested. The actual tool-selection renderer workflow
 and the screenshots above were verified separately in the primary checkout.
 
-[Final composed fork CI](https://github.com/BitL8-ByteShort/OpenMausBot/actions/runs/36804814592)
+Final composed fork CI
 on `738c5a8a586b6922b28a32947a06c05ba12abe62` passed all 26 selected checks,
 including all 12 Vitest shards across macOS, Ubuntu and Windows, builds,
 renderer, Electron and source-free packaging checks. Deployment was deliberately
@@ -185,9 +185,9 @@ files. The new ACP selection, Pi extension and capacity cleanup suites passed
 on Windows without a cleanup warning. The existing ACP suite's temporary-home
 cleanup warning also occurs in the unchanged-production baseline.
 
-[Feature draft #2101](https://github.com/milind-soni/OpenMausBot/pull/2101)
+Feature draft #2101
 keeps those prerequisites out of its diff. Maintainer preflight repair #2088 and
-[Windows cleanup draft #2100](https://github.com/milind-soni/OpenMausBot/pull/2100)
+Windows cleanup draft #2100
 must land before the clean feature branch can have green upstream CI. The
 cleanup candidate's exact-head full fork CI also passed all 26 checks; its one
 unchanged network-fixture failure and focused rerun are disclosed in that PR.

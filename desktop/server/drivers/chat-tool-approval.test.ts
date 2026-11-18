@@ -7,6 +7,23 @@ afterEach(() => vi.useRealTimers());
 const questionFixtures = [{ question: "Ship the fixture?", options: [{ label: "Yes" }, { label: "No" }] }];
 
 describe("chat tool approval lifecycle", () => {
+  it("correlates a real call without using its ID as an approval or allowing it before a click", async () => {
+    const open = vi.fn();
+    const resolved = vi.fn();
+    const gate = createChatToolApproval({ signal: new AbortController().signal, open, resolved, openQuestion: vi.fn(), resolvedQuestion: vi.fn() });
+    const browserTarget = { operation: "open" as const, origin: "http://127.0.0.1:43127" };
+    const answer = gate.ask("browser_open", "Open local page", undefined, { toolCallId: "real-call-17", browserTarget });
+    const request = open.mock.calls[0][0];
+    expect(request).toMatchObject({ toolCallId: "real-call-17", browserTarget });
+    expect(request.id).not.toBe("real-call-17");
+    expect(resolved).not.toHaveBeenCalled();
+    expect(gate.answer("real-call-17", "allow")).toBe("unavailable");
+    expect(resolved).not.toHaveBeenCalled();
+    gate.answer(request.id, "allow");
+    await expect(answer).resolves.toBe(true);
+    expect(resolved).toHaveBeenCalledExactlyOnceWith(request, true, "user");
+  });
+
   it("denies an unanswered request when its deadline expires and rejects late approval", async () => {
     vi.useFakeTimers();
     const open = vi.fn();

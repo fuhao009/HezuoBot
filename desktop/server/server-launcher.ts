@@ -12,10 +12,10 @@ import { restartPolicy } from "./restart.ts";
 export function serverCommand(here: string, env: NodeJS.ProcessEnv, options: { exists?: (path: string) => boolean; box?: BoxMemory } = {}) {
   const bootstrap = join(here, "desktop-entry.mjs");
   const cached = (options.exists ?? existsSync)(bootstrap);
-  const dataDir = env.OMB_DATA_DIR || join(homedir(), ".hezuo");
+  const dataDir = env.HEZUO_DATA_DIR || join(homedir(), ".hezuo");
   return {
     args: [...heapSizeArgs((options.box ?? boxMemory()).cgroupLimit, env.NODE_OPTIONS), cached ? bootstrap : join(here, "index.js")],
-    env: cached ? { ...env, OMB_SERVER_COMPILE_CACHE: join(dataDir, "cache", "node-compile") } : env,
+    env: cached ? { ...env, HEZUO_SERVER_COMPILE_CACHE: join(dataDir, "cache", "node-compile") } : env,
   };
 }
 

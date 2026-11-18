@@ -21,8 +21,8 @@ export function LiveKeySetup({ onSaved, compact = false }: { onSaved: () => void
     setSaving(true);
     setError(null);
     try {
-      const status: ConfigStatus = window.ogb?.setCredential
-        ? await window.ogb.setCredential("openaiLiveKey", value)
+      const status: ConfigStatus = window.hezuo?.setCredential
+        ? await window.hezuo.setCredential("openaiLiveKey", value)
         : await api("/api/config", { method: "PUT", body: JSON.stringify({ live: { key: value } }) });
       dispatch({ type: "configStatus", config: status });
       // The save may finish after the prompt was dismissed; never turn it into a call the user already cancelled.

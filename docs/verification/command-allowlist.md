@@ -14,13 +14,13 @@ and requests to widen a provider sandbox cannot acquire a command rule. Only
 owners/admins manage bot-wide rules. Rules stay on this installation; templates,
 copies and workspace backups do not carry them to another bot or machine.
 
-Use the disposable server and browser from `control-omb ui`; this recipe never
+Use the disposable server and browser from `control-hezuo ui`; this recipe never
 opens the user's desktop app or writes to the user's workspace data.
 
 ## Launch and drive
 
 ```sh
-node --experimental-strip-types scripts/control-omb.ts ui launch
+node --experimental-strip-types scripts/control-hezuo.ts ui launch
 ```
 
 Keep the launcher running. In a second terminal, pass the exact `ui.json` path
@@ -65,7 +65,7 @@ pnpm exec vitest run desktop/src/components/ApprovalModeSelector.allowlist.test.
 
 The recipe prints its passing checks, asserts an error-free renderer console,
 and prints the exact live handle and persistent server log path. Screenshots are kept under
-`.omb-scratch/verify-evidence/command-allowlist/`: `saved-command.png`,
+`.omb-scratch/verify-evidence/command-allowlist/` (historical original path): `saved-command.png`,
 `unsupported-provider.png` and `settings-allowlist.png`. The fixture stays open
 with the settings allowlist visible for inspection.
 

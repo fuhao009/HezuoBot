@@ -23,22 +23,16 @@ import type { HoldLimits } from "../hold.ts";
 import type { Tab } from "../tabs.ts";
 import { ACCEPT_OF, chooseOption, cursorAt, editableAt, selectAt, type SelectPopup } from "./popups.ts";
 import { ViewerHold } from "./hold.ts";
-import { fitsScreen, MIN_WINDOW_WIDTH, requestedSize, VIEWPORT_PRESETS, viewportFor, ZOOM_LIMITS, zoomedLayout, type ViewportSetting } from "./viewport.ts";
+import { fitsScreen, MIN_WINDOW_WIDTH, requestedSize, viewportFor, ZOOM_LIMITS, zoomedLayout, type ViewportSetting } from "./viewport.ts";
+import { appliedKey, CURSOR_EVERY_MS, HELD_LIMIT, modifiersOf, MOTION_FRAMES, MOTION_QUALITY, MOTION_WINDOW_MS, num, parseSetting, record, TEXT_LIMIT } from "./input.ts";
 
 /** Chromium keeps three frames unacknowledged, so acking 100 ms after arrival caps a viewer near 30 fps. */
 export const ACK_PACE_MS = { hi: 100, lo: 200 } as const;
 export const SETTLE_MS = 200;
-/** Only scrolling sends reduced frames; an animation stays sharp. */
-const MOTION_FRAMES = 4;
-const MOTION_WINDOW_MS = 300;
-const MOTION_QUALITY = 50;
 /** The largest frame a viewer may ask for, in device pixels. */
 export const FRAME_CAP_LIMITS = { maxWidth: 7680, maxHeight: 4320 } as const;
 const AGENT_CURSOR_MOVE_MS = 160;
 const AGENT_CURSOR_CLICK_LEAD_MS = 40;
-const TEXT_LIMIT = 10_000;
-const HELD_LIMIT = 64;
-const CURSOR_EVERY_MS = 120;
 
 export interface FrameMetadata {
   deviceWidth: number;
@@ -127,15 +121,7 @@ export interface HubHost {
   download(id: string): Download | undefined;
 }
 
-const num = (value: unknown, fallback = 0) => (typeof value === "number" && Number.isFinite(value) ? value : fallback);
-const record = (value: unknown): Record<string, unknown> | null => (value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null);
-const modifiersOf = (message: Record<string, unknown>) => {
-  const value = num(message.modifiers);
-  return Number.isInteger(value) && value >= 0 && value < 16 ? value : 0;
-};
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-const appliedKey = (size: { width: number; height: number }, zoom: number) => `${size.width}x${size.height}@${zoom}`;
 
 export class Viewer {
   readonly id = randomUUID();
@@ -803,8 +789,11 @@ export class ViewerHub {
 
   async input(viewer: Viewer, message: Record<string, unknown>): Promise<void> {
     const control = this.host.control;
-    if (message.type !== "resize" && message.type !== "frameCap") this.host.used();
+    if (message.type !== "resize" && message.type !== "frameCap" && message.type !== "renewControl") this.host.used();
     switch (message.type) {
+      case "renewControl":
+        this.#hold.renew(viewer);
+        return;
       case "wake":
         await this.host.running().catch(() => viewer.push({ type: "asleep" }));
         return;
@@ -1007,17 +996,3 @@ const newestChallenge = (tabs: readonly Tab[]) => tabs.reduce<{ tab: Tab; challe
   const challenge = tab.page.auth.pending;
   return challenge && (!newest || challenge.since >= newest.challenge.since) ? { tab, challenge } : newest;
 }, null);
-
-function parseSetting(value: unknown): ViewportSetting | null {
-  const setting = record(value);
-  if (!setting) return null;
-  if (setting.mode === "fill") return { mode: "fill" };
-  if (setting.mode === "preset" && typeof setting.preset === "string" && setting.preset in VIEWPORT_PRESETS) {
-    return { mode: "preset", preset: setting.preset as keyof typeof VIEWPORT_PRESETS, ...(setting.landscape === true ? { landscape: true } : {}) };
-  }
-  if (setting.mode === "fixed") {
-    const size = requestedSize(setting.width, setting.height);
-    return size ? { mode: "fixed", ...size } : null;
-  }
-  return null;
-}

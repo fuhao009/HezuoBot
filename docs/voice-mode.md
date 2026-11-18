@@ -94,12 +94,13 @@ hand real work to specialists with `coordinate_bots` — no new machinery requir
 
 ## Known gaps
 
-- **Take-turns calls are macOS-only**, because dictation is. The voice half
-  works everywhere. Live calls (GPT-Live, `desktop/server/live-call.ts`) need no
-  dictation, so they work in the desktop app on any computer and on the
-  phones, with the person's own OpenAI key. A Cloud's page, in a web browser
-  or the desktop app, runs the same code, but no Live call has been made end
-  to end on a real Cloud yet.
+- **Take-turns calls are macOS-only**, because dictation is. The historical
+  implementation record describes voice working elsewhere and Live calls
+  (GPT-Live, `desktop/server/live-call.ts`) working on desktop computers and
+  phones with the person's own OpenAI key, without dictation. The phone path
+  is retired from the supported product scope; this does not revoke that
+  historical implementation claim. The same record explicitly states that no
+  Live call had been made end to end on a real Cloud.
 - **Rooms don't speak yet**, though per-bot voices already exist (`bot.voice`).
 - **No spend meter.** ElevenLabs bills per character. Auto-speak is off by
   default partly for that reason, but the app should eventually show usage.

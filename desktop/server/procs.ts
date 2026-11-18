@@ -12,8 +12,8 @@ import {
 import { closeSync, existsSync, readdirSync, readFileSync } from "node:fs";
 import type { Readable, Writable } from "node:stream";
 import { join } from "node:path";
-import { botBox, type WrappedSpawn } from "./bot-box/box.ts";
-import type { BoxRequest } from "./bot-box/plan.ts";
+import { botBox, type WrappedSpawn } from "./execution-sandbox/box.ts";
+import type { BoxRequest } from "./execution-sandbox/plan.ts";
 import { engineMemory } from "./engine-memory.ts";
 import { engineHomes } from "./engine-homes/engine-homes.ts";
 import type { HomedSpawn } from "./engine-homes/layout.ts";

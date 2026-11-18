@@ -6,7 +6,7 @@ import { WAIT_HOURS, WAIT_KINDS, type WaitKind } from "../../../packages/shared/
 import type { Surface } from "../../../packages/shared/wire.ts";
 import type { json as sendJson } from "../harness/http.ts";
 import { expandHome } from "../wait-probes.ts";
-import { WAIT_WAKE_MS, waitList, type NewWaitCondition, type WaitManager } from "../waits.ts";
+import { waitList, type NewWaitCondition, type WaitManager } from "../waits.ts";
 import { PASS } from "./table.ts";
 
 const WAITS = "/api/internal/waits";
@@ -130,8 +130,8 @@ export function waitSourceRefusal(turn: {
   return null;
 }
 
-export function hostWaitRefusal(turn: { cloudHome: boolean; hosted: boolean; guest: boolean; place: Surface | null }): string | null {
-  if (turn.cloudHome || turn.hosted) return WAIT_MESSAGES.serverHost;
+export function hostWaitRefusal(turn: { hosted: boolean; guest: boolean; place: Surface | null }): string | null {
+  if (turn.hosted) return WAIT_MESSAGES.serverHost;
   if (turn.guest) return WAIT_MESSAGES.guest;
   if (turn.place === "vm" || turn.place === "cloud") return WAIT_MESSAGES.otherComputer;
   return null;
@@ -165,8 +165,7 @@ export interface WaitRouteContext {
   elsewhere?: (name: string) => { where: string } | { hint: string } | null;
 }
 
-/** `sleeps`: the home is a personal My Cloud, whose plan sleeps when idle; a Team Cloud never sleeps. */
-export function createWaitRoutes(deps: { waits: Pick<WaitManager, "create" | "list" | "cancel">; home?: () => string; cloudHome?: boolean; sleeps?: boolean }) {
+export function createWaitRoutes(deps: { waits: Pick<WaitManager, "create" | "list" | "cancel">; home?: () => string }) {
   const home = deps.home ?? homedir;
   return async (ctx: WaitRouteContext): Promise<typeof PASS | void> => {
     const { res, json } = ctx;
@@ -228,10 +227,8 @@ export function createWaitRoutes(deps: { waits: Pick<WaitManager, "create" | "li
     if (result.state === "refused") return void json(res, result.status, { error: result.error });
     if (result.state === "already") return void json(res, 200, { text: result.text });
     const { wait, note } = result;
-    const then = request.followUp ? `, and you will then do what you wrote in follow_up${deps.cloudHome ? " in a run that reports in its own results chat, not this one" : ""}` : "";
-    const every = WAIT_WAKE_MS / 60_000;
-    const sleeps = deps.sleeps ? ` While My Cloud sleeps it wakes to check every ${every} minutes, so the message can come up to ${every} minutes late: tell the person that too.` : "";
-    const text = `Waiting for ${wait.label} (wait id ${wait.id}): plain checks, no AI, until ${iso(wait.expiresAt)}. When it happens a message lands in this chat${then}.${sleeps} Tell the person in one sentence; do not keep checking yourself.`;
+    const then = request.followUp ? ", and you will then do what you wrote in follow_up" : "";
+    const text = `Waiting for ${wait.label} (wait id ${wait.id}): plain checks, no AI, until ${iso(wait.expiresAt)}. When it happens a message lands in this chat${then}. Tell the person in one sentence; do not keep checking yourself.`;
     return void json(res, 201, { text: note ? `${text}\n\n${note}` : text });
   };
 }

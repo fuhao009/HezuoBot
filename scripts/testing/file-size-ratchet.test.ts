@@ -41,15 +41,15 @@ const LINES: Record<string, number> = {
   "desktop/server/drivers/pi.ts": 1036,
   "desktop/server/container-computer.ts": 1225,
   "desktop/src/components/ModelPicker.tsx": 1050,
-  "desktop/src/components/PhoneSetupFlow.tsx": 1146,
   "desktop/server/cli.ts": 1080,
   "desktop/server/org-library.ts": 1003,
   "desktop/src/components/AttachmentPreview.tsx": 1037,
 };
 
 function sourceFiles(): string[] {
-  const out = execFileSync("git", ["ls-files", "desktop", "packages/shared", "scripts", "evals", "gateway"], { cwd: ROOT, encoding: "utf8" });
-  return out.split("\n").filter((file) => /\.(ts|tsx|mjs|cjs)$/.test(file))
+  const out = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "--deduplicate", "desktop", "packages/shared", "scripts", "evals", "gateway"], { cwd: ROOT, encoding: "utf8" });
+  const deleted = new Set(execFileSync("git", ["ls-files", "--deleted"], { cwd: ROOT, encoding: "utf8" }).split("\n"));
+  return out.split("\n").filter((file) => !deleted.has(file) && /\.(ts|tsx|mjs|cjs)$/.test(file))
     .filter((file) => !file.includes(".test.") && !file.includes("/testing/") && !file.includes("goldens") && !file.startsWith("desktop/electron/vendor/"));
 }
 

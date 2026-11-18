@@ -242,7 +242,7 @@ function serialize<T>(key: string, fn: () => Promise<T>): Promise<T> {
 }
 
 // A pin keeps a running turn's pre-turn commit reachable until release(): a collection after a sibling's snapshot would discard it.
-const LIVE_REFS = "refs/omb-live/";
+const LIVE_REFS = "refs/hezuo-live/";
 function liveRef(pin: string): string {
   return LIVE_REFS + createHash("sha256").update(pin).digest("hex").slice(0, 16);
 }

@@ -1,3 +1,4 @@
+import { BOT_PROFILE_LIMITS } from "../../../packages/shared/bot-profile";
 import type { NewBotDefaults } from "../../../packages/shared/new-bot-defaults";
 import { api, type Action, type Bot, type ModelSelection } from "@/state/store";
 import { teamChats } from "@/state/team-chats";
@@ -8,6 +9,7 @@ import { BotCreationDraft } from "./bot-creation-draft";
 import { createConfiguredBot } from "./create-configured-bot";
 import { t } from "./i18n";
 import { botCreated } from "./product-events";
+import { utf8Bytes } from "./soul";
 
 export interface BotDefaultsAnswer { defaults: NewBotDefaults; modelSelection: ModelSelection; suggestedName: string }
 
@@ -45,40 +47,52 @@ export function announceNewBot(dispatch: (action: Action) => void, bot: Bot, war
   if (warnings.length) dispatch({ type: "error", message: warnings.join("\n") });
 }
 
-/** A paired device may not read the host's New bot defaults: the host applies them to an empty request. Auto on this
- * computer needs the person's own OK, so a bot whose defaults ask for it starts on Ask. */
-async function createNewBot(section: string | undefined, bots: readonly Bot[], team: TeamPeople | null, request: typeof api) {
-  if (typeof window !== "undefined" && window.ogb?.remoteClient?.active) {
-    const { bot } = await request<{ bot: Bot }>("/api/bots", { method: "POST", body: JSON.stringify(section === undefined ? {} : { section }) });
-    return { bot, warnings: [] as string[], startsOnAsk: false };
-  }
+export async function newBotDraft(section: string | undefined, bots: readonly Bot[], changed: () => void, request: typeof api = api) {
   const template = startingTemplate(await request<BotDefaultsAnswer>("/api/bot-defaults"), true);
   template.profile.name = freeName(template.profile.name!, bots);
   if (section !== undefined) template.profile.section = section;
-  const draft = new BotCreationDraft(template, () => {}, request);
-  const startsOnAsk = draft.bot.approvalMode === "auto" && draft.bot.computer === "local";
-  if (startsOnAsk) draft.patch({ approvalMode: "ask" });
-  const reportsTo = team ? reportsToFor(null, draft.bot.section, bots, team) ?? undefined : undefined;
+  return new BotCreationDraft(template, changed, request);
+}
+
+export function validNewBotProfile(bot: Pick<Bot, "name" | "soul">): boolean {
+  return Boolean(bot.name.trim()) && utf8Bytes(bot.soul ?? "") <= BOT_PROFILE_LIMITS.soul;
+}
+
+/** A paired device may not read the host's New bot defaults: the host applies them to an empty request. Auto on this
+ * computer needs the person's own OK, so a bot whose defaults ask for it starts on Ask. */
+async function createNewBot(section: string | undefined, bots: readonly Bot[], team: TeamPeople | null, request: typeof api, edited?: BotCreationDraft) {
+  if (!edited && typeof window !== "undefined" && window.hezuo?.remoteClient?.active) {
+    const { bot } = await request<{ bot: Bot }>("/api/bots", { method: "POST", body: JSON.stringify(section === undefined ? {} : { section }) });
+    return { bot, warnings: [] as string[], startsOnAsk: false };
+  }
+  const draft = edited ?? await newBotDraft(section, bots, () => {}, request);
   try {
+    if (!validNewBotProfile(draft.bot)) throw new Error(t("newBot.invalidProfile"));
+    draft.patch({ name: draft.bot.name.trim() });
+    const startsOnAsk = draft.bot.approvalMode === "auto" && draft.bot.computer === "local";
+    if (startsOnAsk) draft.patch({ approvalMode: "ask" });
+    const reportsTo = team ? reportsToFor(null, draft.bot.section, bots, team) ?? undefined : undefined;
     return { ...await createConfiguredBot(draft, request, undefined, undefined, undefined, reportsTo), startsOnAsk };
   } finally {
-    draft.dispose();
+    if (!edited) draft.dispose();
   }
 }
 
-/** New bot: a bot made at once from the New bot defaults, with its chat open and ready for the first message. */
+/** Creates the reviewed draft or the saved defaults, preserving the caller's selection and completion callbacks. */
 export async function makeNewBot(action: Extract<Action, { type: "newBot" }>, bots: readonly Bot[], dispatch: (action: Action) => void,
-  showThreads: boolean, request: typeof api = api): Promise<void> {
+  showThreads: boolean, request: typeof api = api, draft?: BotCreationDraft): Promise<boolean> {
   let made: Awaited<ReturnType<typeof createNewBot>>;
   try {
-    made = await createNewBot(action.section, bots, currentTeamPeople(), request);
+    made = await createNewBot(action.section, bots, currentTeamPeople(), request, draft);
   } catch (cause) {
     const message = t("newBot.failed", { error: cause instanceof Error ? cause.message : String(cause) });
     if (action.onError) action.onError(message);
     else dispatch({ type: "error", message });
-    return;
+    return false;
   }
   announceNewBot(dispatch, made.bot, made.warnings, { preserveSelection: action.preserveSelection, showThreads, source: "blank" });
   if (made.startsOnAsk) dispatch({ type: "notice", notice: { kind: "note", botName: null, text: t("newBot.startsOnAsk", { name: made.bot.name }) } });
-  action.onCreated?.(made.bot);
+  try { action.onCreated?.(made.bot); }
+  catch (cause) { dispatch({ type: "error", message: cause instanceof Error ? cause.message : String(cause) }); }
+  return true;
 }

@@ -1,4 +1,3 @@
-import "./hezuo-preferences-migration";
 import { useSyncExternalStore } from "react";
 import { z } from "zod";
 

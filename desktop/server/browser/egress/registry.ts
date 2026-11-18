@@ -4,7 +4,6 @@ import type { Server } from "node:net";
 
 import { agentBrowserDevToolsPorts, agentBrowserStreamPorts } from "../../browser-engine.ts";
 import { sanitizePageText } from "../../browser-page-health.ts";
-import { FLEET_FIRST_PORT, FLEET_PORT_STRIDE } from "../../fleet.ts";
 import { botEngineSessions } from "../../procs.ts";
 import { openGate, resolveTarget, type EgressGate, type GateTarget, type GateUpstream, type ResolvedAddress } from "./gate.ts";
 import { opensFromHome } from "./home-sites.ts";
@@ -15,10 +14,12 @@ import { opensReddit, REDDIT_REFUSAL, refusesReddit } from "./reddit.ts";
 /** The server (and its fallbacks), webhooks, the desktop client relay, the companion, its control page and its
  * private origin, the Vite dev server and the Local VM's noVNC. */
 const DEFAULT_PORTS = [8799, 18799, 28799, 8800, 8798, 18798, 28798, 8810, 8811, 8812, 5199, 6080];
-const FLEET_WORKSPACES = 100;
-/** A server's edge, Caddy's admin API, and the workspaces a fleet host runs side by side (server and webhooks). */
-const SERVER_PORTS = [8080, 2019, ...Array.from({ length: FLEET_WORKSPACES }, (_, n) => FLEET_FIRST_PORT + FLEET_PORT_STRIDE * n).flatMap((port) => [port, port + 1])];
-const PORT_ENV = ["OMB_PORT", "OMB_WEBHOOK_PORT", "OMB_COMPANION_PORT", "OMB_CONTROL_PORT"];
+const SERVER_FIRST_PORT = 8810;
+const SERVER_PORT_STRIDE = 10;
+const SERVER_PORT_SLOTS = 100;
+/** The edge, its admin API, and reserved server/webhook listener pairs. */
+const SERVER_PORTS = [8080, 2019, ...Array.from({ length: SERVER_PORT_SLOTS }, (_, n) => SERVER_FIRST_PORT + SERVER_PORT_STRIDE * n).flatMap((port) => [port, port + 1])];
+const PORT_ENV = ["HEZUO_PORT", "HEZUO_WEBHOOK_PORT", "HEZUO_COMPANION_PORT", "HEZUO_CONTROL_PORT"];
 const DEVTOOLS_SCAN_MS = 2_000;
 const NOTICE_LIMIT = 20;
 const NOTICE_SHOWN = 3;

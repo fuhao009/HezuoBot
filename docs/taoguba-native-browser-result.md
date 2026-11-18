@@ -20,6 +20,6 @@
 
 上述工具耗时不包含模型推理间隔。派发39.01 ms；提交到首个模型事件136 ms，到首段文本4893 ms，均非完整模型推理耗时。
 
-证据：`.omb-scratch/taoguba-native-result/result.json`。WebContentsView可见页面、隔离、hold与restart另有 `.omb-scratch/embedded-browser-evidence/result.json` 和实际合成窗口截图验证。
+证据：`.omb-scratch/taoguba-native-result/result.json` (historical original path)。WebContentsView可见页面、隔离、hold与restart另有 `.omb-scratch/embedded-browser-evidence/result.json` (historical original path) 和实际合成窗口截图验证。
 
 测试已关闭并删除临时登录数据，当前不保留可继续扫码的窗口。需要另起受控测试、由用户在网站完成账号/扫码/短信验证，才能核对最终登录状态。Hezuo测试账号不是淘股吧账号，不得混用。

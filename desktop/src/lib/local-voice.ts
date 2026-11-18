@@ -1,4 +1,3 @@
-import "./hezuo-preferences-migration";
 export type RemoteVoiceProvider = "host" | "system";
 
 type Preferences = {
@@ -37,8 +36,8 @@ function write(next: Preferences): void {
 export function localSystemVoicesAvailable(): boolean {
   return (
     typeof window !== "undefined" &&
-    window.ogb?.remoteClient?.active === true &&
-    window.ogb?.platform === "darwin" &&
+    window.hezuo?.remoteClient?.active === true &&
+    window.hezuo?.platform === "darwin" &&
     typeof window.speechSynthesis !== "undefined" &&
     typeof window.SpeechSynthesisUtterance !== "undefined"
   );

@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, it } from "vitest";
 
-import { launchVerificationServer } from "../../scripts/control-omb.ts";
+import { launchVerificationServer } from "../../scripts/control-hezuo.ts";
 
 const FAKE_MCP = fileURLToPath(new URL("./testing/fake-mcp-server.ts", import.meta.url));
 
@@ -12,7 +12,7 @@ async function onAsk(run: (f: {
   api: (method: string, path: string, body?: unknown, expected?: number, token?: string) => Promise<any>;
   dump: () => any; config: () => any; iris: { id: string; threadId: string }; card: () => Promise<any>; parkOnCard: () => Promise<any>;
 }) => Promise<void>) {
-  const scratch = mkdtempSync(join(tmpdir(), "omb-mcp-card-"));
+  const scratch = mkdtempSync(join(tmpdir(), "hezuo-mcp-card-"));
   const gate = join(scratch, "finish");
   const fixture = await launchVerificationServer({ FAKE_CLAUDE_MODE: "slow", FAKE_CLAUDE_SLOW_FINISH_GATE: gate });
   const api = async (method: string, path: string, body?: unknown, expected = 200, token?: string) => {
@@ -34,7 +34,7 @@ async function onAsk(run: (f: {
       await api("POST", `/api/bots/${iris.id}/messages`, { threadId: iris.threadId, text: "Add the notes server", sendId: "mcp-card-e2e-send-0001" }, 202);
       let first: any;
       await expect.poll(() => { first = dump(); return JSON.stringify(first?.prompt ?? "").includes("Add the notes server"); }, { timeout: 20_000 }).toBe(true);
-      const token: string = first.mcpConfig.mcpServers.agents.env.OMB_COMMS_TOKEN;
+      const token: string = first.mcpConfig.mcpServers.agents.env.HEZUO_COMMS_TOKEN;
       const added = await api("POST", "/api/internal/mcp-servers", { action: "add", name: "notes", command: process.execPath, args: ["--experimental-strip-types", "--no-warnings", FAKE_MCP] }, 201, token);
       expect(added.text).toContain("A card is now visible to the person. End this turn and wait for the decision.");
       expect(config().mcpServers.notes.enabled).toBe(false);

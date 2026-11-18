@@ -19,15 +19,6 @@ import {
   provisionManagedEndpoint,
   sweepManagedEndpointCleanup,
 } from "./endpoints";
-import {
-  claimHighLevelFlow,
-  HIGHLEVEL_CALLBACK_PATH,
-  highLevelCallback,
-  refreshHighLevelToken,
-  startHighLevelFlow,
-  sweepHighLevelFlows,
-} from "./highlevel";
-import { registerPushDevice, sendPush, unregisterPushDevice } from "./push";
 import { capacityHealth, reportEndpointAccountProblems, scanTunnelCapacity } from "./tunnel-capacity";
 import {
   createInstallation,
@@ -115,8 +106,6 @@ async function route(
   config: AuthConfig,
   requestId: string,
   cloudflareFetch: CloudflareFetch,
-  apnsFetch: typeof fetch,
-  highLevelFetch: typeof fetch,
   aiFetch: typeof fetch,
 ) {
   const url = new URL(request.url);
@@ -204,31 +193,6 @@ async function route(
     }
   }
 
-  if (request.method === "POST" && url.pathname === "/v1/installations/self/push/register") {
-    return registerPushDevice(request, env);
-  }
-  if (request.method === "POST" && url.pathname === "/v1/installations/self/push/unregister") {
-    return unregisterPushDevice(request, env);
-  }
-  if (request.method === "POST" && url.pathname === "/v1/installations/self/push/send") {
-    return sendPush(request, env, apnsFetch, requestId);
-  }
-
-  // The HighLevel relay carries no credential: the random state and the
-  // tokens themselves are the secrets, and every route is limited per address.
-  if (request.method === "POST" && url.pathname === "/v1/highlevel/start") {
-    return startHighLevelFlow(request, env);
-  }
-  if (request.method === "GET" && url.pathname === HIGHLEVEL_CALLBACK_PATH) {
-    return highLevelCallback(request, env, highLevelFetch, requestId);
-  }
-  if (request.method === "POST" && url.pathname === "/v1/highlevel/claim") {
-    return claimHighLevelFlow(request, env);
-  }
-  if (request.method === "POST" && url.pathname === "/v1/highlevel/refresh") {
-    return refreshHighLevelToken(request, env, highLevelFetch, requestId);
-  }
-
   const rotate = url.pathname.match(ROTATE_ROUTE);
   if (request.method === "POST" && rotate) {
     return rotateInstallationCredential(request, rotate[1], env, auth);
@@ -256,8 +220,6 @@ async function route(
 
 export function createWorker(
   cloudflareFetch: CloudflareFetch = fetch,
-  apnsFetch: typeof fetch = fetch,
-  highLevelFetch: typeof fetch = fetch,
   aiFetch: typeof fetch = fetch,
 ) {
   return {
@@ -274,7 +236,7 @@ export function createWorker(
         try { capacity = await capacityHealth(env, readConfig(env), ctx); } catch {}
         return secureResponse(json({
           ok: true,
-          service: "openmausbot-control-plane",
+          service: "hezuobot-control-plane",
           ...(capacity === null ? {} : { capacity }),
         }), request, null, requestId);
       }
@@ -285,11 +247,7 @@ export function createWorker(
         const adminAsset = routeAdminAssets(request);
         if (adminAsset) return secureResponse(adminAsset, request, null, requestId);
         const origin = request.headers.get("origin");
-        // HighLevel sends the person's browser to the callback: a top-level
-        // navigation that may carry any Origin (or `null` after a cross-site
-        // redirect) and never one of ours. It is a public GET like /healthz.
-        const publicNavigation = request.method === "GET" && url.pathname === HIGHLEVEL_CALLBACK_PATH;
-        if (origin && !publicNavigation && !config.allowedOrigins.has(origin)) {
+        if (origin && !config.allowedOrigins.has(origin)) {
           return secureResponse(routeError(url.pathname, 403, "origin_not_allowed"), request, config, requestId);
         }
         if (url.pathname.startsWith("/v1/ai/") && request.method !== "OPTIONS") {
@@ -300,7 +258,7 @@ export function createWorker(
           || url.pathname === "/v1/operator/channels" || url.pathname === "/v1/operator/billing";
         const boundedRequest = ownsBody ? request : await withBoundedRequestBody(request);
         return secureResponse(
-          await route(boundedRequest, env, ctx, config, requestId, cloudflareFetch, apnsFetch, highLevelFetch, aiFetch),
+          await route(boundedRequest, env, ctx, config, requestId, cloudflareFetch, aiFetch),
           request,
           config,
           requestId,
@@ -324,9 +282,6 @@ export function createWorker(
       }));
       ctx.waitUntil(Promise.resolve().then(() => deleteExpiredVerifications(createAuth(env, ctx, readAuthConfig(env), requestId))).catch(() => {
         console.error(JSON.stringify({ message: "expired verification sweep failed", requestId, errorCode: "auth_internal" }));
-      }));
-      ctx.waitUntil(sweepHighLevelFlows(env, requestId).catch(() => {
-        console.error(JSON.stringify({ message: "highlevel flow sweep failed", requestId, errorCode: "highlevel_internal" }));
       }));
       ctx.waitUntil((async () => {
         if (!MANAGED_ENDPOINT_SETTINGS.some((name) => {

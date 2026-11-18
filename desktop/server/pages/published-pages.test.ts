@@ -3,8 +3,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { PublishedPageCard } from "../../../packages/shared/published-page.ts";
-import { FAKE_DESKTOP_TOKEN, FAKE_HOME, FAKE_TOKEN_URL, fakePagesService } from "../testing/fake-pages.ts";
-import { applyIncludedPagesMessage, pagesHomeSignature } from "./access.ts";
+import { FAKE_DESKTOP_TOKEN, FAKE_TOKEN_URL, fakePagesService, fakePageUrl } from "../testing/fake-pages.ts";
+import { applyIncludedPagesMessage } from "./access.ts";
 import { PageBundleError, readPageBundle } from "./bundle.ts";
 import { PublishedPagesStore } from "./store.ts";
 import { createPublishedPages } from "./service.ts";
@@ -14,7 +14,7 @@ import { PASS } from "../routes/table.ts";
 const SITE = { "index.html": "<!doctype html><h1>Bake sale</h1>", "style.css": "h1{color:red}" };
 let dir: string;
 
-beforeEach(() => { dir = mkdtempSync(join(tmpdir(), "omb-pages-")); });
+beforeEach(() => { dir = mkdtempSync(join(tmpdir(), "hezuo-pages-")); });
 afterEach(() => {
   applyIncludedPagesMessage({ type: "hezuo:included-pages", access: null });
   rmSync(dir, { recursive: true, force: true });
@@ -29,13 +29,13 @@ function writeSite(folder: string, files: Record<string, string> = SITE) {
 }
 const signIn = () => applyIncludedPagesMessage({ type: "hezuo:included-pages", access: { url: FAKE_TOKEN_URL, token: FAKE_DESKTOP_TOKEN } });
 
-function setup(options: { home?: boolean; quota?: number; selfHosted?: boolean } = {}) {
+function setup(options: { quota?: number; selfHosted?: boolean } = {}) {
   const service = fakePagesService({ quota: options.quota });
   const work = join(dir, "work"), data = join(dir, "data");
   mkdirSync(work, { recursive: true });
   const cards: Array<{ threadId: string; id: string; text: string; card: PublishedPageCard }> = [];
   let ids = 0;
-  const pages = createPublishedPages({ dataDir: data, cloudHome: options.home ? FAKE_HOME : null, selfHosted: options.selfHosted, fetch: (input, init) => service.fetch(input, init),
+  const pages = createPublishedPages({ dataDir: data, selfHosted: options.selfHosted, fetch: (input, init) => service.fetch(input, init),
     patch: (threadId, messageId, text, card) => { const shown = cards.find((each) => each.id === messageId && each.threadId === threadId); if (shown) Object.assign(shown, { text, card }); } });
   const post = (threadId: string) => (text: string, card: PublishedPageCard) => { const id = `m${++ids}`; cards.push({ threadId, id, text, card }); return id; };
   const publish = (input: { path: string; title?: string; pageId?: string; botId?: string; threadId?: string }) => pages.publisher.publish({
@@ -82,7 +82,7 @@ describe("publishing a page", () => {
     const outcome = await f.publish({ path: "site" });
     expect(outcome.status).toBe(200);
     const [page] = [...f.service.pages.keys()];
-    const url = `https://${page}.mausbot.page/`;
+    const url = fakePageUrl(page);
     expect(outcome.text).toContain(`Published “Bake sale” at ${url}`);
     expect(outcome.text).toContain("This account now has 1 of 5 pages.");
     expect(outcome.text).toContain("Free pages carry a small “Made with Hezuo” badge.");
@@ -101,7 +101,7 @@ describe("publishing a page", () => {
     writeFileSync(join(site, "index.html"), "<h1>Tomorrow's menu</h1>");
     const again = await f.publish({ path: join(site), threadId: "routine-run-2" });
     const [page] = [...f.service.pages.keys()];
-    expect(again.text).toContain(`Updated “Bake sale” at the same link: https://${page}.mausbot.page/`);
+    expect(again.text).toContain(`Updated “Bake sale” at the same link: ${fakePageUrl(page)}`);
     expect(f.service.minted.map((call) => call.action)).toEqual(["create", "update"]);
     expect(f.service.pages.size).toBe(1);
     expect(f.service.pages.get(page!)!.files.get("index.html")).toBe("<h1>Tomorrow's menu</h1>");
@@ -111,7 +111,7 @@ describe("publishing a page", () => {
     await f.publish({ path: "other", pageId: page });
     expect(f.service.minted.at(-1)).toEqual({ action: "update", pageId: page, caller: "desktop" });
     expect(f.service.pages.get(page!)!.files.get("index.html")).toBe("<p>Other</p>");
-    expect(f.cards.map((card) => card.card.url)).toEqual(Array(3).fill(`https://${page}.mausbot.page/`));
+    expect(f.cards.map((card) => card.card.url)).toEqual(Array(3).fill(fakePageUrl(page)));
   });
 
   it("gives a folder whose page was unpublished elsewhere a new link instead of failing", async () => {
@@ -140,12 +140,6 @@ describe("publishing a page", () => {
       card: { state: "limit", title: "Second", upgrade: true, plan: "free", usage: { pages: 1, limit: 1 } } });
   });
 
-  it("publishes as a Cloud home with a request signed by its bootstrap secret", async () => {
-    const f = setup({ home: true });
-    writeSite(join(f.work, "site"));
-    expect((await f.publish({ path: "site" })).status).toBe(200);
-    expect(f.service.minted).toEqual([{ action: "create", caller: "home" }]);
-  });
 
   it("refuses a missing path, a path outside the working folder, a single file that isn't a page, and a folder without index.html", async () => {
     const f = setup();
@@ -394,12 +388,8 @@ describe("pages access", () => {
   it("takes only a well-formed pages token for the Admin over https from the desktop", () => {
     expect(applyIncludedPagesMessage({ type: "hezuo:included-x", access: null })).toBe(false);
     expect(() => applyIncludedPagesMessage({ type: "hezuo:included-pages", access: { url: "http://cloud.example.test/x", token: FAKE_DESKTOP_TOKEN } })).toThrow();
-    expect(() => applyIncludedPagesMessage({ type: "hezuo:included-pages", access: { url: FAKE_TOKEN_URL, token: "omb_xd_short" } })).toThrow();
+    expect(() => applyIncludedPagesMessage({ type: "hezuo:included-pages", access: { url: FAKE_TOKEN_URL, token: "hezuo_xd_short" } })).toThrow();
     expect(applyIncludedPagesMessage({ type: "hezuo:included-pages", access: { url: FAKE_TOKEN_URL, token: FAKE_DESKTOP_TOKEN } })).toBe(true);
   });
 
-  it("signs a home's request exactly as the Admin checks it", () => {
-    // The same vector is pinned in hezuo-cloud tests/cloud-pages.test.ts.
-    expect(pagesHomeSignature("s".repeat(43), "cm-test-home", "1792670400", "nonce-nonce-nonce-1", '{"action":"create"}')).toBe("smys7kDYS99REKsdwsd9OaXv6pH_hP1Wajaq3KrTiVo");
-  });
 });

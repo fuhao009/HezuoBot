@@ -6,7 +6,7 @@ import { afterAll, describe, expect, it } from "vitest";
 
 import { botSettingsFor, withBotSettings } from "./claude-bot-settings.ts";
 
-const root = mkdtempSync(join(tmpdir(), "omb-bot-settings-"));
+const root = mkdtempSync(join(tmpdir(), "hezuo-bot-settings-"));
 afterAll(() => rmSync(root, { recursive: true, force: true }));
 
 let count = 0;
@@ -89,7 +89,7 @@ describe("botSettingsFor", () => {
 
 describe("withBotSettings", () => {
   it("merges as Claude Code merges a project's settings under --settings: lists join, Hezuo's own values win", () => {
-    const ombStop = { matcher: "", hooks: [{ type: "command", command: "omb-hook", timeout: 5 }] };
+    const ombStop = { matcher: "", hooks: [{ type: "command", command: "hezuo-hook", timeout: 5 }] };
     const botStop = { hooks: [{ type: "command", command: "/opt/notify.sh" }] };
     expect(withBotSettings(
       { hooks: { PreToolUse: [guard], Stop: [botStop] }, env: { GUARD_LEVEL: "strict", ENABLE_TOOL_SEARCH: "false" }, enabledPlugins: { "guard@team": true } },

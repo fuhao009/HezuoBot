@@ -11,9 +11,9 @@ export interface VisibilityHostDeps {
   /** index.ts's store, made after this host. */
   store(): Pick<Store, "bots" | "groups" | "bot" | "group" | "botByThread" | "groupByThread" | "patchGroup">;
   routines(): Pick<RoutineManager, "listRoutines" | "listRuns"> | null;
-  /** A Team Cloud: an admin session is a person too. */
-  team: boolean;
-  audiencesFor(viewer: Viewer): ThreadAudiences | undefined;
+  /** When present, admins retain their person-specific private-chat audience. */
+  team?: boolean;
+  audiencesFor?(viewer: Viewer): ThreadAudiences | undefined;
   threadsReferencing(name: string): readonly string[];
 }
 
@@ -43,7 +43,7 @@ export function createVisibilityHost(deps: VisibilityHostDeps) {
     const key = viewer.kind === "all" ? (viewer.email === undefined ? "*" : `admin:${viewer.email.trim().toLowerCase()}`) : `member:${viewer.email?.trim().toLowerCase() ?? ""}`;
     let set = visibleSets.get(key);
     if (!set) {
-      set = new VisibleSet(store.bots, store.groups, viewer, threadOwner, deps.audiencesFor(viewer));
+      set = new VisibleSet(store.bots, store.groups, viewer, threadOwner, deps.audiencesFor?.(viewer));
       if (visibleSets.size >= 1_000) visibleSets.clear();
       visibleSets.set(key, set);
     }

@@ -1,12 +1,15 @@
 // Verification recipes are followed by hand, so nothing else notices when a
 // command, file, route or link they cite stops existing. This reads every
 // recipe under docs/verification and checks each citation against the tree.
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import { HELP } from "../control-omb.ts";
+import { HELP, verificationServerEnvironment } from "../control-hezuo.ts";
+import { SessionRegistry } from "../../desktop/server/sessions.ts";
+import { createWorkspaceAccess } from "../../desktop/server/workspace-access.ts";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 const DOCS = join(ROOT, "docs", "verification");
@@ -34,16 +37,10 @@ const ROUTES_DIR = join(ROOT, "desktop", "server", "routes");
 const routeModules = readdirSync(ROUTES_DIR, { recursive: true, encoding: "utf8" })
   .filter((name) => name.endsWith(".ts") && !name.endsWith(".test.ts")).sort()
   .map((name) => join(ROUTES_DIR, name));
-const featureRouteModules = ["data/routes.ts", "workspace-backup-http.ts", "cloud-move-http.ts"].map((name) => join(ROOT, "desktop", "server", name));
+const featureRouteModules = ["data/routes.ts", "workspace-backup-http.ts"].map((name) => join(ROOT, "desktop", "server", name));
 const serverSource = [join(ROOT, "desktop", "server", "index.ts"), ...routeModules, ...featureRouteModules]
   .map((file) => readFileSync(file, "utf8")).join("\n");
 const hooksSource = readFileSync(join(ROOT, "desktop", "server", "webhook-ingress.ts"), "utf8");
-const hostedSource = readFileSync(join(ROOT, "enterprise", "server", "workspace-access.ts"), "utf8");
-// Only constants named in the public handler's accepted-path guard are routes.
-// Outbound post("/api/handoff/...") calls belong to the identity service, not us.
-const hostedConstants = new Map([...hostedSource.matchAll(/const ([A-Z_]+) = "(\/api\/[^"\n]+)";/g)].map(match => [match[1]!, match[2]!]));
-const hostedPublicRoutes = new Set((hostedSource.match(/!\[([^\]]+)\]\.includes\(path\)/)?.[1] ?? "")
-  .split(",").map(name => hostedConstants.get(name.trim())).filter((path): path is string => path !== undefined));
 // desktop/server/index.ts matches routes two ways: `path === "/api/x"` and
 // `path.match(/^\/api\/x\/(a|b)$/)`. Collect the regex form too.
 const routePatterns = [...serverSource.matchAll(/\/(\^\\\/api\\\/(?:\[(?:[^\]\\]|\\.)*\]|[^/\\\n[]|\\.)*)\/[a-z]*/g)].map((match) => new RegExp(match[1]!));
@@ -52,12 +49,12 @@ const PLACEHOLDER = /^(ID|:[\w-]+|<[^>]+>|\{[^}]+\})$/;
 const slug = (heading: string) => heading.trim().toLowerCase().replace(/[^\w\- ]/g, "").replace(/\s+/g, "-");
 
 describe("docs/verification recipes cite things that exist", () => {
-  it("use control:omb verbs that help lists", () => {
-    const used = cited(/pnpm control:omb ([a-z][\w-]*)/g);
+  it("use control:hezuo verbs that help lists", () => {
+    const used = cited(/pnpm control:hezuo ([a-z][\w-]*)/g);
     expect(used.length).toBeGreaterThan(0);
     expect(used.filter((hit) => !helpVerbs.has(target(hit)))).toEqual([]);
     // the launcher form may also name `launch`, which pnpm cannot run
-    const direct = cited(/scripts\/control-omb\.ts ([a-z][\w-]*)/g);
+    const direct = cited(/scripts\/control-hezuo\.ts ([a-z][\w-]*)/g);
     expect(direct.filter((hit) => target(hit) !== "launch" && !helpVerbs.has(target(hit)))).toEqual([]);
   });
 
@@ -78,7 +75,6 @@ describe("docs/verification recipes cite things that exist", () => {
     expect(refs.length).toBeGreaterThan(5);
     const registered = (route: string) => {
       const path = route.replace(/[.,;:]+$/, "");
-      if (hostedPublicRoutes.has(path)) return true;
       const source = path.startsWith("/hooks/") ? hooksSource : serverSource;
       const segments = path.split("/").slice(1);
       const literal = segments.findIndex((segment) => PLACEHOLDER.test(segment));
@@ -91,10 +87,37 @@ describe("docs/verification recipes cite things that exist", () => {
     expect([...new Set(refs.filter((hit) => !registered(target(hit))))]).toEqual([]);
   });
 
-  it("distinguishes delegated public routes from external identity backchannels", () => {
-    expect([...hostedPublicRoutes]).toEqual(["/api/auth/hosted/start", "/api/auth/hosted/callback"]);
-    expect(hostedPublicRoutes.has("/api/handoff/consume")).toBe(false);
-    expect(hostedPublicRoutes.has("/api/handoff/check")).toBe(false);
+  it("rejects retired hosted settings instead of granting local access", () => {
+    const directory = mkdtempSync(join(tmpdir(), "hezuo-docs-fixture-"));
+    const environment = verificationServerEnvironment({}, directory, 19975);
+    const sessions = new SessionRegistry({ file: join(directory, "sessions.json") });
+    try {
+      const options = { sessions, cookieName: "hezuo_session", closeSessionStreams: () => {} };
+      expect(createWorkspaceAccess({ ...options, env: environment })).toBeNull();
+      sessions.issue({ label: "Injected admin", scopes: ["admin"], email: "admin@example.test" });
+      for (const env of [
+        { HEZUO_ADMIN_URL: "https://admin.example.test" },
+        { HEZUO_ADMIN_WORKSPACE: "acme" },
+        { HEZUO_ADMIN_MEMBERSHIP: "portal" },
+        { HEZUO_ADMIN_URL: "" },
+        { HEZUO_ADMIN_WORKSPACE: "" },
+        { HEZUO_ADMIN_MEMBERSHIP: "" },
+        { HEZUO_ADMIN_MEMBERSHIP: "local" },
+      ]) {
+        expect(() => createWorkspaceAccess({ ...options, env: { ...environment, ...env } })).toThrow(/no longer supported/);
+      }
+    } finally {
+      sessions.close();
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("isolates fixture homes and excludes live credentials and hosted settings", () => {
+    const dataDir = join(ROOT, ".fixture-docs-contract");
+    const env = verificationServerEnvironment({ HOME: "/live", HEZUO_DATA_DIR: "/live/data", OPENAI_API_KEY: "sentinel-secret", HEZUO_ADMIN_URL: "https://admin.example.test", HEZUO_ADMIN_WORKSPACE: "acme", HEZUO_ADMIN_MEMBERSHIP: "portal" }, dataDir, 19975);
+    expect(env).toMatchObject({ HOME: dataDir, USERPROFILE: dataDir, HEZUO_DATA_DIR: dataDir, HEZUO_PORT: "19975", HEZUO_WEBHOOK_PORT: "19976", HEZUO_TEST_SEALED_PATH: "1" });
+    for (const key of ["OPENAI_API_KEY", "HEZUO_ADMIN_URL", "HEZUO_ADMIN_WORKSPACE", "HEZUO_ADMIN_MEMBERSHIP"]) expect(env[key], key).toBeUndefined();
+    expect(JSON.stringify(env)).not.toContain("sentinel-secret");
   });
 
   it("are all reachable from README.md", () => {

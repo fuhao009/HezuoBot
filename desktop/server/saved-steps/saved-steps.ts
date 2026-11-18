@@ -4,7 +4,7 @@ import type { AppConfig } from "../config.ts";
 import type { RuntimeEvent } from "../contracts.ts";
 import { createComputerJournalRoutes } from "../routes/computer-journal.ts";
 import { createSavedStepsRoutes } from "../routes/saved-steps.ts";
-import type { RouteHandler } from "../routes/table.ts";
+import type { RouteHandler, InternalRouteHandler } from "../routes/table.ts";
 import type { Message } from "../store.ts";
 import { openComputerCaller } from "./computer-client.ts";
 import { SavedStepsDispatch, type DispatchDeps, type EngineSlots } from "./dispatch.ts";
@@ -53,7 +53,7 @@ export interface SavedSteps {
   /** Saved steps can run on this server (macOS only in v1), whatever the setting says; clients show the switch only then. */
   here(): boolean;
   routes: RouteHandler;
-  journalRoutes(internal: { capability: JournalCapability; readBody(): Promise<unknown> }): RouteHandler;
+  journalRoutes(internal: { capability: JournalCapability; readBody(): Promise<unknown> }): InternalRouteHandler;
   requestSettled(settled: SettledRequest): void;
   requestEnded(threadId: string, generations: ReadonlySet<string>): void;
   observe(event: RuntimeEvent): void;

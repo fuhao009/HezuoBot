@@ -14,7 +14,7 @@ import {
 const dirs = [];
 
 function scratch() {
-  const dir = mkdtempSync(join(tmpdir(), "omb-gateway-host-"));
+  const dir = mkdtempSync(join(tmpdir(), "hezuo-gateway-host-"));
   dirs.push(dir);
   return dir;
 }
@@ -34,7 +34,7 @@ describe("product account trust file", () => {
       userId: "user-1",
     });
     const raw = readFileSync(file, "utf8");
-    expect(raw).not.toMatch(/token|bearer|omb_/i);
+    expect(raw).not.toMatch(/token|bearer|hezuo_/i);
     const stored = readProductAccountTrust(file);
     expect(stored.origin).toBe("https://gateway.example:8787");
     expect(stored.userId).toBe("user-1");

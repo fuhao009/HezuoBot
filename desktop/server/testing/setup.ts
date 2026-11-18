@@ -7,15 +7,15 @@ import { afterAll, afterEach } from "vitest";
 
 import { removeTempDir } from "./cleanup.ts";
 
-const home = mkdtempSync(join(tmpdir(), "omb-test-home-"));
+const home = mkdtempSync(join(tmpdir(), "hezuo-test-home-"));
 process.env.HOME = home;
 process.env.USERPROFILE = home;
-// OMB_DATA_DIR must never escape the throwaway home the suite deletes.
-delete process.env.OMB_DATA_DIR;
+// HEZUO_DATA_DIR must never escape the throwaway home the suite deletes.
+delete process.env.HEZUO_DATA_DIR;
 // Do not let a developer's Hermes global config path leak into per-test homes.
 delete process.env.HERMES_HOME;
 // Named explicitly although homedir() already covers it: the device tests delete this directory wholesale.
-process.env.OMB_COMPANION_DIR = join(home, ".hezuo-companion");
+process.env.HEZUO_COMPANION_DIR = join(home, ".hezuo-companion");
 
 // Product code follows navigator.language; pin it so English assertions do not depend on the host locale.
 Object.defineProperty(globalThis.navigator, "language", { value: "en", configurable: true });

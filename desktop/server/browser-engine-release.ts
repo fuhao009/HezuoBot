@@ -1,5 +1,5 @@
-// Digests computed from the official GitHub assets on 2026-09-08, except the versioned Windows vendor build; update pins
-// only through a reviewed native end-to-end run. The Dockerfile keeps the official Linux version.
+// Digests computed from the official GitHub assets on 2026-09-08; update pins only through a reviewed
+// native end-to-end run. Windows requires an explicitly configured, reviewed project artifact.
 export const AGENT_BROWSER_VERSION = "0.37.0";
 
 export interface AgentBrowserReleaseAsset {
@@ -39,17 +39,6 @@ const RELEASES = new Map<string, AgentBrowserReleaseAsset>([
     "linux-x64",
     { target: "linux-x64", asset: "agent-browser-linux-x64", sha256: "78e0c5a14a7fa1f3d1ae2acdbdcc94a047b435b998a8c505fcc49d7fa4935a49", bytes: 14253776 },
   ],
-  [
-    "win32-x64",
-    {
-      // Upstream 0.37.0 still lacks vercel-labs/agent-browser#1781's Windows cold-start fix.
-      // Retain the native-verified revision until its replacement is tested.
-      target: "win32-x64", version: "0.36.0-omb.1",
-      asset: "agent-browser-win32-x64-0.36.0-omb.1.exe",
-      url: "https://github.com/milind-soni/OpenMausBot/releases/download/browser-engine-v0.36.0-omb.1/agent-browser-win32-x64-0.36.0-omb.1.exe",
-      sha256: "33bee834f6a6072ec8688b0914726e0262874d758f69f27e8baf7eaac6b5ed15", bytes: 13806080,
-    },
-  ],
 ]);
 
 export function agentBrowserReleaseUrl(asset: AgentBrowserReleaseAsset): string {
@@ -60,12 +49,32 @@ export function agentBrowserReleaseVersion(asset: AgentBrowserReleaseAsset | nul
   return asset?.version ?? AGENT_BROWSER_VERSION;
 }
 
-/** The asset for this machine, or null where Vercel publishes none. */
+/** The pinned asset for this machine, or null when no reviewed artifact is configured or published. */
 export function resolveAgentBrowserReleaseAsset(
   platform: NodeJS.Platform = process.platform,
   arch: string = process.arch,
   musl = false,
+  env: NodeJS.ProcessEnv = process.env,
 ): AgentBrowserReleaseAsset | null {
   const key = platform === "linux" && musl ? `linux-musl-${arch}` : `${platform}-${arch}`;
+  if (key === "win32-x64") {
+    const url = env.HEZUO_BROWSER_ENGINE_WINDOWS_URL;
+    const sha256 = env.HEZUO_BROWSER_ENGINE_WINDOWS_SHA256;
+    const version = env.HEZUO_BROWSER_ENGINE_WINDOWS_VERSION;
+    const bytes = Number(env.HEZUO_BROWSER_ENGINE_WINDOWS_BYTES);
+    if (!url && !sha256 && !version && !env.HEZUO_BROWSER_ENGINE_WINDOWS_BYTES) return null;
+    if (!url || !sha256 || !/^[a-f0-9]{64}$/i.test(sha256) || !version || !/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(version) || !Number.isSafeInteger(bytes) || bytes <= 0) {
+      throw new Error("Configure HEZUO_BROWSER_ENGINE_WINDOWS_URL, SHA256, VERSION and BYTES with a reviewed project artifact.");
+    }
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:" || parsed.username || parsed.password) throw new Error("The Windows browser artifact must use an HTTPS URL without credentials.");
+    return { target: key, asset: `agent-browser-win32-x64-${version}.exe`, url, sha256: sha256.toLowerCase(), version, bytes };
+  }
   return RELEASES.get(key) ?? null;
+}
+
+export function missingAgentBrowserReleaseReason(platform: NodeJS.Platform, arch: string): string {
+  return platform === "win32" && arch === "x64"
+    ? "No reviewed Windows browser engine artifact is configured. Set HEZUO_BROWSER_ENGINE_WINDOWS_URL, HEZUO_BROWSER_ENGINE_WINDOWS_SHA256, HEZUO_BROWSER_ENGINE_WINDOWS_VERSION and HEZUO_BROWSER_ENGINE_WINDOWS_BYTES when building or installing the browser bundle, then rebuild or reinstall Hezuo."
+    : `agent-browser publishes no build for ${platform}-${arch}`;
 }

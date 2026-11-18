@@ -79,7 +79,7 @@ afterAll(() => {
 describe("data sheets in the store", () => {
   it("opens the referenced bot's Data result, including repeated clicks", () => {
     const opened = reducer(seen, { type: "openDataResult", botId: "bot", cardId: "c_1" });
-    expect(opened).toMatchObject({ selectedId: "bot", computerOpen: true, activeView: "chat", dataResultFocus: { botId: "bot", id: "c_1", requestId: 1 } });
+    expect(opened).toMatchObject({ selectedId: "bot", computerOpen: false, activeView: "chat", dataResultFocus: { botId: "bot", id: "c_1", requestId: 1 } });
     expect(reducer(opened, { type: "openDataResult", botId: "bot", cardId: "c_1" }).dataResultFocus?.requestId).toBe(2);
     const consumed = reducer(opened, { type: "dataResultFocusConsumed", requestId: 1 });
     expect(consumed.dataResultFocus?.consumed).toBe(true);
@@ -94,7 +94,7 @@ describe("data sheets in the store", () => {
     expect(sent("/api/bots/other/read")).toHaveLength(0);
     dispatch({ type: "openDataResult", botId: "other", cardId: "c_1" });
     await settle();
-    expect(seen).toMatchObject({ selectedId: "other", activeView: "chat", computerOpen: true, dataResultFocus: { botId: "other", id: "c_1", consumed: false } });
+    expect(seen).toMatchObject({ selectedId: "other", activeView: "chat", computerOpen: false, dataResultFocus: { botId: "other", id: "c_1", consumed: false } });
     const openedBot = seen.bots.find((candidate) => candidate.id === "other");
     expect(openedBot?.unread).toBe(false);
     expect(openedBot?.tasks?.[0]?.unread).toBe(false);

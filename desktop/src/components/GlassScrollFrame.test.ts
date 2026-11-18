@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { URL as NodeURL } from "node:url";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -132,7 +133,7 @@ describe("the scroll fade", () => {
 });
 
 describe("a fading bar", () => {
-  const css = readFileSync("src/styles.css", "utf8");
+  const css = readFileSync(new NodeURL("../styles.css", import.meta.url), "utf8");
   const rule = (selector: string) => css.match(new RegExp(`(?:^|\\n)${selector.replace(/[[\]().:"]/g, "\\$&")} \\{[^}]*\\}`))?.[0] ?? "";
 
   it("marks itself, and a plain bar stays glass", () => {

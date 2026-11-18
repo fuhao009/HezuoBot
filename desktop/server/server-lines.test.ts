@@ -5,20 +5,20 @@ import { serverLine } from "./server-lines.ts";
 
 describe("serverLine", () => {
   it("writes the line in the language given, with its values filled in", () => {
-    expect(serverLine("de", "server.reports.sent", { report: "r-1" })).toBe("An das MausBot (externer Dienst)-Team gesendet (Bericht r-1). Milind und Omkar bekommen ihn per E-Mail.");
-    expect(serverLine(undefined, "server.reports.sent", { report: "r-1" })).toBe("Sent to the MausBot (external service) team (report r-1). Milind and Omkar get it by email.");
-    expect(serverLine("en", "server.reports.when.minutes", { count: 5 })).toBe("in about 5 minutes");
+    expect(serverLine("de", "server.greeting.hello", { name: "Scout" })).toBe("Hallo, ich bin Scout. Was soll ich für dich tun?");
+    expect(serverLine(undefined, "server.greeting.hello", { name: "Scout" })).toBe("Hi, I'm Scout. What would you like me to do?");
   });
 
   it("reads a regional tag as its language, and a language it has no words for as English", () => {
-    expect(serverLine("de-AT", "server.reports.when.soon")).toBe("so bald wie möglich");
-    expect(serverLine("pt", "server.reports.when.soon")).toBe(serverLine("pt-br", "server.reports.when.soon"));
-    expect(serverLine("zh-Hant", "server.reports.when.soon")).toBe(serverLine("zh-tw", "server.reports.when.soon"));
-    expect(serverLine("nl", "server.reports.when.soon")).toBe("as soon as it can");
+    const greeting = (language: string) => serverLine(language, "server.greeting.hello");
+    expect(greeting("de-AT")).toBe(greeting("de"));
+    expect(greeting("pt")).toBe(greeting("pt-br"));
+    expect(greeting("zh-Hant")).toBe(greeting("zh-tw"));
+    expect(greeting("nl")).toBe(greeting("en"));
   });
 
   it("leaves a {name} it was given no value for as it is", () => {
-    expect(serverLine("en", "server.reports.refused", {})).toBe("The MausBot (external service) team's server refused this bug report, so nothing was sent: {detail}.");
+    expect(serverLine("en", "server.greeting.hello", {})).toBe("Hi, I'm {name}. What would you like me to do?");
   });
 
   it.each(["zh", "zh-Hant", "en", "ko"])("writes welcome and setup lines in %s", (language) => {

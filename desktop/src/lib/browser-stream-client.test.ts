@@ -48,6 +48,21 @@ const agent: PreviewStreamControl = { canOperate: true, controller: "agent", gen
 beforeEach(() => vi.stubGlobal("WebSocket", FakeSocket));
 afterEach(() => vi.unstubAllGlobals());
 
+it("sends renewal only for its current authorized driver", () => {
+  const client = createPreviewStreamClient(target, events());
+  const socket = FakeSocket.current;
+  for (const controller of ["agent", "unclaimed", "another-viewer"] as const) {
+    socket.control({ ...agent, controller });
+    expect(client.send({ type: "renewControl" })).toBe(false);
+  }
+  socket.control({ ...agent, controller: "you", canOperate: false });
+  expect(client.send({ type: "renewControl" })).toBe(false);
+  socket.control({ ...agent, controller: "you" });
+  expect(client.send({ type: "renewControl" })).toBe(true);
+  expect(socket.sent.at(-1)).toBe(JSON.stringify({ type: "renewControl" }));
+  client.stop();
+});
+
 describe("preview stream control", () => {
   const connect = () => {
     const onFrame = vi.fn();

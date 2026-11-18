@@ -4,7 +4,7 @@ import { ComputerAsks, type DesktopState, type OnlineComputer } from "./computer
 import type { LentPlatform } from "./lent-computers.ts";
 import type { Message } from "./store.ts";
 
-const bot = { id: "scout", name: "Scout", color: "blue" } as unknown as Parameters<ComputerAsks["ask"]>[0]["bot"];
+const bot = { id: "scout", name: "Scout", color: "blue", notifications: true } satisfies Parameters<ComputerAsks["ask"]>[0]["bot"];
 const PC = { name: "HOME-PC", platform: "win32" } as const;
 const desktop = (fields: Partial<DesktopState> = {}): DesktopState => ({ ...PC, paused: false, screen: { ready: true, reason: null }, terminal: false, ...fields });
 const lends = (fields: Partial<OnlineComputer> = {}): OnlineComputer => ({ id: "pc-1", ...PC, computer: true, terminal: false, ...fields });
@@ -124,7 +124,7 @@ describe("a bot on the person's own Cloud asks to turn on what it needs from the
     const call = f.asks.ask({ threadId: "t1", bot, need: "screen", why: "Open Excel" }, 30_000);
     await vi.advanceTimersByTimeAsync(20_000);
     expect(f.card()).toMatchObject({ options: ["Not now"], computerAsk: { reason: "closed", device: "PC" } });
-    expect(f.card().subtitle).toContain("Hezuo isn't open on your PC. Open it there and Scout carries on.");
+    expect(f.card().subtitle).toContain("HezuoBot isn't open on your PC. Open it there and Scout carries on.");
     await f.present(desktop({ paused: true }));
     expect(f.card()).toMatchObject({ options: ["Turn on", "Not now"], computerAsk: { reason: "paused" } });
     f.state.online = [lends()];

@@ -35,34 +35,6 @@ function writeFrame(socket, streamId, type, payload) {
   socket.send(encodeFrame(streamId, type, payload));
 }
 
-function attachStream(socket, streamId, target) {
-  const upstream = originConnect(target);
-  let closed = false;
-  const close = (reset = false) => {
-    if (closed) return;
-    closed = true;
-    if (reset) writeFrame(socket, streamId, FRAME.RESET);
-    else writeFrame(socket, streamId, FRAME.END);
-    upstream.destroy();
-  };
-  upstream.on("data", (chunk) => writeFrame(socket, streamId, FRAME.DATA, chunk));
-  upstream.on("end", () => close(false));
-  upstream.on("error", () => close(true));
-  upstream.on("close", () => {
-    if (!closed) close(false);
-  });
-  return {
-    write(chunk) {
-      if (!closed) upstream.write(chunk);
-    },
-    end() {
-      if (!closed) upstream.end();
-    },
-    reset() {
-      close(true);
-    },
-  };
-}
 
 export function createGatewayCompanionTunnel({
   origin,
@@ -190,7 +162,7 @@ export function createGatewayCompanionTunnel({
     ws.on("message", (data) => {
       let frames;
       try { frames = decoder.push(data); }
-      catch (error) {
+      catch {
         log("gateway companion tunnel: frame error");
         ws.close();
         return;

@@ -42,7 +42,6 @@ vi.mock("@/state/store", async (importOriginal) => ({
 const { ComputerPanel } = await import("./ComputerPanel");
 const { requestPanelPage } = await import("@/lib/page-open");
 const { BotEditorStore, initialState } = await import("@/state/store");
-import { requestBrowserTakeover } from "@/lib/browser-takeover";
 
 const engine = (instanceId: string) => ({
   instanceId, driverKind: "claudeAgent", displayName: instanceId, access: "subscription",
@@ -92,7 +91,7 @@ const press = (label: string, key: string) => {
 };
 
 beforeAll(() => {
-  vi.stubGlobal("ogb", undefined);
+  vi.stubGlobal("hezuo", undefined);
 });
 beforeEach(() => {
   // The panel remembers each conversation's tab, so one test's click must not choose the next test's tab.
@@ -118,7 +117,7 @@ afterEach(() => {
 describe("Computer panel tab", () => {
   it("keeps a browser-only bot hidden through bot activity and restored panel state", async () => {
     fixture.browser = true;
-    localStorage.setItem("omb-computer-panel-view:scout", "browser");
+    localStorage.setItem("hezuo-computer-panel-view:scout", "browser");
     await open(makeBot({ computer: "browser" }));
     expect(selected()).toBe("Screen");
     expect(document.querySelector('[data-testid="browser-panel"]')).toBeNull();
@@ -127,23 +126,6 @@ describe("Computer panel tab", () => {
     expect(document.querySelector('[data-testid="browser-panel"]')).toBeNull();
   });
 
-  it("shows and takes only the explicitly requested conversation, without replaying on thread changes", async () => {
-    fixture.browser = true;
-    requestBrowserTakeover("scout", "thread");
-    await open(makeBot());
-    expect(selected()).toBe("Browser");
-    expect(fixture.takeover).toEqual(expect.any(Number));
-    await open(makeBot({ threadId: "other-thread" }));
-    expect(selected()).toBe("Screen");
-    expect(document.querySelector('[data-testid="browser-panel"]')).toBeNull();
-    await open(makeBot());
-    expect(selected()).toBe("Screen");
-    flushSync(() => requestBrowserTakeover("other-bot", "thread"));
-    expect(selected()).toBe("Screen");
-    flushSync(() => requestBrowserTakeover("scout", "thread"));
-    await settle();
-    expect(selected()).toBe("Browser");
-  });
 
   it("names the tablist from the active catalog", async () => {
     setLocale("de");
@@ -173,7 +155,7 @@ describe("Computer panel tab", () => {
     fixture.browser = true;
     await open(makeBot());
     expect(selected()).toBe("Screen");
-    const PAGE = "https://abcdefghijklmnopqrstuvwxyz.mausbot.page/";
+    const PAGE = "https://abcdefghijklmnopqrstuvwxyz.hezuobot.page/";
     flushSync(() => requestPanelPage("scout", PAGE));
     await settle();
     expect(selected()).toBe("Browser");

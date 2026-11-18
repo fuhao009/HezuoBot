@@ -94,7 +94,8 @@ The script uses `launchVerificationServer` and the shared control tool against a
 
 ## Verification record — 2026-11-14
 
-- `node --test desktop/electron/bot-test-api.test.mjs`: 5 tests passed.
+- Current test path: `node --test desktop/electron/bot-test-api.node-test.mjs` (also collected by `pnpm test:electron`). The file currently contains 7 tests; they were not rerun for this rename.
+- Historical result recorded on 2026-11-14: 5 tests passed under the former path `desktop/electron/bot-test-api.test.mjs`. This is not a passing result for the current 7-test file.
 - `node --experimental-strip-types scripts/verify-bot-test-api.mjs`: passed; measured command wall time 1.93 seconds after correcting the fixture owner-token encoding to the production base64url format.
 - Verified normal Bot dispatch/completion, dedicated Bot isolation, fresh tasks, stop, close cancellation, token rotation, descriptor removal/permissions, and authorization/browser rejection.
 - This is fake-engine integration proof, not real-model/browser acceptance. No installed application was updated, and no persistent test listener was left running.

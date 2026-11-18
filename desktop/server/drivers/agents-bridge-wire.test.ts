@@ -13,7 +13,7 @@ import { availableTools, catalogProfileFromEnv } from "./agents-catalog.ts";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PROXY_SOURCE = join(HERE, "agents-proxy.ts");
-const BRIDGE_ON = { OMB_AGENTS_TOOL_BRIDGE: "1" };
+const BRIDGE_ON = { HEZUO_AGENTS_TOOL_BRIDGE: "1" };
 
 const flag = (on: boolean) => (on ? "1" : "0");
 
@@ -27,26 +27,26 @@ function profiles(): Record<string, Record<string, string>> {
           const name = [skills && "skills", shared && "shared", voice && "voice", !chief && "non-chief"]
             .filter(Boolean).join("+") || "default";
           all[name] = {
-            OMB_SKILL_AUTHORING_ENABLED: flag(skills),
-            OMB_SHARED_COMPUTERS_ENABLED: flag(shared),
-            OMB_VOICE_NOTES: flag(voice),
-            OMB_CHIEF_OF_STAFF: flag(chief),
-            OMB_COMPUTER_SELECTION: "1",
+            HEZUO_SKILL_AUTHORING_ENABLED: flag(skills),
+            HEZUO_SHARED_COMPUTERS_ENABLED: flag(shared),
+            HEZUO_VOICE_NOTES: flag(voice),
+            HEZUO_CHIEF_OF_STAFF: flag(chief),
+            HEZUO_COMPUTER_SELECTION: "1",
           };
         }
       }
     }
   }
   for (const name of ["skills+shared+voice", "skills+shared+voice+non-chief"]) {
-    all[`${name}+cloud-home`] = { ...all[name]!, OMB_CLOUD_HOME: "1" };
+    all[`${name}+cloud-home`] = { ...all[name]!, HEZUO_CLOUD_HOME: "1" };
   }
-  all["skills+shared+voice+escalations"] = { ...all["skills+shared+voice"]!, OMB_ESCALATIONS: "1" };
-  all["skills+shared+voice+escalations+x"] = { ...all["skills+shared+voice+escalations"]!, OMB_X_RESEARCH: "1", OMB_RESEARCH: "1" };
-  all["skills+shared+voice+escalations+x+team"] = { ...all["skills+shared+voice+escalations+x"]!, OMB_TEAM_PEOPLE: "1" };
-  all["default+legacy-switches"] = { ...all.default!, OMB_ROOM_TURN: "1", OMB_OWN_THREAD_CREATION: "1", OMB_EXTERNAL_RUNTIME: "1", OMB_ACTIVE_WAITS: "0" };
-  for (const name of ["default", "skills+shared+voice"]) all[`${name}+hezuo`] = { ...all[name]!, OMB_HEZUO: "1" };
-  all["default+no-computer-pick"] = { ...all.default!, OMB_COMPUTER_SELECTION: "0" };
-  for (const name of ["default", "non-chief"]) all[`${name}+room`] = { ...all[name]!, OMB_COMPUTER_SELECTION: "0", OMB_ROOM: "1" };
+  all["skills+shared+voice+escalations"] = { ...all["skills+shared+voice"]!, HEZUO_ESCALATIONS: "1" };
+  all["skills+shared+voice+escalations+x"] = { ...all["skills+shared+voice+escalations"]!, HEZUO_X_RESEARCH: "1", HEZUO_RESEARCH: "1" };
+  all["skills+shared+voice+escalations+x+team"] = { ...all["skills+shared+voice+escalations+x"]!, HEZUO_TEAM_PEOPLE: "1" };
+  all["default+legacy-switches"] = { ...all.default!, HEZUO_ROOM_TURN: "1", HEZUO_OWN_THREAD_CREATION: "1", HEZUO_EXTERNAL_RUNTIME: "1", HEZUO_ACTIVE_WAITS: "0" };
+  for (const name of ["default", "skills+shared+voice"]) all[`${name}+hezuo`] = { ...all[name]!, HEZUO_HEZUO: "1" };
+  all["default+no-computer-pick"] = { ...all.default!, HEZUO_COMPUTER_SELECTION: "0" };
+  for (const name of ["default", "non-chief"]) all[`${name}+room`] = { ...all[name]!, HEZUO_COMPUTER_SELECTION: "0", HEZUO_ROOM: "1" };
   return all;
 }
 
@@ -63,10 +63,10 @@ type RpcAnswer = { id: number; result?: { tools?: unknown[]; content?: Array<{ t
  * asked, read off its stdout as they arrive. */
 async function proxyLines(entry: string, env: Record<string, string>, requests: Array<{ method: string; params?: unknown }>): Promise<string[]> {
   // A developer shell (or an Hezuo turn running this suite) can carry
-  // OMB_* switches of its own; the profile must be the only source.
-  const inherited = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("OMB_")));
+  // HEZUO_* switches of its own; the profile must be the only source.
+  const inherited = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("HEZUO_")));
   const child = spawn(process.execPath, [entry], {
-    env: { ...inherited, OMB_HARNESS_URL: "http://127.0.0.1:9", OMB_BOT_ID: "bot-golden", OMB_THREAD_ID: "thread-golden", OMB_COMMS_TOKEN: "unused", OMB_TURN_DEPTH: "0", ...env },
+    env: { ...inherited, HEZUO_HARNESS_URL: "http://127.0.0.1:9", HEZUO_BOT_ID: "bot-golden", HEZUO_THREAD_ID: "thread-golden", HEZUO_COMMS_TOKEN: "unused", HEZUO_TURN_DEPTH: "0", ...env },
     stdio: ["pipe", "pipe", "inherit"],
   });
   try {
@@ -118,7 +118,7 @@ const bytes = (text: string) => Buffer.byteLength(text, "utf8");
 type Tool = { name: string; description: string; inputSchema: Record<string, unknown> };
 const toolsOf = (wire: string) => (JSON.parse(wire) as { tools: Tool[] }).tools;
 /** The turn's whole catalog with the bridge disabled. */
-const unbridgedWire = (name: string) => JSON.stringify({ tools: availableTools(catalogProfileFromEnv({ OMB_BOT_ID: "bot-golden", ...PROFILES[name]! })) });
+const unbridgedWire = (name: string) => JSON.stringify({ tools: availableTools(catalogProfileFromEnv({ HEZUO_BOT_ID: "bot-golden", ...PROFILES[name]! })) });
 
 
 /** The names find_tool's description says are reached through use_tool. */
@@ -166,7 +166,7 @@ describe("agents proxy tools/list with the tool bridge on", () => {
       expect(namedHidden(wire), name).toEqual(twinNames.filter((tool) => !listed.has(tool)));
     }
     // So a bot that is not a Chief is not told the Chief-only tools exist.
-    const nonChief = Object.keys(PROFILES).filter((name) => PROFILES[name]!.OMB_CHIEF_OF_STAFF === "0");
+    const nonChief = Object.keys(PROFILES).filter((name) => PROFILES[name]!.HEZUO_CHIEF_OF_STAFF === "0");
     expect(nonChief).toHaveLength(10);
     for (const name of nonChief) {
       for (const tool of CHIEF_ONLY_TOOLS) expect(wires[name], `${name}: ${tool}`).not.toContain(tool);
@@ -180,15 +180,15 @@ describe("agents proxy tools/list with the tool bridge on", () => {
     const base = hotOf("default");
     expect(base).toEqual(["tool_result_read", "list_room_targets", "coordinate_bots", "list_bots", "list_rooms", "select_computer", "attach_file", "publish_page", "post_to_room", "request_credential", "request_sign_in", "fill_login", "memory_update"]);
     for (const name of Object.keys(PROFILES)) {
-      const selects = PROFILES[name]!.OMB_COMPUTER_SELECTION === "1";
+      const selects = PROFILES[name]!.HEZUO_COMPUTER_SELECTION === "1";
       expect(hotOf(name).filter((tool) => tool !== "send_voice_note"), name).toEqual(selects ? base : base.filter((tool) => tool !== "select_computer"));
-      expect(hotOf(name).includes("send_voice_note"), name).toBe(PROFILES[name]!.OMB_VOICE_NOTES === "1");
+      expect(hotOf(name).includes("send_voice_note"), name).toBe(PROFILES[name]!.HEZUO_VOICE_NOTES === "1");
     }
   });
 
   it("is what the catalog and the bridge compute in-process, so another front end lists the same tools", () => {
     for (const name of Object.keys(PROFILES)) {
-      const turn = catalogProfileFromEnv({ OMB_BOT_ID: "bot-golden", ...PROFILES[name]! });
+      const turn = catalogProfileFromEnv({ HEZUO_BOT_ID: "bot-golden", ...PROFILES[name]! });
       const tools = createToolBridge(availableTools(turn) as BridgeTool[]).listed;
       expect(JSON.stringify({ tools }), name).toBe(wires[name]);
     }
@@ -212,7 +212,7 @@ describe("agents proxy tools/list with the tool bridge on", () => {
 
   it("serves the full catalog unless the switch is exactly 1", async () => {
     const full = unbridgedWire(FULL);
-    const served = await Promise.all(["0", "", "true", "yes", "on"].map((value) => toolsListWire(PROXY_SOURCE, { ...PROFILES[FULL]!, OMB_AGENTS_TOOL_BRIDGE: value })));
+    const served = await Promise.all(["0", "", "true", "yes", "on"].map((value) => toolsListWire(PROXY_SOURCE, { ...PROFILES[FULL]!, HEZUO_AGENTS_TOOL_BRIDGE: value })));
     for (const wire of [...served, await toolsListWire(PROXY_SOURCE, PROFILES[FULL]!)]) expect(wire).toBe(full);
   }, 60_000);
 });
@@ -227,7 +227,7 @@ describe("agents proxy with the tool bridge on, from the packaged bundle", () =>
     // The proxy runs as its own process in a packaged build, so the bridge
     // and the ranker it searches with have to be inlined into the one
     // agents-proxy.js that scripts/bundle-server.mjs's options produce.
-    directory = realpathSync(mkdtempSync(join(tmpdir(), "omb-agents-proxy-bridge-bundle-")));
+    directory = realpathSync(mkdtempSync(join(tmpdir(), "hezuo-agents-proxy-bridge-bundle-")));
     await build({
       entryPoints: [PROXY_SOURCE],
       bundle: true,

@@ -393,7 +393,6 @@ const PENDING: Readonly<Record<string, ReadonlyArray<readonly [file: string, sni
     ["server/store.ts", "reached its turn limit"],
   ],
   "AI engines and limits": [
-    ["server/cloud-credit-moves.ts", "notice:  …  is connected, so this conversation uses it now instead of"],
     ["server/computer-engine-removal.ts", "The Computer choice in the model list was removed."],
     ["server/computer-engine-removal.ts", "This conversation now uses  … ."],
     ["server/computer-engine-removal.ts", "…  now uses  … ; this conversation keeps its own model."],
@@ -507,9 +506,6 @@ const PENDING: Readonly<Record<string, ReadonlyArray<readonly [file: string, sni
     ["server/index.ts", "invalid image"],
     ["server/index.ts", "Queued follow-up interrupted by restart or restore — it may have alrea"],
     ["../packages/shared/first-reply-rescue.ts", "notice:  …  hasn't heard back from  …  yet."],
-  ],
-  "moves to the Cloud": [
-    ["server/cloud-send-arrived.ts", "I'm back on this computer, so my webhook \" … \" has an address here aga"],
   ],
   "calls": [
     ["../packages/shared/live-call.ts", "Call with  …  ·  …"],

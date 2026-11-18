@@ -1,4 +1,3 @@
-import "./hezuo-preferences-migration";
 export const LAST_CONVERSATION_KEY = "hezuo.lastConversation.v1";
 
 export function readLastConversation(): string | null {

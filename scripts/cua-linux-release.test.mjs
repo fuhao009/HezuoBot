@@ -15,7 +15,7 @@ const BLOCK = 512;
 const temporaryDirectories = [];
 
 function temporaryProject() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "omb-cua-stage-test-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "hezuo-cua-stage-test-"));
   temporaryDirectories.push(root);
   fs.writeFileSync(
     path.join(root, "package.json"),

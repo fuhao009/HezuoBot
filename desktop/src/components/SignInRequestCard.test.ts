@@ -20,14 +20,9 @@ vi.mock("@/state/store", async (original) => ({
 const answerSignIn = vi.fn();
 const here = { value: true };
 vi.mock("@/lib/sign-in", () => ({ answerSignIn: (...args: unknown[]) => answerSignIn(...args), signInHostIsHere: () => here.value }));
-const saveLoginFromCard = vi.fn();
-const cardSaveTarget = vi.fn();
-vi.mock("@/lib/logins", () => ({
-  saveLoginFromCard: (...args: unknown[]) => saveLoginFromCard(...args),
-  cardSaveTarget: (...args: unknown[]) => cardSaveTarget(...args),
-}));
-
-import { LoginForm } from "./LoginForm";
+const takeover = vi.fn();
+const cancelTakeover = vi.fn();
+vi.mock("@/lib/browser-takeover", () => ({ requestBrowserTakeover: (...args: unknown[]) => takeover(...args), cancelBrowserTakeover: (...args: unknown[]) => cancelTakeover(...args) }));
 import { SignInBanner, SignInRequestCard } from "./SignInRequestCard";
 
 const card = (signIn: Record<string, unknown> = {}): Message => ({
@@ -60,21 +55,19 @@ const settle = async () => { for (let turn = 0; turn < 10; turn++) await Promise
 beforeEach(() => {
   vi.stubGlobal("window", {});
   dispatch.mockReset(); answerSignIn.mockReset().mockResolvedValue(undefined);
-  saveLoginFromCard.mockReset().mockResolvedValue(undefined);
-  cardSaveTarget.mockReset().mockResolvedValue({ site: "example.com" });
+  takeover.mockReset().mockResolvedValue(undefined);
+  cancelTakeover.mockReset().mockResolvedValue(undefined);
   fixture.setters = []; fixture.states = {}; here.value = true;
 });
 
 describe("SignInRequestCard while it waits", () => {
-  it("leads with the site, quotes the bot's reason, and offers Open, Done and Cancel", () => {
+  it("offers only takeover and cancel for the browser", () => {
     const html = view();
-    expect(html).toContain("Sign in needed");
-    expect(html).toMatch(/data-testid="sign-in-site"[^>]*>example\.com</);
-    expect(html).toContain("“The report is behind a login.”");
-    expect(html).toContain("— Pepper");
-    expect(html).toContain("Pepper’s built-in browser");
-    for (const label of ["Open", "Done", "Cancel"]) expect(html).toContain(label);
-    expect(html).not.toContain("<input");
+    expect(html).toContain("Pepper needs you to sign in to example.com");
+    expect(html.match(/<button/g)).toHaveLength(2);
+    expect(html).toContain("Take over browser");
+    expect(html).toContain("Cancel");
+    expect(html).not.toContain("built-in");
   });
 
   it.each([
@@ -93,11 +86,12 @@ describe("SignInRequestCard while it waits", () => {
     expect(remote).not.toBe(view({ place: "local" }));
   });
 
-  it("Open goes to the place the bot works", () => {
-    button(tree(), "Open").props.onClick!();
-    expect(dispatch).toHaveBeenCalledExactlyOnceWith({
-      type: "openSignIn", botId: "pepper", messageId: "card-1", url: "https://example.com/login", site: "example.com", place: "browser",
-    });
+  it("takes over directly without opening a panel or navigating", async () => {
+    button(tree(), "Take over browser").props.onClick!();
+    await settle();
+    expect(takeover).toHaveBeenCalledExactlyOnceWith({ botId: "pepper", threadId: "thread-1", messageId: "card-1", place: "browser" }, "Pepper", expect.any(Function));
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(answerSignIn).not.toHaveBeenCalled();
   });
 
   it("Open on this computer explains where to sign in instead", () => {
@@ -106,60 +100,31 @@ describe("SignInRequestCard while it waits", () => {
     // explained (the second useState) turns on
     expect(fixture.setters[1]).toHaveBeenCalledWith(true);
     fixture.setters = []; fixture.states = { 1: true };
-    expect(view({ place: "local" })).toContain("Not the Browser tab: it keeps its own sign-ins");
+    expect(view({ place: "local" })).toContain("Then press Done");
   });
 
-  it("offers to save a login in the built-in browser, which opens a masked form in place of the buttons", () => {
-    button(tree(), "Save a login").props.onClick!();
-    // saving (the third useState) turns on
-    expect(fixture.setters[2]).toHaveBeenCalledWith(true);
-    fixture.setters = []; fixture.states = { 2: true };
-    const html = view();
-    expect(html).toContain("Save the username and password for example.com.");
-    expect(html).toContain('type="password"');
-    expect(html).toMatch(/type="password" autocomplete="new-password"/iu);
-    expect(html).toContain("Save and continue");
-    expect(html).not.toMatch(/>Done<|>Open</);
-    expect(saveLoginFromCard).not.toHaveBeenCalled();
-  });
-
-  it("names a sign-in page on another site, open in the browser, as a choice left unticked, and saves it only when ticked", async () => {
-    const elsewhere = { site: "example.com", signInHost: "login.microsoftonline.com" };
-    cardSaveTarget.mockResolvedValue(elsewhere);
-    button(tree(), "Save a login").props.onClick!();
-    await settle();
-    expect(cardSaveTarget).toHaveBeenCalledExactlyOnceWith({ botId: "pepper", threadId: "thread-1", messageId: "card-1", place: "browser" });
-    // target and the tick are the fourth and fifth useState
-    expect(fixture.setters[3]).toHaveBeenCalledWith(elsewhere);
-    fixture.setters = []; fixture.states = { 2: true, 3: elsewhere };
-    const html = view();
-    expect(html).toContain("Also fill it on login.microsoftonline.com, the sign-in page open in the browser now");
-    const tick = /<input type="checkbox"[^>]*name="signInHost"[^>]*>/u.exec(html)?.[0];
-    expect(tick).toBeDefined();
-    expect(tick).not.toContain("checked");
-    const fields = { username: "alice", password: "fake-card-pass", totp: "" };
-    const form = (nodes: Node[]) => nodes.find((node) => node.type === LoginForm)!.props as unknown as { onSubmit: (value: typeof fields) => Promise<void> };
-    fixture.setters = [];
-    await form(tree()).onSubmit(fields);
-    expect(saveLoginFromCard).toHaveBeenLastCalledWith({ botId: "pepper", threadId: "thread-1", messageId: "card-1" }, fields, undefined);
-    fixture.setters = []; fixture.states = { 2: true, 3: elsewhere, 4: true };
-    await form(tree()).onSubmit(fields);
-    expect(saveLoginFromCard).toHaveBeenLastCalledWith({ botId: "pepper", threadId: "thread-1", messageId: "card-1" }, fields, "login.microsoftonline.com");
-  });
 
   it.each(["vm", "cloud", "local"])("does not offer to save a login on %s, where fill_login cannot reach yet", (place) => {
     expect(view({ place })).not.toContain("Save a login");
   });
 
   it("does not offer to save a login from a desktop paired to another computer", () => {
-    vi.stubGlobal("window", { ogb: { remoteClient: { active: true } } });
+    vi.stubGlobal("window", { hezuo: { remoteClient: { active: true } } });
     expect(view()).not.toContain("Save a login");
   });
 
-  it.each(["done", "cancel"] as const)("%s settles this card", async (choice) => {
-    button(tree(), choice === "done" ? "Done" : "Cancel").props.onClick!();
+  it("cancel answers without opening a window", async () => {
+    button(tree(), "Cancel").props.onClick!();
     await settle();
-    expect(answerSignIn).toHaveBeenCalledExactlyOnceWith({ botId: "pepper", threadId: "thread-1", messageId: "card-1", place: "browser" }, choice);
+    expect(answerSignIn).toHaveBeenCalledExactlyOnceWith({ botId: "pepper", threadId: "thread-1", messageId: "card-1", place: "browser" }, "cancel");
+    expect(takeover).not.toHaveBeenCalled();
+    expect(cancelTakeover).toHaveBeenCalledExactlyOnceWith({ botId: "pepper", threadId: "thread-1", messageId: "card-1", place: "browser" });
+    expect(cancelTakeover.mock.invocationCallOrder[0]).toBeLessThan(answerSignIn.mock.invocationCallOrder[0]!);
+  });
+  it.each(["vm", "cloud", "local"])("retains completion for %s", async place => {
+    button(tree({ place }), "Done").props.onClick!();
+    await settle();
+    expect(answerSignIn).toHaveBeenCalledWith(expect.objectContaining({ place }), "done");
   });
 });
 
@@ -167,16 +132,10 @@ describe("SignInRequestCard once settled", () => {
   it("folds into one line that names the site once done and resumed", () => {
     const html = view({ done: true, resumed: true });
     expect(html).toContain('data-ask-card="settled"');
-    expect(html).toContain("Signed in to example.com");
-    expect(html).toContain("Pepper is continuing");
+    expect(html).toContain("Handed back to Pepper");
     expect(html).not.toMatch(/>Done<|>Open</);
   });
 
-  it("says a login was saved, for the site it was saved for", () => {
-    const html = view({ done: true, resumed: true, savedLogin: "example.com and login.microsoftonline.com" });
-    expect(html).toContain("Login saved for example.com and login.microsoftonline.com");
-    expect(html).toContain("Pepper is continuing");
-  });
 
   it("says a declined sign-in was declined", () => {
     expect(view({ cancelled: true, resumed: true })).toContain("Sign-in to example.com declined");

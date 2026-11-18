@@ -57,7 +57,7 @@ function runner(responses: Record<string, string | Error>) {
 }
 
 it("recognizes only a durable VM workspace directory as prior provisioning evidence", () => {
-  const root = mkdtempSync(join(tmpdir(), "omb-vm-workspace-"));
+  const root = mkdtempSync(join(tmpdir(), "hezuo-vm-workspace-"));
   const target = { ...perBotLocalVmTarget("workspace-fixture"), workspaceDir: join(root, "workspace") };
   try {
     expect(localVmWorkspaceExists(target)).toBe(false);

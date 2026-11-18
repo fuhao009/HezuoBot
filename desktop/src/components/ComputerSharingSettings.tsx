@@ -9,7 +9,7 @@ import { LendingActivityList } from "./LendingActivity";
 export function ComputerSharingSettings({ workspace, onClose }: { workspace: { id: string; name: string; origin: string }; onClose: () => void }) {
   const { state: appState } = useStore();
   const offered = sharedComputersEnabled(appState.config);
-  const bridge = offered ? window.ogb?.computerSharing : undefined;
+  const bridge = offered ? window.hezuo?.computerSharing : undefined;
   const [state, setState] = useState<DesktopComputerSharing | null>(null);
   const [folders, setFolders] = useState<DesktopSharedFolder[]>([]);
   const [terminal, setTerminal] = useState(false);

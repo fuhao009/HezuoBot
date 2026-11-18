@@ -41,8 +41,8 @@ const room = (patch: Partial<Group> = {}): Group => ({
   ...patch,
 });
 
-const view = (group: Group, ogb?: unknown) => {
-  vi.stubGlobal("window", { ...globalThis.window, ogb });
+const view = (group: Group, hezuo?: unknown) => {
+  vi.stubGlobal("window", { ...globalThis.window, hezuo });
   try {
     return renderToStaticMarkup(createElement(GroupView, { group }));
   } finally {

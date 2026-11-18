@@ -4,6 +4,7 @@ import { join } from "node:path";
 import {
   agentBrowserReleaseUrl,
   agentBrowserReleaseVersion,
+  missingAgentBrowserReleaseReason,
   resolveAgentBrowserReleaseAsset,
 } from "./browser-engine-release.ts";
 
@@ -19,11 +20,12 @@ const CHROME_ASSETS = {
   "win32-x64": { platform: "win64", bytes: 120466147, sha256: "9f405cfaf7bc08bf9e046e653cd3086c0faa1d4e25907de857f7e7f093a20122", executableSha256: "01176f6928faeb37ff018bc8884bbca8a0197f51b659d467f2501ab2c64f9fcf" },
 } as const;
 
-export function browserBundleSpec(target: string) {
+export function browserBundleSpec(target: string, env: NodeJS.ProcessEnv = process.env) {
   if (!Object.hasOwn(CHROME_ASSETS, target)) throw new Error(`Unsupported desktop browser target: ${target}`);
   const pinned = CHROME_ASSETS[target as BrowserBundleTarget];
   const [platform, arch] = target.split("-");
-  const engine = resolveAgentBrowserReleaseAsset(platform as NodeJS.Platform, arch)!;
+  const engine = resolveAgentBrowserReleaseAsset(platform as NodeJS.Platform, arch, false, env);
+  if (!engine) throw new Error(missingAgentBrowserReleaseReason(platform as NodeJS.Platform, arch));
   const suffix = platform === "win32" ? ".exe" : "";
   const directory = `chrome-headless-shell-${pinned.platform}`;
   return {
@@ -51,8 +53,8 @@ export function browserBundleSpec(target: string) {
   };
 }
 
-export function browserBundlePaths(bundleDirectory: string, target: string) {
-  const spec = browserBundleSpec(target);
+export function browserBundlePaths(bundleDirectory: string, target: string, env: NodeJS.ProcessEnv = process.env) {
+  const spec = browserBundleSpec(target, env);
   return {
     directory: bundleDirectory,
     manifest: join(bundleDirectory, "manifest.json"),

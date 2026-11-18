@@ -1,6 +1,6 @@
-// hezuo://thread/<thread-id>?bot=<bot-id> and hezuo://bot/<bot-id>. The page checks them strictly against
+// hezuobot://thread/<thread-id>?bot=<bot-id> and hezuobot://bot/<bot-id>. The page checks them strictly against
 // its chats; opening one never sends, interrupts or creates anything.
-const CHAT_LINK_PREFIXES = ["hezuo://thread/", "hezuo://bot/"];
+const CHAT_LINK_PREFIXES = ["hezuobot://thread/", "hezuobot://bot/"];
 const MAX_LINK_LENGTH = 1024;
 
 export function chatLinkFrom(value) {

@@ -8,12 +8,9 @@
 
 **Tech Stack:** Node 24 (`~/.nvm/versions/node/v24.14.1/bin`), TypeScript, zod, vitest, React.
 
-**Spec:** `docs/superpowers/specs/2026-09-30-mcp-sign-in-and-plugin-catalog-design.md` (section A). Catalog (B) and phone labels get their own plans.
-
 ## Global Constraints
 
 - Desktop only: sign-in starts only when `!isProxied(req) && isLoopbackHost(req.socket.remoteAddress)`; otherwise `409` with "Sign in from the computer running this workspace."
-- Tokens live in `${DATA_DIR}/mcp-oauth.json`, written with `writeFileAtomic(..., { mode: 0o600 })`; never in API responses, logs, or phone payloads.
 - Tokens are bound to the server URL; a URL change or removal deletes them.
 - PKCE `S256` is required; a server without it is not signable.
 - Metadata endpoints must be `https:` (plain `http:` only for loopback hosts, used by tests).
@@ -175,5 +172,5 @@
 
 - [ ] `npx tsc -p desktop/tsconfig.server.json --noEmit` and `npx tsc -p desktop/tsconfig.json --noEmit` — clean.
 - [ ] `npx vitest run desktop/server/mcp-* desktop/server/index.test.ts desktop/src/components/McpServers*` — PASS.
-- [ ] Live check against Higgsfield with a scratch data dir (`OMB_DATA_DIR`): probe → needs sign-in; start → authorization URL on `clerk.higgsfield.ai` (sign-in itself needs Omkar).
-- [ ] Hand-off: OMB2 side-by-side build for Omkar to sign in and run a bot turn.
+- [ ] Live check against Higgsfield with a scratch data dir (`HEZUO_DATA_DIR`): probe → needs sign-in; start → authorization URL on `clerk.higgsfield.ai` (sign-in itself needs maintainer).
+- [ ] Hand-off: Hezuo side-by-side build for maintainer to sign in and run a bot turn.

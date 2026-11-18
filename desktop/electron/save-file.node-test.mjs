@@ -10,7 +10,7 @@ import { collisionFreeDownloadPath, defaultSaveName, openLogsFolder, resolveSava
 
 // Creating a symlink on Windows needs elevation or developer mode.
 const canSymlink = (() => {
-  const probe = fs.mkdtempSync(path.join(os.tmpdir(), "omb-symlink-probe-"));
+  const probe = fs.mkdtempSync(path.join(os.tmpdir(), "hezuo-symlink-probe-"));
   try {
     fs.symlinkSync(probe, path.join(probe, "link"));
     return true;
@@ -25,7 +25,7 @@ let home;
 let botHome;
 
 before(() => {
-  home = fs.mkdtempSync(path.join(os.tmpdir(), "omb-save-file-"));
+  home = fs.mkdtempSync(path.join(os.tmpdir(), "hezuo-save-file-"));
   botHome = path.join(home, ".hezuo");
   fs.mkdirSync(path.join(botHome, "workspaces", "bot"), { recursive: true });
   fs.writeFileSync(path.join(botHome, "workspaces", "bot", "report.docx"), "docx");
@@ -46,8 +46,8 @@ describe("save-file path validation", () => {
   });
 
   it("accepts a file under a symlinked bot home", { skip: !canSymlink }, async () => {
-    const realHome = fs.mkdtempSync(path.join(os.tmpdir(), "omb-real-home-"));
-    const linkedHome = fs.mkdtempSync(path.join(os.tmpdir(), "omb-linked-home-"));
+    const realHome = fs.mkdtempSync(path.join(os.tmpdir(), "hezuo-real-home-"));
+    const linkedHome = fs.mkdtempSync(path.join(os.tmpdir(), "hezuo-linked-home-"));
     const realBotHome = path.join(realHome, "bot-data");
     fs.mkdirSync(realBotHome, { recursive: true });
     fs.writeFileSync(path.join(realBotHome, "report.docx"), "docx");
@@ -85,7 +85,7 @@ describe("save-file path validation", () => {
 
 describe("save-file dialog default name", () => {
   it("suggests a name that does not overwrite an existing file", async () => {
-    const downloads = fs.mkdtempSync(path.join(os.tmpdir(), "omb-downloads-"));
+    const downloads = fs.mkdtempSync(path.join(os.tmpdir(), "hezuo-downloads-"));
     const source = path.join(botHome, "workspaces", "bot", "report.docx");
 
     assert.equal(await defaultSaveName(downloads, source), path.join(downloads, "report.docx"));
@@ -98,7 +98,7 @@ describe("save-file dialog default name", () => {
   });
 
   it("keeps the extension on the suggestion", async () => {
-    const downloads = fs.mkdtempSync(path.join(os.tmpdir(), "omb-downloads-ext-"));
+    const downloads = fs.mkdtempSync(path.join(os.tmpdir(), "hezuo-downloads-ext-"));
     const source = path.join(botHome, "workspaces", "bot", "report.docx");
     fs.writeFileSync(path.join(downloads, "report.docx"), "");
 
@@ -110,7 +110,7 @@ describe("save-file dialog default name", () => {
 
 describe("attachment download destination", () => {
   it("uses Chromium-style suffixes without replacing an existing download", () => {
-    const downloads = fs.mkdtempSync(path.join(os.tmpdir(), "omb-attachment-downloads-"));
+    const downloads = fs.mkdtempSync(path.join(os.tmpdir(), "hezuo-attachment-downloads-"));
     try {
       assert.equal(
         collisionFreeDownloadPath(downloads, "report.tar.gz"),
@@ -132,7 +132,7 @@ describe("attachment download destination", () => {
   });
 
   it("keeps renderer-supplied directories outside the destination", () => {
-    const downloads = fs.mkdtempSync(path.join(os.tmpdir(), "omb-attachment-basename-"));
+    const downloads = fs.mkdtempSync(path.join(os.tmpdir(), "hezuo-attachment-basename-"));
     try {
       assert.equal(
         collisionFreeDownloadPath(downloads, "../../outside.txt"),
@@ -145,11 +145,15 @@ describe("attachment download destination", () => {
 
   it("is installed on the default session before the primary window is created", () => {
     const main = fs.readFileSync(new URL("./main.mjs", import.meta.url), "utf8");
-    const handler = main.indexOf('session.defaultSession.on("will-download"');
-    assert.notEqual(handler, -1);
-    assert.match(main.slice(handler), /item\.setSavePath\(collisionFreeDownloadPath\(/);
-    assert.match(main.slice(handler), /revealDownloadWhenDone\(item, /);
-    assert.ok(handler < main.indexOf("!deliveredCloudEntry) await showHome();"));
+    const handler = main.match(/function installDownloadHandler\(targetSession\) \{[\s\S]*?targetSession\.on\("will-download", \(_event, item\) => \{([\s\S]*?)\n  \}\);/);
+    assert.ok(handler, "the shared installer must define the safe download handler");
+    const installation = main.indexOf("installDownloadHandler(session.defaultSession);");
+    assert.notEqual(installation, -1, "the default session must install the shared download handler");
+    assert.match(handler[1], /item\.setSavePath\(collisionFreeDownloadPath\(app\.getPath\("downloads"\), item\.getFilename\(\)\)\)/);
+    assert.match(handler[1], /revealDownloadWhenDone\(item, \(filePath\) => shell\.showItemInFolder\(filePath\)\)/);
+    const primaryWindow = main.indexOf("if (!hiddenStart && !restoredOrganizationEntry && !deliveredOrganizationEntry) showLocalWindow();");
+    assert.notEqual(primaryWindow, -1, "the primary-window startup entry must exist");
+    assert.ok(installation < primaryWindow, "downloads must be installed before opening the primary window");
   });
 
   it("reveals only a completed download at its actual save path", () => {
@@ -269,9 +273,9 @@ describe("Show in folder for a file outside the workspace", () => {
 
 describe("openLogsFolder", () => {
   it("opens exactly main's own logs folder, making it first, and says where it is when the system cannot open it", async () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "omb-logs-folder-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "hezuo-logs-folder-"));
     try {
-      const folder = path.join(root, "Hezuo", "logs");
+      const folder = path.join(root, "HezuoBot", "logs");
       const opened = [];
       assert.deepEqual(await openLogsFolder(folder, { open: async (target) => { opened.push(target); return ""; } }), { folder, opened: true });
       assert.deepEqual(opened, [folder]);

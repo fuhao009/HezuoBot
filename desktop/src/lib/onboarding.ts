@@ -118,7 +118,7 @@ export function welcomeOnScreen(): boolean {
   return welcomeShown > 0;
 }
 
-const WELCOME_FINISHED_KEY = "omb.onboarding.welcomeFinished";
+const WELCOME_FINISHED_KEY = "hezuo.onboarding.welcomeFinished";
 /** The first-run welcome ended in this app session (never a replay): the full-screen Cloud Pro popup waits for a later
  * launch rather than following it. Kept for the window's session, so a reload counts as the same launch. */
 // Where browser storage is blocked, this page's memory stands in for it.
@@ -138,14 +138,12 @@ export function welcomeFinishedThisLaunch(): boolean {
   }
 }
 
-export const DEFAULT_ADMIN_ORIGIN = "https://admin.openmausbot.com";
-
 export function organisationSignIn<Bridge>(
-  ogb: { organization?: Bridge; remoteClient?: { active?: boolean } } | undefined,
+  hezuo: { organization?: Bridge; remoteClient?: { active?: boolean } } | undefined,
   options: { hosted: boolean },
 ): Bridge | undefined {
-  if (options.hosted || !ogb || ogb.remoteClient?.active === true) return undefined;
-  return ogb.organization;
+  if (options.hosted || !hezuo || hezuo.remoteClient?.active === true) return undefined;
+  return hezuo.organization;
 }
 
 export function companyModelCount(state: { providers?: Array<{ configured: boolean; models: string[] }> } | null): number {

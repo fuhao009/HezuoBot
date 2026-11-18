@@ -318,7 +318,7 @@ export function createProxyHandler(options: ProxyOptions) {
     // session; the owner enables this per device, off by default.
     if (isCloudDesktopAccess(method, path) && !device?.cloudDesktopAccess) {
       return sendJson(res, 403, {
-        error: "computer access is off for this device — enable it in Hezuo → Settings → Remote access",
+        error: "computer access is off for this device — enable it in HezuoBot → Settings → Remote access",
       });
     }
 
@@ -402,7 +402,7 @@ export function createProxyHandler(options: ProxyOptions) {
           const fail = () => {
             if (finished) return;
             finished = true;
-            sendJson(res, 502, { error: "Hezuo is not ready on this computer" });
+            sendJson(res, 502, { error: "HezuoBot is not ready on this computer" });
           };
           harness.on("data", (chunk: Buffer) => {
             size += chunk.length;
@@ -556,7 +556,7 @@ export function createProxyHandler(options: ProxyOptions) {
           if (size > MAX_JSON_BODY_BYTES) {
             harness.destroy();
             if (res.headersSent) res.destroy();
-            else sendJson(res, 502, { error: "the response from Hezuo was too large" });
+            else sendJson(res, 502, { error: "the response from HezuoBot was too large" });
             return;
           }
           chunks.push(chunk);
@@ -640,8 +640,8 @@ export function createProxyHandler(options: ProxyOptions) {
         res,
         timedOut ? 504 : 502,
         timedOut
-          ? { error: "Hezuo did not respond" }
-          : { error: "Hezuo is not running on this computer" },
+          ? { error: "HezuoBot did not respond" }
+          : { error: "HezuoBot is not running on this computer" },
       );
     });
     req.pipe(upstream);

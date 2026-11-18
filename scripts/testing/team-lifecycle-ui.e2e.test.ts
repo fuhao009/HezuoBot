@@ -5,15 +5,15 @@ import { fileURLToPath } from "node:url";
 import { expect, it } from "vitest";
 import { resolveAgentBrowserBinary } from "../../desktop/server/browser-engine.ts";
 import { waitForExit } from "../../desktop/server/testing/cleanup.ts";
-import { runControlOmb } from "../control-omb.ts";
+import { runControlHezuo } from "../control-hezuo.ts";
 import { request } from "../mcp-server.ts";
 import { mountPreview, type MountedPreview } from "./preview-fixture.ts";
-import { OPEN_SIDEBAR_TOOLS, UI_TOOLS_DIR } from "./control-omb-ui.ts";
+import { OPEN_SIDEBAR_TOOLS, UI_TOOLS_DIR } from "./control-hezuo-ui.ts";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 const binary = resolveAgentBrowserBinary({ dataDir: UI_TOOLS_DIR, env: process.env });
-const enabled = process.env.OMB_UI_E2E === "1" || Boolean(binary);
-if (!enabled) console.log("skipping team lifecycle UI e2e: set OMB_UI_E2E=1 to install the pinned browser");
+const enabled = process.env.HEZUO_UI_E2E === "1" || Boolean(binary);
+if (!enabled) console.log("skipping team lifecycle UI e2e: set HEZUO_UI_E2E=1 to install the pinned browser");
 
 (enabled ? it : it.skip)("creates an empty team, moves bots, and manages shared instructions in the renderer", async () => {
   let child: ChildProcess | undefined;
@@ -24,7 +24,7 @@ if (!enabled) console.log("skipping team lifecycle UI e2e: set OMB_UI_E2E=1 to i
   try {
     let stdout = "", stderr = "";
     let info: { ui: string; url: string; botId: string; logPath: string };
-    child = spawn(process.execPath, ["--experimental-strip-types", join(ROOT, "scripts/control-omb.ts"), "ui", "launch"], {
+    child = spawn(process.execPath, ["--experimental-strip-types", join(ROOT, "scripts/control-hezuo.ts"), "ui", "launch"], {
       cwd: ROOT, env: process.env, stdio: ["ignore", "pipe", "pipe"],
     });
     child.stdout!.on("data", (chunk: Buffer) => { stdout += String(chunk); });
@@ -36,7 +36,7 @@ if (!enabled) console.log("skipping team lifecycle UI e2e: set OMB_UI_E2E=1 to i
     }, { timeout: binary ? 180_000 : 600_000, interval: 250 }).toBe(true);
     fixtureHandle = info!.ui;
     fixtureLog = info!.logPath;
-    const ui = (verb: string, ...args: string[]) => runControlOmb(["ui", verb, "--ui", info.ui, ...args]) as Promise<Record<string, any>>;
+    const ui = (verb: string, ...args: string[]) => runControlHezuo(["ui", verb, "--ui", info.ui, ...args]) as Promise<Record<string, any>>;
     const target = async (name: string, roles: string[]) => {
       let matches: Array<[string, { name: string; role: string }]> = [];
       await expect.poll(async () => {
@@ -75,7 +75,7 @@ if (!enabled) console.log("skipping team lifecycle UI e2e: set OMB_UI_E2E=1 to i
     };
     const api = (path: string, method = "GET", body?: unknown) => request(path, { method,
       ...(body === undefined ? {} : { body: JSON.stringify(body) }) }, info.url);
-    const control = (...args: string[]) => runControlOmb([...args, "--url", info.url]);
+    const control = (...args: string[]) => runControlHezuo([...args, "--url", info.url]);
     const a = (await control("new-bot", "--name", "Researcher", "--section", "Research") as any).bot;
     const b = (await control("new-bot", "--name", "Engineer", "--section", "Engineering") as any).bot;
 
@@ -175,7 +175,7 @@ if (!enabled) console.log("skipping team lifecycle UI e2e: set OMB_UI_E2E=1 to i
     await manage("Launch");
     await expect.poll(snapshot, { timeout: 10_000 }).toContain("Edit Launch shared instructions");
     expect((await api("/api/section-context?section=Launch")).text).toBe("Research first, then build and review.");
-    const screenshot = join(ROOT, ".omb-scratch", "verify-evidence", "team-lifecycle.png");
+    const screenshot = join(ROOT, ".hezuo-scratch", "verify-evidence", "team-lifecycle.png");
     await ui("screenshot", "--out", screenshot);
     await teamMenu("Launch");
     await click("Delete department");
@@ -350,9 +350,9 @@ if (!enabled) console.log("skipping team lifecycle UI e2e: set OMB_UI_E2E=1 to i
   } finally {
     if (!succeeded && fixtureHandle && fixtureLog) {
       try {
-        const result = await runControlOmb(["ui", "snapshot", "--ui", fixtureHandle]);
+        const result = await runControlHezuo(["ui", "snapshot", "--ui", fixtureHandle]);
         writeFileSync(`${fixtureLog}.team-lifecycle-failure.json`, JSON.stringify(result, null, 2));
-        await runControlOmb(["ui", "screenshot", "--ui", fixtureHandle, "--out", `${fixtureLog}.team-lifecycle-failure.png`]);
+        await runControlHezuo(["ui", "screenshot", "--ui", fixtureHandle, "--out", `${fixtureLog}.team-lifecycle-failure.png`]);
         console.info(JSON.stringify({ failureEvidence: `${fixtureLog}.team-lifecycle-failure.json` }));
       } catch { /* The original failure remains authoritative if the browser stopped. */ }
     }

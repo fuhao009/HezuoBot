@@ -1,4 +1,3 @@
-import "./hezuo-preferences-migration";
 import type { BotSettingsSection } from "@/state/store";
 
 export const LAST_BOT_SECTION_KEY = "hezuo.lastBotSection.v1";

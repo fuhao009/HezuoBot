@@ -109,7 +109,7 @@ const VERBS: Record<string, { options: ParseArgsOptionsConfig; positionals: numb
 
 export const HEADLESS_VERBS: ReadonlySet<string> = new Set(Object.keys(VERBS).map((verb) => verb.split(" ")[0]!));
 
-/** Verbs that change something; control-omb refuses them on a discovered server. */
+/** Verbs that change something; control-hezuo refuses them on a discovered server. */
 export const MUTATING_VERBS: ReadonlySet<string> = new Set([
   "send", "send-channel", "run", "interrupt", "new-bot", "new-channel", "set-model", "edit", "team apply", "engine set",
 ]);

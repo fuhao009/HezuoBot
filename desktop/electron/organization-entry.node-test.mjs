@@ -2,13 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
-import { patchOrganizationUpdater } from "../../scripts/patch-organization-updater.mjs";
 import environments from "./environments.cjs";
 import localOrigin from "./local-origin.cjs";
 import { createOrganizationEntry, isOrganizationDeepLink, takeOrganizationDeepLink, organizationRestartIntent, withOrganizationRestartIntent, withoutOrganizationRestartIntent } from "./organization-entry.mjs";
 
 const remote = { id: "old", name: "Old cloud", origin: "https://old.example" };
-const companion = { endpoint: "https://c-old.openmausbot.com", serverName: "Old computer", deviceId: "device-a" };
+const companion = { endpoint: "https://c-old.example.test", serverName: "Old computer", deviceId: "device-a" };
 function fixture({ activeId = "old", remoteAccess = null, restartIntent = false, accepted = true } = {}) {
   const state = { environments: { activeId, environments: [remote] }, remoteAccess, restartIntent };
   const calls = [];
@@ -25,8 +24,8 @@ function fixture({ activeId = "old", remoteAccess = null, restartIntent = false,
 }
 
 test("the organisation protocol is a fixed action without URL routing or credentials", () => {
-  assert.equal(isOrganizationDeepLink("hezuo://organization"), true);
-  for (const value of [null, {}, "", "hezuo://organization/", "hezuo://organization?", "hezuo://organization#", "hezuo://organization?url=https://old.example", "hezuo://organization#token=secret", "hezuo://organization/other", "hezuo://user@organization", "hezuo://organization:443", "hezuo://organization.evil", "https://organization", " hezuo://organization", "hezuo://%6frganization"]) {
+  assert.equal(isOrganizationDeepLink("hezuobot://organization"), true);
+  for (const value of [null, {}, "", "hezuobot://organization/", "hezuobot://organization?", "hezuobot://organization#", "hezuobot://organization?url=https://old.example", "hezuobot://organization#token=secret", "hezuobot://organization/other", "hezuobot://user@organization", "hezuobot://organization:443", "hezuobot://organization.evil", "https://organization", " hezuobot://organization", "hezuobot://%6frganization"]) {
     assert.equal(isOrganizationDeepLink(value), false);
   }
 });
@@ -38,8 +37,8 @@ test("local entry opens Settings without enrollment or persistence", async () =>
 });
 
 test("consuming a launch action prevents it replaying on a later restart without changing other arguments", () => {
-  const original = ["/Applications/Hezuo", "--profile=fixture", "hezuo://organization?ignored", "hezuo://install/example"];
-  const argv = [...original, "hezuo://organization", "hezuo://organization"];
+  const original = ["/Applications/HezuoBot", "--profile=fixture", "hezuobot://organization?ignored", "hezuobot://install/example"];
+  const argv = [...original, "hezuobot://organization", "hezuobot://organization"];
   assert.equal(takeOrganizationDeepLink(argv), true);
   assert.deepEqual(argv, original);
   assert.equal(takeOrganizationDeepLink(argv), false, "the action is consumed exactly once");
@@ -50,7 +49,7 @@ test("desktop relaunch accepts every platform once, guards its sender, and prese
   const main = readFileSync(new URL("./main.mjs", import.meta.url), "utf8");
   const source = main.slice(main.indexOf('ipcMain.handle("desktop:relaunch"'), main.indexOf("const talk = installTalk("))
     + main.slice(main.indexOf("function requireMainWindowSender("), main.indexOf('ipcMain.handle("desktop-remote:state"'));
-  const argv = ["/fixture/Hezuo", "--fixture", "hezuo://organization", "hezuo://organization?ignored"];
+  const argv = ["/fixture/HezuoBot", "--fixture", "hezuobot://organization", "hezuobot://organization?ignored"];
   takeOrganizationDeepLink(argv);
   const origin = "http://127.0.0.1:48995";
   localOrigin.setLocalOrigin(origin);
@@ -84,24 +83,7 @@ test("desktop relaunch accepts every platform once, guards its sender, and prese
     assert.equal(timers.length, 1, `${platform}: repeated calls schedule only one restart`);
     assert.deepEqual(calls, [], "the IPC response precedes normal shutdown");
     timers[0]();
-    assert.deepEqual(calls, [["--fixture", "hezuo://organization?ignored"], "quit"]);
-  }
-});
-
-test("the shipped updater adapter explicitly omits only the fixed action and its reproducible patch fails closed", () => {
-  const before = "      relaunch() {\n        this.app.relaunch();\n      }";
-  const patched = patchOrganizationUpdater(before);
-  // Git may check the vendored bundle out with CRLF on Windows.
-  const bundle = readFileSync(new URL("./vendor/electron-updater.cjs", import.meta.url), "utf8").replace(/\r\n/g, "\n");
-  assert.ok(bundle.includes(patched));
-  const calls = [];
-  const argv = ["/fixture/Hezuo", "--fixture", "hezuo://organization", "hezuo://organization?ignored"];
-  runInNewContext(`({ app, ${patched} }).relaunch();`, {
-    process: { argv }, app: { relaunch: options => calls.push(options.args) },
-  });
-  assert.deepEqual(calls, [["--fixture", "hezuo://organization?ignored"]]);
-  for (const changed of ["", `${before}\n${before}`, patched]) {
-    assert.throws(() => patchOrganizationUpdater(changed), /to patch, found/);
+    assert.deepEqual(calls, [["--fixture", "hezuobot://organization?ignored"], "quit"]);
   }
 });
 
@@ -211,12 +193,35 @@ test("native entry checks owned server readiness before creating, sending to, or
   }
 });
 
-test("startup delivers a pending organisation action before default navigation and falls back after cancellation", () => {
+test("startup delivers a pending organisation action before default navigation and falls back after cancellation", async () => {
   const main = readFileSync(new URL("./main.mjs", import.meta.url), "utf8");
-  const startup = main.slice(main.indexOf("  let restoredOrganizationEntry = false;"), main.indexOf("  // Reconcile incomplete setup"));
-  assert.ok(startup.indexOf("await deliverOrganizationEntry()") < startup.indexOf("await showHome()"));
-  // A launch from the login item lending added opens no window: lending runs out of sight until the person opens it.
-  assert.match(startup, /if \(!hiddenStart && !restoredOrganizationEntry && !deliveredOrganizationEntry && !deliveredCloudEntry\) await showHome\(\);/);
+  const from = main.indexOf("  let restoredOrganizationEntry = false;");
+  const to = main.indexOf("  refreshApplicationMenu();", from);
+  assert.ok(from >= 0 && to > from, "organisation startup wiring must be present");
+  const startup = main.slice(from, to);
+  for (const restored of [false, true]) {
+    for (const delivered of [false, true]) {
+      for (const hiddenStart of [false, true]) {
+        const calls = [];
+        const context = {
+          hiddenStart, organizationEntryReady: false,
+          workspaceMenuAction: async action => { await action(); },
+          organizationEntry: { restore: async () => { calls.push("restore"); return restored; } },
+          deliverOrganizationEntry: async () => {
+            assert.equal(context.organizationEntryReady, true);
+            calls.push("deliver");
+            return delivered;
+          },
+          showLocalWindow: () => { calls.push("show"); },
+        };
+        await runInNewContext(`(async () => { ${startup} })()`, context);
+        // A cancelled action falls back locally; restored/delivered actions own navigation.
+        // Login-item lending stays windowless even when no organisation action was delivered.
+        assert.deepEqual(calls, !hiddenStart && !restored && !delivered
+          ? ["restore", "deliver", "show"] : ["restore", "deliver"]);
+      }
+    }
+  }
 });
 
 test("concurrent links share one confirmation and stale confirmations cannot change a new selection", async () => {

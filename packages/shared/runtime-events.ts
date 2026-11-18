@@ -8,6 +8,9 @@ export type InstanceId = string;
 export type ThreadId = string;
 export type TurnId = string;
 
+/** Approval evidence only: never the browser URL's credentials, path, query or fragment. */
+export interface BrowserApprovalTarget { operation: "open"; origin: string }
+
 export interface ModelVariantOption {
   id: string;
   label: string;
@@ -129,6 +132,9 @@ export type RuntimeEvent = RuntimeEventBase &
         requestType: "permission" | "question";
         tool: string;
         summary: string;
+        /** The actual model tool call awaiting this request, not the approval request ID. */
+        toolCallId?: string;
+        browserTarget?: BrowserApprovalTarget;
         /** Complete native shell input and its effective working directory.
          * Used for exact-command grants; never reconstructed from a display
          * summary, tool title, or argv. Absent when either value is unknown. */

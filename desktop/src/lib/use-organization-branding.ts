@@ -4,8 +4,8 @@ import { parseOrganizationBranding } from "../../electron/organization-branding.
 
 /** Native enrollment only: never apply this computer's branding to a remote workspace. */
 export function useOrganizationBranding() {
-  const ogb = typeof window === "undefined" ? undefined : window.ogb;
-  const bridge = ogb?.remoteClient?.active ? undefined : ogb?.organization;
+  const hezuo = typeof window === "undefined" ? undefined : window.hezuo;
+  const bridge = hezuo?.remoteClient?.active ? undefined : hezuo?.organization;
   const [state, setState] = useState<ManagedDesktopState | null>(null);
   useEffect(() => {
     let active = true, revision = 0;

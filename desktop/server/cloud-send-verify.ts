@@ -5,7 +5,7 @@
 // Known open risk: an answer lets whoever holds the owner's session test guesses at a weak saved password offline.
 import { createHmac } from "node:crypto";
 
-import { itemKey } from "../electron/cloud-send-parts.mjs";
+import { itemKey } from "../electron/credential-fingerprint-keys.mjs";
 import { canonicalJson } from "../../packages/shared/package-format.ts";
 import type { LoginStore } from "./login-store.ts";
 

@@ -1,21 +1,14 @@
 // The config pins one deliberately unknown driver, so the suite is deterministic with or without agent CLIs installed.
-import { HIGHLEVEL_TOOLS } from "./highlevel/tools.js";
 import { spawn, type ChildProcess } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { once } from "node:events";
 import { createServer, request, type Server } from "node:http";
 import { connect, type Socket } from "node:net";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, symlinkSync, truncateSync, utimesSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, statSync, symlinkSync, truncateSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { DatabaseSync } from "node:sqlite";
-import {
-  Aes256Gcm,
-  CipherSuite,
-  DhkemP256HkdfSha256,
-  HkdfSha256,
-} from "@hpke/core";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
@@ -29,11 +22,6 @@ import { DEFAULT_MASCOT_BODY } from "../../packages/shared/mascot-bodies.ts";
 import { readHandoffs } from "./testing/handoff-rows.ts";
 import { FILE_MAX_BYTES, IMAGE_MAX_BYTES } from "./attachments.ts";
 import { computerPrompt, SIGN_IN_PROMPT } from "./system-prompt.ts";
-import {
-  PHONE_SECRET_INFO,
-  phoneSecretAAD,
-  type PhoneSecretContext,
-} from "./phone-secret.ts";
 
 const SERVER_DIR = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(SERVER_DIR, "..", "..");
@@ -69,44 +57,6 @@ async function mintTestCapability(
   return ((await response.json()) as { token: string }).token;
 }
 
-const PHONE_SECRET_TEST_IDENTITY = {
-  type: "hezuo:phone-secret-key",
-  version: 1,
-  keyId: "taWSR_nZ7ojlH_0Z3tar6Q",
-  privateKey: {
-    kty: "EC",
-    crv: "P-256",
-    x: "g8FDXb91acXUNkuxNk7dWDQ0aN2zn6On2HeOGOvZOjs",
-    y: "bJelczS0LM82rfXV68PmSJhz2ePosj3fL974XckCpDU",
-    d: "5B-SwYLGXc04u4v7YLpzFrwj2JjysBFaJevOPl3h3Zg",
-  },
-} as const;
-const phoneSecretTestSuite = new CipherSuite({
-  kem: new DhkemP256HkdfSha256(),
-  kdf: new HkdfSha256(),
-  aead: new Aes256Gcm(),
-});
-
-async function sealPhoneSecretForTest(
-  context: Omit<PhoneSecretContext, "encapsulatedKey" | "ciphertext">,
-  value: string,
-): Promise<PhoneSecretContext> {
-  const publicKey = await phoneSecretTestSuite.kem.deserializePublicKey(Buffer.concat([
-    Buffer.from([4]),
-    Buffer.from(PHONE_SECRET_TEST_IDENTITY.privateKey.x, "base64url"),
-    Buffer.from(PHONE_SECRET_TEST_IDENTITY.privateKey.y, "base64url"),
-  ]));
-  const sender = await phoneSecretTestSuite.createSenderContext({
-    recipientPublicKey: publicKey,
-    info: new TextEncoder().encode(PHONE_SECRET_INFO),
-  });
-  const ciphertext = await sender.seal(new TextEncoder().encode(value), phoneSecretAAD(context));
-  return {
-    ...context,
-    encapsulatedKey: Buffer.from(sender.enc).toString("base64url"),
-    ciphertext: Buffer.from(ciphertext).toString("base64url"),
-  };
-}
 
 let child: ChildProcess;
 /** stands in for the boat provider so config saving never touches the network */
@@ -190,7 +140,7 @@ const managedBoatNameForFixture = (botId: string): string => {
   const environmentScope = createHash("sha256").update(environmentId).digest("hex").slice(0, 12);
   const botPrefix = botId.slice(0, 8).toLowerCase().replace(/[^a-z0-9]/g, "") || "bot";
   const botHash = createHash("sha256").update(botId).digest("hex").slice(0, 6);
-  return `ogb-${environmentScope}-${botPrefix}-${botHash}`;
+  return `hezuo-${environmentScope}-${botPrefix}-${botHash}`;
 };
 
 const managedVpsNameForFixture = (botId: string): string => {
@@ -387,7 +337,7 @@ const statusWithHeaders = (headers: Record<string, string>): Promise<number> =>
   });
 
 beforeAll(async () => {
-  home = mkdtempSync(join(tmpdir(), "omb-api-test-"));
+  home = mkdtempSync(join(tmpdir(), "hezuo-api-test-"));
   writeFileSync(join(home, "fake-agent-browser"), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
   staticDir = join(home, "static");
   fakeClaudeDump = join(home, "fake-claude-dump.json");
@@ -923,11 +873,11 @@ beforeAll(async () => {
       res.writeHead(201, { "content-type": "application/json" });
       return res.end(JSON.stringify({
         session_id: "trs_config_test",
-        mcp: { type: "http", url: "https://app.composio.dev/tool_router/v3/trs_config_test/mcp" },
+        mcp: { type: "http", url: `http://127.0.0.1:${boatStubPort}/tool_router/v3/trs_config_test/mcp` },
         config: { user_id: body.user_id },
       }));
     }
-    if (req.url?.startsWith("/broker/v1/mcp")) {
+    if (req.url === "/tool_router/v3/trs_config_test/mcp") {
       let raw = "";
       for await (const chunk of req) raw += chunk;
       const body = raw ? JSON.parse(raw) : null;
@@ -1195,7 +1145,7 @@ beforeAll(async () => {
     const spawn = childProcess.spawn;
     const base = ${JSON.stringify(home)};
     childProcess.spawn = function(command, args, options) {
-      if (command !== process.env.OMB_AGENT_BROWSER_PATH) return spawn(command, args, options);
+      if (command !== process.env.HEZUO_AGENT_BROWSER_PATH) return spawn(command, args, options);
       const program = 'const fs = require("node:fs"); const path = require("node:path"); '
         + 'const base = ' + JSON.stringify(base) + '; '
         + 'fs.appendFileSync(path.join(base, "browser-calls.jsonl"), JSON.stringify({args: process.argv.slice(1), session: process.env.AGENT_BROWSER_SESSION}) + "\\\\n"); '
@@ -1227,20 +1177,17 @@ beforeAll(async () => {
       ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}),
       HOME: home,
       USERPROFILE: home,
-      OMB_PORT: String(PORT),
-      OMB_WEBHOOK_PORT: String(WEBHOOK_PORT),
-      OMB_EXTRA_PATH: fakeDockerDir,
-      OMB_BOAT_API: `http://127.0.0.1:${boatStubPort}`,
-      OMB_COMPOSIO_API: `http://127.0.0.1:${boatStubPort}/api/v3.1`,
-      OMB_COMPOSIO_TOOLKITS_API: `http://127.0.0.1:${boatStubPort}/api/v3`,
-      // A managed connected-apps broker on the stub, so relayed MCP frames are observable without any network.
-      OMB_COMPOSIO_BROKER_URL: `http://127.0.0.1:${boatStubPort}/broker`,
-      OMB_COMPOSIO_BROKER_TOKEN: "a".repeat(64),
-      OMB_STATIC_DIR: staticDir,
+      HEZUO_PORT: String(PORT),
+      HEZUO_WEBHOOK_PORT: String(WEBHOOK_PORT),
+      HEZUO_EXTRA_PATH: fakeDockerDir,
+      HEZUO_BOAT_API: `http://127.0.0.1:${boatStubPort}`,
+      HEZUO_COMPOSIO_API: `http://127.0.0.1:${boatStubPort}/api/v3.1`,
+      HEZUO_COMPOSIO_TOOLKITS_API: `http://127.0.0.1:${boatStubPort}/api/v3`,
+      HEZUO_STATIC_DIR: staticDir,
       // A stand-in binary the fake engines never run: the turn only has to mount it.
-      OMB_AGENT_BROWSER_PATH: join(home, "fake-agent-browser"),
+      HEZUO_AGENT_BROWSER_PATH: join(home, "fake-agent-browser"),
       // Production uses 15 s; the real timer path stays, but fast.
-      OMB_SSE_HEARTBEAT_MS: "50",
+      HEZUO_SSE_HEARTBEAT_MS: "50",
       FAKE_CLAUDE_MODE: "hang",
       FAKE_CLAUDE_DUMP: fakeClaudeDump,
       FAKE_CLAUDE_PROMPTS: fakeClaudePrompts,
@@ -1252,7 +1199,7 @@ beforeAll(async () => {
       FAKE_CLAUDE_SETUP_DUMP: setupAnswersDump,
       // the real CLI runs Manual for these even when asked for auto
       FAKE_CLAUDE_AUTO_UNAVAILABLE_MODELS: "claude-haiku-4-5",
-      OMB_TEST_INTERNAL_CAPABILITY_KEY: TEST_CAPABILITY_KEY,
+      HEZUO_TEST_INTERNAL_CAPABILITY_KEY: TEST_CAPABILITY_KEY,
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -1332,7 +1279,7 @@ describe("harness HTTP API", () => {
   });
 
   it("restores a live unanswered provider question after a server restart", async () => {
-    const isolatedHome = mkdtempSync(join(tmpdir(), "omb-question-restart-"));
+    const isolatedHome = mkdtempSync(join(tmpdir(), "hezuo-question-restart-"));
     const isolatedData = join(isolatedHome, ".hezuo");
     const isolatedStatic = join(isolatedHome, "static");
     const isolatedDump = join(isolatedHome, "fake-claude-dump.json");
@@ -1359,9 +1306,9 @@ describe("harness HTTP API", () => {
           ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}),
           HOME: isolatedHome,
           USERPROFILE: isolatedHome,
-          OMB_PORT: String(isolatedPort),
-          OMB_WEBHOOK_PORT: String(isolatedPort + 1),
-          OMB_STATIC_DIR: isolatedStatic,
+          HEZUO_PORT: String(isolatedPort),
+          HEZUO_WEBHOOK_PORT: String(isolatedPort + 1),
+          HEZUO_STATIC_DIR: isolatedStatic,
           FAKE_CLAUDE_MODE: "hang",
           FAKE_CLAUDE_DUMP: isolatedDump,
           FAKE_CLAUDE_FINISH_GATE: isolatedFinishGate,
@@ -1404,9 +1351,9 @@ describe("harness HTTP API", () => {
         .find((candidate: { id: string }) => candidate.id === bot.id)?.busy, { timeout: 5_000 }).toBe(true);
 
       const dump = z.object({
-        mcpConfig: z.object({ mcpServers: z.object({ ogb: z.object({ args: z.array(z.string()) }) }) }),
+        mcpConfig: z.object({ mcpServers: z.object({ hezuo: z.object({ args: z.array(z.string()) }) }) }),
       }).parse(await readJsonFileWhenReady(isolatedDump));
-      questionSocket = connect(dump.mcpConfig.mcpServers.ogb.args[1]!);
+      questionSocket = connect(dump.mcpConfig.mcpServers.hezuo.args[1]!);
       questionSocket.on("data", (chunk) => {
         socketBuffer += chunk.toString();
         const newline = socketBuffer.indexOf("\n");
@@ -1672,12 +1619,21 @@ describe("harness HTTP API", () => {
     expect(await statusWithHeaders({ origin: `http://[::1]:${PORT}` })).toBe(200);
   });
 
-  it("keeps the fleet screen behind the admin entitlement on the open-source edition", async () => {
-    const fleet = await api("GET", "/api/fleet");
-    expect(fleet.status).toBe(403);
-    expect(fleet.body.error).toContain("enterprise");
-    expect((await api("POST", "/api/fleet/workspaces", { slug: "acme", admins: ["a@b.test"] })).status).toBe(403);
-    expect((await api("DELETE", "/api/fleet/workspaces/acme")).status).toBe(403);
+  it("does not expose retired fleet management routes", async () => {
+    expect((await api("GET", "/api/fleet")).status).toBe(404);
+    expect((await api("POST", "/api/fleet/workspaces", { slug: "acme", admins: ["a@b.test"] })).status).toBe(404);
+    expect((await api("DELETE", "/api/fleet/workspaces/acme")).status).toBe(404);
+  });
+
+  it("does not expose retired standalone deployment routes", async () => {
+    const descriptor = await api("GET", "/.well-known/hezuo/environment");
+    expect(descriptor.body.capabilities).not.toHaveProperty("emailSignIn");
+    expect((await api("GET", `/.well-known/hezuo/domain-check/${"a".repeat(64)}`)).status).toBe(404);
+    expect((await api("POST", "/api/auth/email/start", { email: "owner@example.test" })).status).toBe(404);
+    expect((await api("POST", "/api/auth/email/verify", { email: "owner@example.test", code: "123456" })).status).toBe(404);
+    expect((await api("GET", "/api/settings/custom-domain")).status).toBe(404);
+    expect((await api("POST", "/api/settings/custom-domain", { domain: "example.test" })).status).toBe(404);
+    expect((await api("DELETE", "/api/settings/custom-domain")).status).toBe(404);
   });
 
   it("identifies itself on /api/health", async () => {
@@ -1696,9 +1652,9 @@ describe("harness HTTP API", () => {
       env: {
         ...(process.env.PATH ? { PATH: process.env.PATH } : {}),
         ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}),
-        OMB_DATA_DIR: join(home, ".hezuo"),
-        OMB_PORT: String(contenderPort),
-        OMB_STATIC_DIR: staticDir,
+        HEZUO_DATA_DIR: join(home, ".hezuo"),
+        HEZUO_PORT: String(contenderPort),
+        HEZUO_STATIC_DIR: staticDir,
       },
       stdio: ["ignore", "ignore", "pipe"],
     });
@@ -2520,11 +2476,11 @@ describe("harness HTTP API", () => {
       const dump = z.object({
         mcpConfig: z.object({
           mcpServers: z.object({
-            agents: z.object({ env: z.object({ OMB_COMMS_TOKEN: z.string() }) }),
+            agents: z.object({ env: z.object({ HEZUO_COMMS_TOKEN: z.string() }) }),
           }),
         }),
       }).parse(await readJsonFileWhenReady(fakeClaudeDump));
-      expect(dump.mcpConfig.mcpServers.agents.env.OMB_COMMS_TOKEN).toMatch(/^[a-f0-9]{48}$/);
+      expect(dump.mcpConfig.mcpServers.agents.env.HEZUO_COMMS_TOKEN).toMatch(/^[a-f0-9]{48}$/);
       expect((await api("POST", `/api/bots/${chief.id}/interrupt`)).status).toBe(200);
 
       const createOperator = async (fromThreadId: string, name: string, fromBotId = chief.id) => {
@@ -2779,7 +2735,7 @@ describe("harness HTTP API", () => {
         });
         return { status: response.status, body: await response.json() as { id?: string; error?: string } };
       };
-      const folder = mkdtempSync(join(tmpdir(), "omb-create-cwd-"));
+      const folder = mkdtempSync(join(tmpdir(), "hezuo-create-cwd-"));
       const landed = await create(`Folder operator ${chief.id}`, folder) as { status: number; body: { id?: string; state?: string; detail?: string } };
       expect(landed.body).toMatchObject({ state: "applied" });
       expect(landed.body.detail).toContain(`Working folder: "${folder}"`);
@@ -2889,11 +2845,11 @@ describe("harness HTTP API", () => {
     }
   });
 
-  it("lets only a Chief read the team library from its turn", async () => {
+  it("lets only a Chief read team setup metadata from its turn", async () => {
     const helper = (await api("POST", "/api/bots")).body.bot;
     try {
       const token = await mintTestCapability(BASE, helper.id, helper.threadId);
-      const response = await fetch(`${BASE}/api/internal/team-library`, { headers: { authorization: `Bearer ${token}` } });
+      const response = await fetch(`${BASE}/api/internal/team-setup-catalog`, { headers: { authorization: `Bearer ${token}` } });
       expect(response.status).toBe(403);
       expect(await response.json()).toEqual({ error: "Only an active Chief may plan team setup" });
     } finally {
@@ -3119,6 +3075,8 @@ describe("harness HTTP API", () => {
   });
 
   it("creates, patches, and deletes a bot", async () => {
+    // This CRUD case checks grant shape; connected-service validation has its own configured-project case.
+    expect((await api("PUT", "/api/config", { composio: { apiKey: "" } })).status).toBe(200);
     const created = await api("POST", "/api/bots");
     expect(created.status).toBe(201);
     const bot = created.body.bot;
@@ -3702,7 +3660,7 @@ describe("harness HTTP API", () => {
     const requestId = randomUUID();
     const section = `Park machine ${requestId.slice(0, 8)}`;
     // The main fixture runs the production ceiling (minutes); this test boots its own server with a seconds-scale cap.
-    const isolatedHome = mkdtempSync(join(tmpdir(), "omb-computer-wait-park-"));
+    const isolatedHome = mkdtempSync(join(tmpdir(), "hezuo-computer-wait-park-"));
     const isolatedData = join(isolatedHome, ".hezuo");
     const isolatedStatic = join(isolatedHome, "static");
     const isolatedPort = await freePortBlock([0, 1]);
@@ -3723,14 +3681,14 @@ describe("harness HTTP API", () => {
         ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}),
         HOME: isolatedHome,
         USERPROFILE: isolatedHome,
-        OMB_PORT: String(isolatedPort),
-        OMB_WEBHOOK_PORT: String(isolatedPort + 1),
-        OMB_STATIC_DIR: isolatedStatic,
-        OMB_BOAT_API: `http://127.0.0.1:${boatStubPort}`,
+        HEZUO_PORT: String(isolatedPort),
+        HEZUO_WEBHOOK_PORT: String(isolatedPort + 1),
+        HEZUO_STATIC_DIR: isolatedStatic,
+        HEZUO_BOAT_API: `http://127.0.0.1:${boatStubPort}`,
         FAKE_CLAUDE_MODE: "hang",
         FAKE_CLAUDE_PROMPTS: join(isolatedHome, "desktop-prompts.jsonl"),
         // seconds, not minutes: the point of this test is the computer cap firing
-        OMB_COMPUTER_WAIT_MAX_MS: "2000",
+        HEZUO_COMPUTER_WAIT_MAX_MS: "2000",
       },
       stdio: ["ignore", "pipe", "pipe"],
     });
@@ -3890,7 +3848,7 @@ describe("harness HTTP API", () => {
     const requestId = randomUUID();
     const section = `Park goal machine ${requestId.slice(0, 8)}`;
     // An isolated server with a seconds-scale computer wait ceiling, plus scripted coordinator replies.
-    const isolatedHome = mkdtempSync(join(tmpdir(), "omb-computer-wait-goal-"));
+    const isolatedHome = mkdtempSync(join(tmpdir(), "hezuo-computer-wait-goal-"));
     const isolatedData = join(isolatedHome, ".hezuo");
     const isolatedStatic = join(isolatedHome, "static");
     const isolatedPort = await freePortBlock([0, 1]);
@@ -3949,11 +3907,11 @@ describe("harness HTTP API", () => {
         ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}),
         HOME: isolatedHome,
         USERPROFILE: isolatedHome,
-        OMB_PORT: String(isolatedPort),
-        OMB_WEBHOOK_PORT: String(isolatedPort + 1),
-        OMB_STATIC_DIR: isolatedStatic,
-        OMB_BOAT_API: `http://127.0.0.1:${boatStubPort}`,
-        OMB_COMPUTER_WAIT_MAX_MS: "2000",
+        HEZUO_PORT: String(isolatedPort),
+        HEZUO_WEBHOOK_PORT: String(isolatedPort + 1),
+        HEZUO_STATIC_DIR: isolatedStatic,
+        HEZUO_BOAT_API: `http://127.0.0.1:${boatStubPort}`,
+        HEZUO_COMPUTER_WAIT_MAX_MS: "2000",
       },
       stdio: ["ignore", "pipe", "pipe"],
     });
@@ -5547,7 +5505,7 @@ describe("harness HTTP API", () => {
   });
 
   it("carries a Full bot's access across engines silently, and keeps Custom bots on Codex", async () => {
-    const isolatedHome = mkdtempSync(join(tmpdir(), "omb-trusted-mode-model-"));
+    const isolatedHome = mkdtempSync(join(tmpdir(), "hezuo-trusted-mode-model-"));
     const isolatedData = join(isolatedHome, ".hezuo");
     const isolatedStatic = join(isolatedHome, "static");
     const isolatedPort = await freePortBlock([0, 1]);
@@ -5595,9 +5553,9 @@ describe("harness HTTP API", () => {
         ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}),
         HOME: isolatedHome,
         USERPROFILE: isolatedHome,
-        OMB_PORT: String(isolatedPort),
-        OMB_WEBHOOK_PORT: String(isolatedPort + 1),
-        OMB_STATIC_DIR: isolatedStatic,
+        HEZUO_PORT: String(isolatedPort),
+        HEZUO_WEBHOOK_PORT: String(isolatedPort + 1),
+        HEZUO_STATIC_DIR: isolatedStatic,
         FAKE_CLAUDE_MODE: "hang",
         FAKE_CLAUDE_DUMP: join(isolatedHome, "fake-claude-dump.json"),
       },
@@ -5819,7 +5777,7 @@ describe("harness HTTP API", () => {
     expect(exported.body.team).not.toHaveProperty("room");
 
     const roomsBefore = (await api("GET", "/api/bots")).body.groups.length;
-    const folder = mkdtempSync(join(tmpdir(), "omb-project-"));
+    const folder = mkdtempSync(join(tmpdir(), "hezuo-project-"));
 
     const stream = await openSse(`${BASE}/api/events`);
     try {
@@ -6024,7 +5982,7 @@ describe("harness HTTP API", () => {
   });
 
   it("the scout reads a folder, proposes an importable team, and creates nothing until the human imports", async () => {
-    const folder = mkdtempSync(join(tmpdir(), "omb-scout-"));
+    const folder = mkdtempSync(join(tmpdir(), "hezuo-scout-"));
     writeFileSync(join(folder, "README.md"), "# Demo Shop\n\nA storefront demo.\n");
     writeFileSync(
       join(folder, "package.json"),
@@ -6261,9 +6219,9 @@ describe("harness HTTP API", () => {
       rmSync(fakeClaudeDump, { force: true });
       expect((await api("POST", `/api/bots/${bot.id}/messages`, { text: "stay active" })).status).toBe(202);
       const dump = await readJsonFileWhenReady<{
-        mcpConfig: { mcpServers: { agents: { env: { OMB_COMMS_TOKEN: string } } } };
+        mcpConfig: { mcpServers: { agents: { env: { HEZUO_COMMS_TOKEN: string } } } };
       }>(fakeClaudeDump);
-      const token = dump.mcpConfig.mcpServers.agents.env.OMB_COMMS_TOKEN;
+      const token = dump.mcpConfig.mcpServers.agents.env.HEZUO_COMMS_TOKEN;
       const requested = await fetch(`${BASE}/api/internal/request-credential`, {
         method: "POST",
         headers: {
@@ -6292,39 +6250,6 @@ describe("harness HTTP API", () => {
       );
       expect(directCard).not.toHaveProperty("from");
 
-      const encryptedEnvelope = {
-        version: 1,
-        threadId: bot.threadId,
-        keyId: "A".repeat(22),
-        deviceId: "phone-1",
-        target: "openaiImageApiKey",
-        requestKey: directCard.secret.requestKey,
-        encapsulatedKey: "A".repeat(87),
-        ciphertext: "A".repeat(23),
-      };
-      const directProvision = await fetch(
-        `${BASE}/api/bots/${bot.id}/secret-cards/${messageId}/provide`,
-        {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify(encryptedEnvelope),
-        },
-      );
-      expect(directProvision.status).toBe(403);
-
-      const developmentProvision = await fetch(
-        `${BASE}/api/bots/${bot.id}/secret-cards/${messageId}/provide`,
-        {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            "x-hezuo-companion": "1",
-            "x-hezuo-companion-device": "phone-1",
-          },
-          body: JSON.stringify(encryptedEnvelope),
-        },
-      );
-      expect(developmentProvision.status).toBe(503);
 
       await releaseTurn(bot.id);
       const originalUserMessage = directState?.messages.find(
@@ -6743,369 +6668,6 @@ describe("harness HTTP API", () => {
     }
   });
 
-  it("keeps credential-card ownership stable while an encrypted phone save is in flight", async () => {
-    const isolatedHome = mkdtempSync(join(tmpdir(), "omb-phone-secret-races-"));
-    const isolatedData = join(isolatedHome, ".hezuo");
-    const isolatedStatic = join(isolatedHome, "static");
-    const isolatedGate = join(isolatedHome, "credential-gate");
-    const isolatedPort = await freePortBlock([0, 1]);
-    const isolatedDump = join(isolatedHome, "fake-claude-dump.json");
-    const releaseFile = join(isolatedGate, "release");
-    mkdirSync(join(isolatedStatic, "assets"), { recursive: true });
-    mkdirSync(isolatedData, { recursive: true });
-    mkdirSync(isolatedGate, { recursive: true });
-    writeFileSync(join(isolatedStatic, "index.html"), "<!doctype html><title>Phone secret race test</title>");
-    writeFileSync(join(isolatedStatic, "assets", "smoke.css"), "body{}");
-    writeFileSync(join(isolatedData, "config.json"), JSON.stringify({
-      instances: {
-        claude: { driver: "claudeAgent", displayName: "Fixture Claude", config: { cli: FAKE_CLAUDE_CLI } },
-      },
-    }));
-
-    // Models Electron's private utility-process bridge: both saves pause after decryption, before the config commit.
-    const desktopPrelude = `data:text/javascript,${encodeURIComponent(`
-      const { existsSync, writeFileSync } = await import("node:fs");
-      const { join } = await import("node:path");
-      const identity = ${JSON.stringify(PHONE_SECRET_TEST_IDENTITY)};
-      const gate = ${JSON.stringify(isolatedGate)};
-      const release = ${JSON.stringify(releaseFile)};
-      const { EventEmitter } = await import("node:events");
-      const messages = new EventEmitter();
-      let saves = Promise.resolve();
-      const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-      Object.defineProperty(process, "parentPort", {
-        value: {
-          on(event, callback) {
-            if (event !== "message") return;
-            messages.on(event, callback);
-            queueMicrotask(() => callback({ data: identity }));
-          },
-          postMessage(message) {
-            if (message?.type !== "hezuo:phone-secret-save") return;
-            writeFileSync(join(gate, message.requestId + ".started"), message.target);
-            saves = saves.then(async () => {
-              while (!existsSync(release)) await delay(10);
-              try {
-                const patch = message.target === "openaiImageApiKey"
-                  ? { imageGen: { key: message.value } }
-                  : null;
-                if (!patch) throw new Error("unsupported test credential target");
-                const response = await fetch(
-                  "http://127.0.0.1:" + process.env.OMB_PORT + "/api/config?secretStorage=external",
-                  {
-                    method: "PUT",
-                    headers: { "content-type": "application/json" },
-                    body: JSON.stringify(patch),
-                  },
-                );
-                const body = await response.json().catch(() => null);
-                if (!response.ok) throw new Error(body?.error || "credential config failed");
-                messages.emit("message", { data: {
-                  type: "hezuo:phone-secret-save-result",
-                  requestId: message.requestId,
-                  ok: true,
-                } });
-              } catch (error) {
-                messages.emit("message", { data: {
-                  type: "hezuo:phone-secret-save-result",
-                  requestId: message.requestId,
-                  ok: false,
-                  error: error instanceof Error ? error.message : String(error),
-                } });
-              }
-            });
-          },
-        },
-      });
-    `)}`;
-    let isolatedStderr = "";
-    const isolatedChild = spawn(
-      process.execPath,
-      ["--import", desktopPrelude, join(SERVER_DIR, "index.ts")],
-      {
-        cwd: ROOT,
-        env: {
-          ...(process.env.PATH ? { PATH: process.env.PATH } : {}),
-          ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}),
-          HOME: isolatedHome,
-          USERPROFILE: isolatedHome,
-          OMB_PORT: String(isolatedPort),
-          OMB_WEBHOOK_PORT: String(isolatedPort + 1),
-          OMB_STATIC_DIR: isolatedStatic,
-          FAKE_CLAUDE_MODE: "hang",
-          FAKE_CLAUDE_DUMP: isolatedDump,
-          OMB_TEST_INTERNAL_CAPABILITY_KEY: TEST_CAPABILITY_KEY,
-        },
-        stdio: ["ignore", "pipe", "pipe"],
-      },
-    );
-    isolatedChild.stderr!.on("data", (chunk) => (isolatedStderr += chunk));
-    const isolatedApi = async (method: string, path: string, body?: unknown): Promise<{
-      status: number;
-      body: any;
-    }> => {
-      const response = await fetch(`http://127.0.0.1:${isolatedPort}${path}`, {
-        method,
-        headers: body ? { "content-type": "application/json" } : undefined,
-        body: body ? JSON.stringify(body) : undefined,
-      });
-      return { status: response.status, body: await response.json() };
-    };
-    const requestCredential = async (
-      botId: string,
-      threadId: string,
-    ): Promise<{ messageId: string }> => {
-      const token = await mintTestCapability(`http://127.0.0.1:${isolatedPort}`, botId, threadId);
-      const response = await fetch(`http://127.0.0.1:${isolatedPort}/api/internal/request-credential`, {
-        method: "POST",
-        headers: {
-          authorization: `Bearer ${token}`,
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          fromBotId: botId,
-          fromThreadId: threadId,
-          credentialId: "openaiImageApiKey",
-          reason: "needed for this task",
-        }),
-      });
-      expect(response.status).toBe(201);
-      return response.json() as Promise<{ messageId: string }>;
-    };
-    const provideRequests: Array<Promise<Response>> = [];
-    const earlyProvisionStatuses: number[] = [];
-
-    try {
-      await waitForIsolatedServer(isolatedChild, isolatedPort, () => isolatedStderr);
-      const createBot = async () => (await isolatedApi("POST", "/api/bots", {
-        modelSelection: { instanceId: "claude", model: "claude-sonnet-5" },
-        requireAvailableModel: true,
-      })).body.bot;
-      const direct = await createBot();
-      const channelOwner = await createBot();
-      const channelPeer = await createBot();
-      expect((await isolatedApi("PATCH", `/api/bots/${channelPeer.id}`, { chiefOfStaff: true })).status).toBe(200);
-      const roomChiefToken = await mintTestCapability(`http://127.0.0.1:${isolatedPort}`, channelPeer.id, channelPeer.threadId);
-
-      const directOriginalThread = direct.threadId as string;
-      const directAlternate = await isolatedApi("POST", `/api/bots/${direct.id}/tasks`, { title: "Alternate" });
-      expect(directAlternate.status).toBe(201);
-      expect((await isolatedApi(
-        "POST",
-        `/api/bots/${direct.id}/tasks/${directOriginalThread}`,
-      )).status).toBe(200);
-
-      const group = (await isolatedApi("POST", "/api/groups", {
-        name: "Credential ownership",
-        memberIds: [channelOwner.id, channelPeer.id],
-        setup: { bulletin: "", defaultResponder: { kind: "member", botId: channelOwner.id } },
-      })).body.group;
-      const groupOriginalThread = group.threadId as string;
-      const groupAlternate = await isolatedApi("POST", `/api/groups/${group.id}/tasks`, { title: "Alternate" });
-      expect(groupAlternate.status).toBe(201);
-      expect((await isolatedApi(
-        "POST",
-        `/api/groups/${group.id}/tasks/${groupOriginalThread}`,
-      )).status).toBe(200);
-
-      expect((await isolatedApi(
-        "POST",
-        `/api/bots/${direct.id}/messages`,
-        { text: "request a private key" },
-      )).status).toBe(202);
-      await readJsonFileWhenReady(isolatedDump);
-      const directRequest = await requestCredential(direct.id, directOriginalThread);
-      expect((await isolatedApi("POST", `/api/bots/${direct.id}/interrupt`, {})).status).toBe(200);
-      await expect.poll(async () => {
-        const state = (await isolatedApi("GET", "/api/bots?messages=0")).body;
-        return state.bots.find((bot: { id: string }) => bot.id === direct.id)?.busy;
-      }).toBe(false);
-      expect((await isolatedApi("POST", `/api/groups/${group.id}/messages`, { text: "request a private key in the room" })).status).toBe(202);
-      await expect.poll(async () => (await isolatedApi("GET", "/api/bots?messages=0")).body.groups
-        .find((candidate: { id: string }) => candidate.id === group.id)?.busyBotId, { timeout: 10_000 }).toBe(channelOwner.id);
-      const groupRequest = await requestCredential(channelOwner.id, groupOriginalThread);
-      expect((await isolatedApi("POST", `/api/groups/${group.id}/interrupt`, {})).status).toBe(200);
-      await expect.poll(async () => {
-        const state = (await isolatedApi("GET", "/api/bots?messages=0")).body;
-        return {
-          working: state.groups.find((candidate: { id: string }) => candidate.id === group.id)?.working,
-          busy: state.bots.find((bot: { id: string }) => bot.id === channelOwner.id)?.busy,
-        };
-      }, { timeout: 10_000 }).toEqual({ working: false, busy: false });
-
-      const state = (await isolatedApi("GET", "/api/bots?messages=20")).body;
-      const directState = state.bots.find((bot: { id: string }) => bot.id === direct.id);
-      const directCard = directState.messages.find(
-        (message: { id: string }) => message.id === directRequest.messageId,
-      );
-      const directUser = directState.messages.find(
-        (message: { role: string; text?: string }) => message.role === "user" && message.text === "request a private key",
-      );
-      const groupCard = state.groups
-        .find((candidate: { id: string }) => candidate.id === group.id).messages
-        .find((message: { id: string }) => message.id === groupRequest.messageId);
-      expect(directCard?.secret?.requestKey).toEqual(expect.any(String));
-      expect(directUser?.id).toEqual(expect.any(String));
-      expect(groupCard).toMatchObject({ from: { botId: channelOwner.id } });
-
-      const deviceId = "paired-phone";
-      const directEnvelope = await sealPhoneSecretForTest({
-        version: 1,
-        keyId: PHONE_SECRET_TEST_IDENTITY.keyId,
-        deviceId,
-        botId: direct.id,
-        threadId: directOriginalThread,
-        messageId: directRequest.messageId,
-        target: "openaiImageApiKey",
-        requestKey: directCard.secret.requestKey,
-      }, "sk-test-direct");
-      const groupEnvelope = await sealPhoneSecretForTest({
-        version: 1,
-        keyId: PHONE_SECRET_TEST_IDENTITY.keyId,
-        deviceId,
-        botId: channelOwner.id,
-        threadId: groupOriginalThread,
-        messageId: groupRequest.messageId,
-        target: "openaiImageApiKey",
-        requestKey: groupCard.secret.requestKey,
-      }, "sk-test-channel");
-      const provide = (botId: string, messageId: string, envelope: PhoneSecretContext) => fetch(
-        `http://127.0.0.1:${isolatedPort}/api/bots/${botId}/secret-cards/${messageId}/provide`,
-        {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            "x-hezuo-companion": "1",
-            "x-hezuo-companion-device": deviceId,
-          },
-          body: JSON.stringify(Object.fromEntries(
-            Object.entries(envelope).filter(([key]) => key !== "botId" && key !== "messageId"),
-          )),
-        },
-      );
-      // On a third bot, before any credential is configured, so the ownership fixtures below keep their cards.
-      const raceBot = await createBot();
-      const raceThread = raceBot.threadId as string;
-      const supersededRequest = await requestCredential(raceBot.id, raceThread);
-      const raceCard = async (messageId: string) => (await isolatedApi("GET", "/api/bots?messages=20")).body.bots
-        .find((bot: { id: string }) => bot.id === raceBot.id).messages
-        .find((message: { id: string }) => message.id === messageId);
-      const supersededEnvelope = await sealPhoneSecretForTest({
-        version: 1,
-        keyId: PHONE_SECRET_TEST_IDENTITY.keyId,
-        deviceId,
-        botId: raceBot.id,
-        threadId: raceThread,
-        messageId: supersededRequest.messageId,
-        target: "openaiImageApiKey",
-        requestKey: (await raceCard(supersededRequest.messageId)).secret.requestKey,
-      }, "sk-test-superseded");
-      const supersededProvide = provide(raceBot.id, supersededRequest.messageId, supersededEnvelope);
-      await expect.poll(() => readdirSync(isolatedGate).filter((name) => name.endsWith(".started")).length).toBe(1);
-      const freshRequest = await requestCredential(raceBot.id, raceThread);
-      writeFileSync(releaseFile, "release");
-      const rejected = await supersededProvide;
-      expect(rejected.status).toBe(409);
-      expect(await rejected.json()).toMatchObject({ error: expect.stringMatching(/superseded by a newer one/i) });
-      expect((await raceCard(supersededRequest.messageId)).secret).toMatchObject({ superseded: true });
-      expect((await raceCard(supersededRequest.messageId)).secret.provided).not.toBe(true);
-      const freshEnvelope = await sealPhoneSecretForTest({
-        version: 1,
-        keyId: PHONE_SECRET_TEST_IDENTITY.keyId,
-        deviceId,
-        botId: raceBot.id,
-        threadId: raceThread,
-        messageId: freshRequest.messageId,
-        target: "openaiImageApiKey",
-        requestKey: (await raceCard(freshRequest.messageId)).secret.requestKey,
-      }, "sk-test-fresh-card");
-      const freshProvide = await provide(raceBot.id, freshRequest.messageId, freshEnvelope);
-      expect(freshProvide.status).toBe(200);
-      expect(await freshProvide.json()).toEqual({ provided: true, resumed: false });
-      // Hand the gate back: the ownership fixtures' saves must start held, with no started markers.
-      for (const name of readdirSync(isolatedGate)) rmSync(join(isolatedGate, name));
-      provideRequests.push(...[
-        provide(direct.id, directRequest.messageId, directEnvelope),
-        provide(channelOwner.id, groupRequest.messageId, groupEnvelope),
-      ].map((request) => request.then((response) => {
-        earlyProvisionStatuses.push(response.status);
-        return response;
-      })));
-      await expect.poll(
-        () => ({
-          started: readdirSync(isolatedGate).filter((name) => name.endsWith(".started")).length,
-          earlyProvisionStatuses,
-        }),
-        { timeout: 20_000 },
-      ).toEqual({ started: 2, earlyProvisionStatuses: [] });
-
-      const expectLocked = async (result: Promise<{ status: number; body: any }>) => {
-        const response = await result;
-        expect(response.status).toBe(409);
-        expect(response.body.error).toMatch(/securely saving a credential/i);
-      };
-      await expectLocked(isolatedApi("POST", `/api/bots/${direct.id}/messages/${directUser.id}/edit`, {
-        text: "rewind under the save",
-      }));
-      await expectLocked(isolatedApi("POST", `/api/bots/${direct.id}/active-branch`, {
-        messageId: directRequest.messageId,
-      }));
-      await expectLocked(isolatedApi("POST", `/api/bots/${direct.id}/tasks`, { title: "Race" }));
-      await expectLocked(isolatedApi(
-        "POST",
-        `/api/bots/${direct.id}/tasks/${directAlternate.body.task.threadId}`,
-      ));
-      await expectLocked(isolatedApi("DELETE", `/api/bots/${direct.id}/tasks/${directOriginalThread}`));
-      await expectLocked(isolatedApi("DELETE", `/api/bots/${direct.id}`));
-
-      await expectLocked(isolatedApi("POST", `/api/groups/${group.id}/tasks`, { title: "Race" }));
-      await expectLocked(isolatedApi(
-        "POST",
-        `/api/groups/${group.id}/tasks/${groupAlternate.body.task.threadId}`,
-      ));
-      await expectLocked(isolatedApi("DELETE", `/api/groups/${group.id}/tasks/${groupOriginalThread}`));
-      await expectLocked(isolatedApi("PATCH", `/api/groups/${group.id}`, {
-        memberIds: [channelPeer.id],
-      }));
-      const chiefRosterChange = await chiefRoomRequest(`http://127.0.0.1:${isolatedPort}`, roomChiefToken, "manage-room", {
-        roomId: group.id, action: "set_members", memberIds: [channelOwner.id, channelPeer.id],
-      });
-      expect(chiefRosterChange.status).toBe(409);
-      expect(chiefRosterChange.body.error).toMatch(/securely saving a credential/i);
-      await expectLocked(isolatedApi("DELETE", `/api/groups/${group.id}`));
-      await expectLocked(isolatedApi("DELETE", `/api/bots/${channelOwner.id}`));
-      await expectLocked(isolatedApi("DELETE", `/api/bots/${channelPeer.id}`));
-
-      writeFileSync(releaseFile, "release");
-      const completed = await Promise.all(provideRequests);
-      for (const response of completed) expect(response.status).toBe(200);
-      expect(await completed[0]!.json()).toEqual({ provided: true, resumed: false });
-      expect(await completed[1]!.json()).toEqual({ provided: true, resumed: false });
-
-      const exactRetry = await provide(direct.id, directRequest.messageId, directEnvelope);
-      expect(exactRetry.status).toBe(200);
-      expect(await exactRetry.json()).toEqual({ provided: true, resumed: false });
-      const replacementEnvelope = await sealPhoneSecretForTest({
-        version: 1,
-        keyId: PHONE_SECRET_TEST_IDENTITY.keyId,
-        deviceId,
-        botId: direct.id,
-        threadId: directOriginalThread,
-        messageId: directRequest.messageId,
-        target: "openaiImageApiKey",
-        requestKey: directCard.secret.requestKey,
-      }, "sk-test-replacement");
-      const replacement = await provide(direct.id, directRequest.messageId, replacementEnvelope);
-      expect(replacement.status).toBe(409);
-      expect(await replacement.json()).toMatchObject({ error: expect.stringMatching(/already completed/i) });
-    } finally {
-      writeFileSync(releaseFile, "release");
-      await Promise.allSettled(provideRequests);
-      await waitForExit(isolatedChild, { signal: "SIGTERM" });
-      await removeTempDir(isolatedHome);
-    }
-    expectStoppedTestServerCleanly(isolatedChild, isolatedStderr);
-  }, 45_000);
 
   it("reports a failed routine once, not twice", async () => {
     // A routine reports through onDispatchError too, so this pins the count, not merely the presence.
@@ -7843,14 +7405,14 @@ describe("harness HTTP API", () => {
 
   it("a new bot greets its person by first name and is announced in its chosen look, or a fresh one, from the first frame", async () => {
     const before = (await api("GET", "/api/config")).body.profile?.name ?? "";
-    expect((await api("PUT", "/api/config", { profile: { name: "Milind Soni" } })).status).toBe(200);
+    expect((await api("PUT", "/api/config", { profile: { name: "Alex Soni" } })).status).toBe(200);
     const stream = await openSse(`${BASE}/api/events`);
     let id = "";
     try {
       await stream.until((frame) => frame.kind === "hello");
       const bot = (await api("POST", "/api/bots", { name: "Scout", useDefaults: false, settings: { color: "purple", mascotBody: "star" } })).body.bot;
       id = bot.id;
-      expect(bot.messages[0].text).toBe("Hi Milind, I'm Scout. What would you like me to do?");
+      expect(bot.messages[0].text).toBe("Hi Alex, I'm Scout. What would you like me to do?");
       const announced = await stream.until((frame) => frame.kind === "bot" && frame.bot?.id === id);
       expect(announced.bot).toMatchObject({ color: "purple", mascotBody: "star" });
       const plain = (await api("POST", "/api/bots", { name: "Wren", useDefaults: false })).body.bot;
@@ -7876,7 +7438,7 @@ describe("harness HTTP API", () => {
       ids.push(created.body.bot.id);
       return created.body.bot;
     };
-    expect((await api("PUT", "/api/config", { profile: { name: "Milind Soni" }, features: { smartSetupChoices: true } })).status).toBe(200);
+    expect((await api("PUT", "/api/config", { profile: { name: "Alex Soni" }, features: { smartSetupChoices: true } })).status).toBe(200);
     try {
       writeFileSync(setupAnswersFile, `${JSON.stringify(answers)}\n`);
       rmSync(setupAnswersDump, { force: true });
@@ -7890,7 +7452,7 @@ describe("harness HTTP API", () => {
       expect(seen.argv).not.toContain("--effort");
       expect(seen.env.MAX_THINKING_TOKENS).toBeUndefined();
       expect(seen.prompt).toContain("Bot name: Bookkeeper");
-      expect(seen.prompt).not.toContain("Milind");
+      expect(seen.prompt).not.toContain("Alex");
       const day = (offset: number) => new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
       const usage = await (await fetch(`${BASE}/api/usage.csv?from=${day(-1)}&to=${day(1)}`)).text();
       expect(usage.split("\n").some((line) => line.includes("Bookkeeper") && line.includes(",setup-suggestions-"))).toBe(true);
@@ -8931,58 +8493,6 @@ describe("harness HTTP API", () => {
     }
   });
 
-  it("brings a sign-in started in a browser on another computer back to this server's https address", async () => {
-    const oauth = await startFakeOAuth();
-    const fake = await startFakeHttpMcp({ acceptBearer: oauth.isValid, wwwAuthenticate: oauth.challenge });
-    const opened = await api("POST", "/api/auth/pairing", { scopes: ["admin", "client"] });
-    const token = (await api("POST", "/api/auth/pair", { code: opened.body.code })).body.token as string;
-    // What the edge proxy in front of My Cloud hands the server; node's fetch drops a custom Host header.
-    const viaProxy = (method: string, path: string, headers: Record<string, string> = {}, body?: unknown) =>
-      new Promise<{ status: number; text: string; headers: Record<string, unknown> }>((resolve, reject) => {
-        const req = request({
-          hostname: "127.0.0.1", port: PORT, path, method,
-          headers: { host: "cloud.example", "x-forwarded-proto": "https", "x-forwarded-for": "192.0.2.20", ...headers },
-        }, (res) => {
-          let raw = "";
-          res.on("data", (chunk) => (raw += chunk));
-          res.on("end", () => resolve({ status: res.statusCode ?? 0, text: raw, headers: res.headers }));
-        });
-        req.on("error", reject);
-        req.end(body === undefined ? undefined : JSON.stringify(body));
-      });
-    const signedIn = { authorization: `Bearer ${token}`, origin: "https://cloud.example", "content-type": "application/json" };
-    const base = "/api/mcp/servers/whop/sign-in";
-    try {
-      expect((await api("POST", "/api/mcp/servers", { name: "whop", url: fake.url })).status).toBe(201);
-      const started = await viaProxy("POST", base, signedIn);
-      expect(started.status).toBe(200);
-      const auth = JSON.parse(started.text).auth;
-      expect(auth.pasteBack).toBeUndefined();
-      expect(new URL(auth.authorizationUrl).searchParams.get("redirect_uri")).toBe("https://cloud.example/mcp-oauth/callback");
-      const callback = new URL((await fetch(auth.authorizationUrl, { redirect: "manual" })).headers.get("location")!);
-      expect(callback.origin + callback.pathname).toBe("https://cloud.example/mcp-oauth/callback");
-
-      const forged = new URL(callback);
-      forged.searchParams.set("state", "forged");
-      expect((await viaProxy("GET", forged.pathname + forged.search)).status).toBe(400);
-      expect(JSON.parse((await viaProxy("GET", `${base}/${auth.flowId}`, signedIn)).text).auth.phase).toBe("waiting");
-
-      const page = await viaProxy("GET", callback.pathname + callback.search);
-      expect(page.status).toBe(200);
-      expect(page.text).toBe("Signed in. You can close this tab and return to Hezuo.");
-      expect(page.headers).toMatchObject({ "cache-control": "no-store", "referrer-policy": "no-referrer", "content-type": "text/plain; charset=utf-8" });
-      expect(page.text).not.toContain(callback.searchParams.get("code"));
-      expect(JSON.parse((await viaProxy("GET", `${base}/${auth.flowId}`, signedIn)).text).auth.phase).toBe("succeeded");
-      expect((await viaProxy("GET", callback.pathname + callback.search)).status).toBe(409);
-      expect(oauth.counts.token).toBe(1);
-      expect((await api("POST", "/api/mcp/servers/whop/test")).body.ok).toBe(true);
-    } finally {
-      await api("DELETE", "/api/mcp/servers/whop").catch(() => undefined);
-      await viaProxy("POST", "/api/auth/logout", signedIn).catch(() => undefined);
-      await fake.close();
-      await oauth.close();
-    }
-  });
 
   it("round-trips the UI language and clears it back to system", async () => {
     const set = await api("PUT", "/api/config", { language: "de" });
@@ -9070,9 +8580,9 @@ describe("harness HTTP API", () => {
       rmSync(fakeClaudeDump, { force: true });
       expect((await api("POST", `/api/bots/${bot.id}/messages`, { text: "count my notes" })).status).toBe(202);
       const dump = z.object({
-        mcpConfig: z.object({ mcpServers: z.object({ ogb: z.object({ args: z.array(z.string()) }) }) }),
+        mcpConfig: z.object({ mcpServers: z.object({ hezuo: z.object({ args: z.array(z.string()) }) }) }),
       }).parse(await readJsonFileWhenReady(fakeClaudeDump));
-      const socketPath = dump.mcpConfig.mcpServers.ogb.args[1];
+      const socketPath = dump.mcpConfig.mcpServers.hezuo.args[1];
       const raise = async (
         id: string,
         command: string,
@@ -9347,25 +8857,6 @@ describe("harness HTTP API", () => {
     }
   });
 
-  it("mounts the USB phone server on every turn, whatever its words: they pick only the phone skill's instructions", async () => {
-    const bot = (await api("POST", "/api/bots", { name: "Phone words" })).body.bot;
-    try {
-      expect((await api("PATCH", `/api/bots/${bot.id}`, { modelSelection: { instanceId: "claude", model: "claude-sonnet-5" } })).status).toBe(200);
-      for (const [text, instructed] of [["hello", false], ["open the Uber app on my Android", true], ["thanks", false]] as const) {
-        rmSync(fakeClaudeDump, { force: true });
-        expect((await api("POST", `/api/bots/${bot.id}/messages`, { text })).status).toBe(202);
-        const seen = await readJsonFileWhenReady<{ systemPrompt: string; mcpConfig: { mcpServers: Record<string, unknown> } }>(fakeClaudeDump, 15_000);
-        expect(seen.mcpConfig.mcpServers.phone, text).toBeDefined();
-        expect(seen.systemPrompt.includes('<hezuo-skill id="phone-harness"'), text).toBe(instructed);
-        expect((await api("POST", `/api/bots/${bot.id}/interrupt`)).status).toBe(200);
-        await expect.poll(async () => (await api("GET", "/api/bots?messages=0")).body.bots
-          .find((candidate: { id: string }) => candidate.id === bot.id)?.busy, { timeout: 5_000 }).toBe(false);
-      }
-    } finally {
-      await api("POST", `/api/bots/${bot.id}/interrupt`);
-      await api("DELETE", `/api/bots/${bot.id}`);
-    }
-  });
 
   it("re-enters setup mode for a configured bot when the user sends /setup, and rewrites the turn text", async () => {
     const bot = (await api("POST", "/api/bots", { name: "Kiwi", description: "Files bugs." })).body.bot;
@@ -9574,7 +9065,7 @@ describe("harness HTTP API", () => {
   });
 
   it("tells a /setup turn to connect an app itself when its connected-apps tools are mounted, and names the switch when they are off", async () => {
-    // This suite's server has the managed connected-apps service (the stub broker).
+    expect((await api("PUT", "/api/config", { composio: { apiKey: "ak_good" } })).status).toBe(200);
     type Dump = { systemPrompt: string; mcpConfig: { mcpServers: Record<string, unknown> } };
     const setupTurn = async (botId: string) => {
       rmSync(fakeClaudeDump, { force: true });
@@ -9605,6 +9096,7 @@ describe("harness HTTP API", () => {
         await api("POST", `/api/bots/${bot.id}/interrupt`);
         await api("DELETE", `/api/bots/${bot.id}`);
       }
+      await api("PUT", "/api/config", { composio: { apiKey: "" } });
     }
   });
 
@@ -9646,12 +9138,11 @@ describe("harness HTTP API", () => {
 
       rmSync(fakeClaudeDump, { force: true });
       expect((await api("POST", `/api/groups/${room.id}/messages`, {
-        text: "/create-verification-skill for my mobile app",
+        text: "/create-verification-skill for my desktop app",
       })).status).toBe(202);
       let seen = await readJsonFileWhenReady<{ systemPrompt?: string }>(fakeClaudeDump);
       let system = seen.systemPrompt ?? "";
       expect(system).toContain('<hezuo-skill id="create-verification-skill"');
-      expect(system).toContain('<hezuo-skill id="phone-harness"');
       expect((await api("POST", `/api/groups/${room.id}/interrupt`, {})).status).toBe(200);
       await expect.poll(async () => {
         const state = (await api("GET", "/api/bots?messages=0")).body;
@@ -9665,7 +9156,6 @@ describe("harness HTTP API", () => {
       seen = await readJsonFileWhenReady<{ systemPrompt?: string }>(fakeClaudeDump);
       system = seen.systemPrompt ?? "";
       expect(system).not.toContain('<hezuo-skill id="create-verification-skill"');
-      expect(system).toContain('<hezuo-skill id="phone-harness"');
     } finally {
       if (room) {
         expect((await api("POST", `/api/groups/${room.id}/interrupt`, {})).status).toBe(200);
@@ -10075,7 +9565,7 @@ describe("harness HTTP API", () => {
       pending = fetch(`${BASE}/api/internal/browser/mcp`, {
         method: "POST", headers: {
           "content-type": "application/json",
-          authorization: `Bearer ${dump.mcpConfig.mcpServers.browser.env.OMB_MCP_TOKEN_BROWSER}`,
+          authorization: `Bearer ${dump.mcpConfig.mcpServers.browser.env.HEZUO_MCP_TOKEN_BROWSER}`,
         },
         body: JSON.stringify({ method: "tools/call", params: { name: "agent_browser_upload", arguments: { files } } }),
       });
@@ -10146,8 +9636,8 @@ describe("harness HTTP API", () => {
       const browser = dump.mcpConfig.mcpServers.browser;
       expect(browser.command).toBe(process.execPath);
       expect(browser.args).toEqual([expect.stringMatching(/harness-mcp-proxy\.(?:ts|js|mjs)$/), "browser"]);
-      expect(browser.env.OMB_MCP_TOKEN_BROWSER).toEqual(expect.any(String));
-      expect(browser.env.OMB_HARNESS_URL).toBe(BASE);
+      expect(browser.env.HEZUO_MCP_TOKEN_BROWSER).toEqual(expect.any(String));
+      expect(browser.env.HEZUO_HARNESS_URL).toBe(BASE);
       expect(browser.env.AGENT_BROWSER_SESSION).toBeUndefined();
       expect(browser.env.AGENT_BROWSER_RESTORE).toBeUndefined();
       expect(browser.env.AGENT_BROWSER_ENCRYPTION_KEY).toBeUndefined();
@@ -10301,7 +9791,7 @@ describe("harness HTTP API", () => {
     }
   }, 60_000);
   it("reconciles a committed crash-stale bot reference before ACK and profile-id reuse", async () => {
-    const isolatedHome = mkdtempSync(join(tmpdir(), "omb-browser-cleanup-restart-"));
+    const isolatedHome = mkdtempSync(join(tmpdir(), "hezuo-browser-cleanup-restart-"));
     const isolatedData = join(isolatedHome, ".hezuo");
     const isolatedStatic = join(isolatedHome, "static");
     const isolatedPort = await freePortBlock([0, 1]);
@@ -10366,11 +9856,11 @@ describe("harness HTTP API", () => {
           ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}),
           HOME: isolatedHome,
           USERPROFILE: isolatedHome,
-          OMB_PORT: String(isolatedPort),
-          OMB_WEBHOOK_PORT: String(isolatedPort + 1),
-          OMB_STATIC_DIR: isolatedStatic,
+          HEZUO_PORT: String(isolatedPort),
+          HEZUO_WEBHOOK_PORT: String(isolatedPort + 1),
+          HEZUO_STATIC_DIR: isolatedStatic,
           // macOS caps socket paths at 103 bytes, so a real agent-browser cannot name its socket under this HOME.
-          OMB_AGENT_BROWSER_PATH: join(isolatedHome, "missing-agent-browser"),
+          HEZUO_AGENT_BROWSER_PATH: join(isolatedHome, "missing-agent-browser"),
           FAKE_CLAUDE_MODE: "hang",
           FAKE_CLAUDE_DUMP: join(isolatedHome, "fake-claude-dump.json"),
         },
@@ -10550,85 +10040,7 @@ describe("harness HTTP API", () => {
     }
   });
 
-  it("lets a phone paired directly with Full access ask for the Local VM desktop under its lease, and nobody else", async () => {
-    const previous = (await api("GET", "/api/config")).body.localVm;
-    const bot = (await api("POST", "/api/bots")).body.bot;
-    const lease = "phone-lease-0123456789";
-    const owner = await asPairedPerson("Owner's phone");
-    const chatOnlyWindow = await api("POST", "/api/auth/pairing", { scopes: ["client"] });
-    const chatOnlyPaired = await fetch(`${BASE}/api/auth/pair`, {
-      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code: chatOnlyWindow.body.code }),
-    });
-    const chatOnlyToken = ((await chatOnlyPaired.json()) as any).token as string;
-    const asChatOnly = async (method: string, path: string, payload?: unknown) => {
-      const res = await fetch(`${BASE}${path}`, {
-        method, headers: { authorization: `Bearer ${chatOnlyToken}`, ...(payload ? { "content-type": "application/json" } : {}) },
-        body: payload ? JSON.stringify(payload) : undefined,
-      });
-      return { status: res.status, body: await res.json() as any };
-    };
-    const join = `/api/bots/${bot.id}/local-computer/join?controlLeaseId=${lease}`;
-    const target = `local/bot-${createHash("sha256").update(bot.id).digest("hex")}`;
-    const proxy = `/api/desktop-viewer/${target}?botId=${bot.id}&controlLeaseId=${lease}`;
-    try {
-      expect((await api("PATCH", "/api/config", { localVm: { ...previous, mode: "per-bot" } })).status).toBe(200);
-      expect((await asChatOnly("POST", `/api/bots/${bot.id}/computer/control`, { action: "take", controlLeaseId: lease })).status).toBe(403);
-      expect((await asChatOnly("POST", join, {})).status).toBe(403);
-      expect((await asChatOnly("GET", proxy)).status).toBe(403);
-      expect((await asChatOnly("POST", `/api/bots/${bot.id}/computer/viewer-close`, {})).status).toBe(403);
 
-      const unheld = await owner.call("POST", join, {});
-      expect(unheld.status).toBe(409);
-      expect(unheld.body.error).toMatch(/take control/i);
-      const unheldProxy = await owner.call("GET", proxy);
-      expect(unheldProxy.status).toBe(409);
-      expect(unheldProxy.body.error).toMatch(/take control/i);
-
-      expect((await owner.call("POST", `/api/bots/${bot.id}/computer/control`, { action: "take", controlLeaseId: lease })).body)
-        .toMatchObject({ held: true, owned: true });
-      const notReady = await owner.call("POST", join, {});
-      expect(notReady.status).toBe(409);
-      expect(notReady.body.error).not.toMatch(/take control/i);
-      expect(notReady.body.joinUrl).toBeUndefined();
-      expect(notReady.body.socketPath).toBeUndefined();
-      const boundProxy = await owner.call("GET", proxy);
-      expect(boundProxy.status).toBe(409);
-      expect(boundProxy.body.error).not.toMatch(/take control/i);
-      expect((await owner.call("GET", `/api/desktop-viewer/${target}?botId=${bot.id}&controlLeaseId=phone-lease-9876543210`)).status).toBe(409);
-
-      expect((await owner.call("POST", `/api/bots/${bot.id}/computer/viewer-close`, {})).body).toEqual({ closed: false });
-      await owner.call("POST", `/api/bots/${bot.id}/computer/control`, { action: "release", controlLeaseId: lease });
-      expect((await owner.call("GET", proxy)).status).toBe(409);
-    } finally {
-      await api("POST", `/api/bots/${bot.id}/computer/control`, { action: "release" }).catch(() => undefined);
-      await api("PATCH", "/api/config", { localVm: previous }).catch(() => undefined);
-      await api("DELETE", `/api/bots/${bot.id}`).catch(() => undefined);
-    }
-  });
-
-  it.each(["shared", "pool"])("refuses Local VM phone joins in %s mode for direct and companion callers", async testedMode => {
-    const { mode, maxInstances } = (await api("GET", "/api/config")).body.localVm;
-    const previous = { mode, maxInstances };
-    const bot = (await api("POST", "/api/bots")).body.bot;
-    const owner = await asPairedPerson("Pool viewer phone");
-    const lease = "phone-pool-lease-0123456789";
-    try {
-      expect((await api("PATCH", "/api/config", { localVm: { ...previous, mode: testedMode } })).status).toBe(200);
-      expect((await owner.call("POST", `/api/bots/${bot.id}/computer/control`, { action: "take", controlLeaseId: lease })).body.owned).toBe(true);
-      const join = `/api/bots/${bot.id}/local-computer/join?controlLeaseId=${lease}`;
-      for (const response of [await owner.call("POST", join, {}), await api("POST", join, {})]) {
-        expect(response.status).toBe(409);
-        expect(response.body.error).toContain("per-bot Local VM");
-        expect(response.body.joinUrl).toBeUndefined();
-        expect(response.body.socketPath).toBeUndefined();
-        expect(response.body.password).toBeUndefined();
-      }
-    } finally {
-      await api("POST", `/api/bots/${bot.id}/computer/control`, { action: "release", controlLeaseId: lease });
-      await api("PATCH", "/api/config", { localVm: previous });
-      await api("DELETE", `/api/bots/${bot.id}`);
-    }
-  });
 
   it("keeps shared Local VM mode by default and resolves isolated targets per bot when enabled", async () => {
     const first = (await api("POST", "/api/bots")).body.bot;
@@ -10947,9 +10359,9 @@ describe("harness HTTP API", () => {
       expect((await api("POST", `/api/groups/${room.id}/messages`, { text: "start the lead" })).status).toBe(202);
       const firstDump = await readJsonFileWhenReady<{
         pid: number;
-        mcpConfig: { mcpServers: { agents: { env: { OMB_COMMS_TOKEN: string } } } };
+        mcpConfig: { mcpServers: { agents: { env: { HEZUO_COMMS_TOKEN: string } } } };
       }>(fakeClaudeDump);
-      expect(firstDump.mcpConfig.mcpServers.agents.env.OMB_COMMS_TOKEN).toMatch(/^[a-f0-9]{48}$/);
+      expect(firstDump.mcpConfig.mcpServers.agents.env.HEZUO_COMMS_TOKEN).toMatch(/^[a-f0-9]{48}$/);
       const token = await mintTestCapability(BASE, second.id, room.threadId);
 
       const requested = await fetch(`${BASE}/api/internal/request-credential`, {
@@ -10981,28 +10393,10 @@ describe("harness HTTP API", () => {
         threadId: room.threadId,
       });
       expect(wrongOwner.status).toBe(404);
-      const wrongOwnerPhone = await fetch(
-        `${BASE}/api/bots/${first.id}/secret-cards/${messageId}/provide`,
-        {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            "x-hezuo-companion": "1",
-            "x-hezuo-companion-device": "phone-1",
-          },
-          body: JSON.stringify({
-            version: 1,
-            threadId: room.threadId,
-            keyId: "A".repeat(22),
-            deviceId: "phone-1",
-            target: "openaiImageApiKey",
-            requestKey: roomCard.secret.requestKey,
-            encapsulatedKey: "A".repeat(87),
-            ciphertext: "A".repeat(23),
-          }),
-        },
-      );
-      expect(wrongOwnerPhone.status).toBe(404);
+      const wrongOwnerProvided = await api("POST", `/api/bots/${first.id}/secret-cards/${messageId}/provided`, {
+        threadId: room.threadId,
+      });
+      expect(wrongOwnerProvided.status).toBe(404);
 
       const dismissed = await api("POST", `/api/bots/${second.id}/secret-cards/${messageId}/dismiss`, {
         threadId: room.threadId,
@@ -11067,9 +10461,9 @@ describe("harness HTTP API", () => {
       rmSync(fakeClaudeDump, { force: true });
       expect((await api("POST", `/api/bots/${bot.id}/messages`, { text: "prepare a routine" })).status).toBe(202);
       const dump = await readJsonFileWhenReady<{
-        mcpConfig: { mcpServers: { agents: { env: { OMB_COMMS_TOKEN: string } } } };
+        mcpConfig: { mcpServers: { agents: { env: { HEZUO_COMMS_TOKEN: string } } } };
       }>(fakeClaudeDump);
-      expect(dump.mcpConfig.mcpServers.agents.env.OMB_COMMS_TOKEN).toMatch(/^[a-f0-9]{48}$/);
+      expect(dump.mcpConfig.mcpServers.agents.env.HEZUO_COMMS_TOKEN).toMatch(/^[a-f0-9]{48}$/);
       expect((await api("POST", `/api/bots/${bot.id}/interrupt`)).status).toBe(200);
       await expect.poll(async () => {
         const state = (await api("GET", "/api/bots")).body;
@@ -11820,9 +11214,9 @@ describe("harness HTTP API", () => {
       rmSync(fakeClaudeDump, { force: true });
       expect((await api("POST", `/api/bots/${bot.id}/messages`, { text: "prepare a skill" })).status).toBe(202);
       const dump = await readJsonFileWhenReady<{
-        mcpConfig: { mcpServers: { agents: { env: { OMB_COMMS_TOKEN: string } } } };
+        mcpConfig: { mcpServers: { agents: { env: { HEZUO_COMMS_TOKEN: string } } } };
       }>(fakeClaudeDump);
-      expect(dump.mcpConfig.mcpServers.agents.env.OMB_COMMS_TOKEN).toMatch(/^[a-f0-9]{48}$/);
+      expect(dump.mcpConfig.mcpServers.agents.env.HEZUO_COMMS_TOKEN).toMatch(/^[a-f0-9]{48}$/);
       const token = await mintTestCapability(BASE, bot.id, bot.threadId, { skillAuthoring: true });
       const internalHeaders = {
         authorization: `Bearer ${token}`,
@@ -12185,7 +11579,7 @@ describe("harness HTTP API", () => {
       }
       const requests = connectorLinkRequests.slice(before);
       expect(requests).toHaveLength(3);
-      for (const request of requests) expect(request).toEqual({ toolkit: "slack", alias: expect.stringMatching(/^omb-retry-[0-9a-f-]{36}$/) });
+      for (const request of requests) expect(request).toEqual({ toolkit: "slack", alias: expect.stringMatching(/^hezuo-retry-[0-9a-f-]{36}$/) });
       expect(new Set(requests.map((request) => request.alias)).size).toBe(3);
       expect(connectorAccounts.map((account) => account.alias)).toEqual(["original", "expired"]);
 
@@ -12214,6 +11608,7 @@ describe("harness HTTP API", () => {
   it("does not relay a slow connector request after Connected Apps is disabled", async () => {
     const bot = (await api("POST", "/api/bots")).body.bot;
     let held: Awaited<ReturnType<typeof delayedJsonBody>> | undefined;
+    expect((await api("PUT", "/api/config", { composio: { apiKey: "ak_good" } })).status).toBe(200);
     try {
       expect((await api("PATCH", `/api/bots/${bot.id}`, { composio: true })).status).toBe(200);
       const token = await mintTestCapability(BASE, bot.id, bot.threadId, { kind: "connectors" });
@@ -12231,6 +11626,7 @@ describe("harness HTTP API", () => {
     } finally {
       held?.close();
       await api("DELETE", `/api/bots/${bot.id}`);
+      await api("PUT", "/api/config", { composio: { apiKey: "" } });
     }
   });
 
@@ -12247,7 +11643,7 @@ describe("harness HTTP API", () => {
 
   it("explains a missing Google permission instead of passing the bare 403 to the bot", async () => {
     // GMAIL_CREATE_FILTER needs gmail.settings.basic, which the default Composio Gmail connection never asks for.
-    expect((await api("PUT", "/api/config", { composio: { apiKey: "" } })).status).toBe(200);
+    expect((await api("PUT", "/api/config", { composio: { apiKey: "ak_good" } })).status).toBe(200);
     const bot = (await api("POST", "/api/bots")).body.bot;
     try {
       expect((await api("PATCH", `/api/bots/${bot.id}`, { composio: true })).status).toBe(200);
@@ -12268,12 +11664,19 @@ describe("harness HTTP API", () => {
       expect(hint).toContain("Do not retry");
     } finally {
       await api("DELETE", `/api/bots/${bot.id}`);
+      await api("PUT", "/api/config", { composio: { apiKey: "" } });
     }
   });
 
   it("enforces per-bot connector tool grants on relayed tool calls", async () => {
-    // Clear any project key an earlier test left, so the relay uses the stubbed managed broker.
-    expect((await api("PUT", "/api/config", { composio: { apiKey: "" } })).status).toBe(200);
+    expect((await api("PUT", "/api/config", { composio: { apiKey: "ak_good" } })).status).toBe(200);
+    const previousAccounts = connectorAccounts;
+    const previousCatalog = connectorCatalogToolkits;
+    connectorAccounts = [
+      { id: "ca_gmail", status: "ACTIVE", toolkit: { slug: "gmail" } },
+      { id: "ca_slack", status: "ACTIVE", toolkit: { slug: "slack" } },
+    ];
+    connectorCatalogToolkits = [{ slug: "gmail", name: "Gmail" }, { slug: "slack", name: "Slack" }];
     const bot = (await api("POST", "/api/bots")).body.bot;
     connectorRelayCalls.length = 0;
     const relayed = () => connectorRelayCalls.map((entry) => entry.body);
@@ -12382,11 +11785,14 @@ describe("harness HTTP API", () => {
       expect(allowRows.some((row) => row.botId === legacy.id && row.tool === "SLACK_POST_MESSAGE" && row.rule === "composio")).toBe(true);
     } finally {
       await api("DELETE", `/api/bots/${bot.id}`);
+      connectorAccounts = previousAccounts;
+      connectorCatalogToolkits = previousCatalog;
+      await api("PUT", "/api/config", { composio: { apiKey: "" } });
     }
   });
 
   it("refuses MULTI_EXECUTE shapes it cannot read and writes connector-scope denial rows", async () => {
-    expect((await api("PUT", "/api/config", { composio: { apiKey: "" } })).status).toBe(200);
+    expect((await api("PUT", "/api/config", { composio: { apiKey: "ak_good" } })).status).toBe(200);
     const bot = (await api("POST", "/api/bots")).body.bot;
     connectorRelayCalls.length = 0;
     try {
@@ -12436,6 +11842,7 @@ describe("harness HTTP API", () => {
       expect(denyRows.some((row) => row.tool === "gmail_send_email")).toBe(true);
     } finally {
       await api("DELETE", `/api/bots/${bot.id}`);
+      await api("PUT", "/api/config", { composio: { apiKey: "" } });
     }
   });
 
@@ -12529,21 +11936,30 @@ describe("harness HTTP API", () => {
   });
 
   it("serves the grant editor's tool inventory grouped by service", async () => {
-    // Broker mode: clear any project key an earlier test left behind.
+    expect((await api("PUT", "/api/config", { composio: { apiKey: "ak_good" } })).status).toBe(200);
+    try {
+      const response = await api("GET", "/api/connectors/tools");
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({
+        configured: true,
+        services: {
+          gmail: [
+            { name: "GMAIL_FETCH_EMAILS", description: "Fetch emails" },
+            { name: "GMAIL_SEND_EMAIL", description: "Send an email" },
+          ],
+          slack: [{ name: "SLACK_POST_MESSAGE", description: "a".repeat(240) }],
+        },
+      });
+    } finally {
+      await api("PUT", "/api/config", { composio: { apiKey: "" } });
+    }
+  });
+
+  it("reports connector tools as unconfigured without a project key", async () => {
     expect((await api("PUT", "/api/config", { composio: { apiKey: "" } })).status).toBe(200);
-    const response = await api("GET", "/api/connectors/tools");
-    expect(response.status).toBe(200);
-    expect(response.body).toEqual({
-      configured: true,
-      services: {
-        gmail: [
-          { name: "GMAIL_FETCH_EMAILS", description: "Fetch emails" },
-          { name: "GMAIL_SEND_EMAIL", description: "Send an email" },
-        ],
-        slack: [{ name: "SLACK_POST_MESSAGE", description: "a".repeat(240) }],
-        // HighLevel's tools are listed whenever its relay is configured, so grants can be set before connecting.
-        highlevel: HIGHLEVEL_TOOLS.map(({ name, description }) => ({ name, description })),
-      },
+    expect(await api("GET", "/api/connectors/tools")).toEqual({
+      status: 200,
+      body: { configured: false, services: {} },
     });
   });
 
@@ -13098,7 +12514,7 @@ describe("bot memory API", () => {
       })).status).toBe(202);
       const dump = await readJsonFileWhenReady<{
         systemPrompt?: string;
-        mcpConfig: { mcpServers: { agents: { env: { OMB_COMMS_TOKEN: string } } } };
+        mcpConfig: { mcpServers: { agents: { env: { HEZUO_COMMS_TOKEN: string } } } };
       }>(fakeClaudeDump);
       expect(dump.systemPrompt ?? "").toContain("session_search");
       // A capability is bound to one bot and thread, minted per turn: each search mints its own.

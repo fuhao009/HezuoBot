@@ -403,7 +403,7 @@ export class AppTriggerManager {
   async runNow(id: string): Promise<{ via: "service" | "here"; runId?: string } | null> {
     const trigger = this.triggers.find((candidate) => candidate.id === id);
     if (!trigger) return null;
-    const data = { omb_test: true, note: "A test run started from Hezuo." };
+    const data = { hezuo_test: true, note: "A test run started from Hezuo." };
     if (trigger.remote.triggerId && trigger.remote.state === "active" && this.options.service().available) {
       try {
         await this.options.broker.testEvent(trigger.remote.triggerId, data);

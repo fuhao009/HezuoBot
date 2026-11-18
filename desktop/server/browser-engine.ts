@@ -18,6 +18,7 @@ import {
   AGENT_BROWSER_VERSION,
   agentBrowserReleaseUrl,
   agentBrowserReleaseVersion,
+  missingAgentBrowserReleaseReason,
   resolveAgentBrowserReleaseAsset,
   type AgentBrowserReleaseAsset,
 } from "./browser-engine-release.ts";
@@ -29,7 +30,7 @@ const DOWNLOAD_TIMEOUT_MS = 10 * 60_000;
 /** agent-browser's restore looks up a filename prefix; fixed-length keys keep `work` from restoring `work-client`. */
 export function browserRestoreKey(session: string): string {
   if (!/^[A-Za-z0-9_.-]{1,96}$/.test(session)) throw new Error("Invalid browser session.");
-  return `omb-${createHash("sha256").update(session).digest("hex")}`;
+  return `hezuo-${createHash("sha256").update(session).digest("hex")}`;
 }
 
 const PROFILES_DIR = "agent-browser-profiles";
@@ -56,7 +57,7 @@ export function browserSessionsDirectory(env: NodeJS.ProcessEnv): string {
 }
 
 function managedBrowserConfigPath(env: NodeJS.ProcessEnv): string {
-  return join(browserSessionsDirectory(env), "..", "omb-managed-config.json");
+  return join(browserSessionsDirectory(env), "..", "hezuo-managed-config.json");
 }
 
 function ensureManagedBrowserConfig(env: NodeJS.ProcessEnv): string {
@@ -210,7 +211,7 @@ function portInFile(path: string): number[] {
 }
 
 /** The stream servers of this machine's agent-browser daemons: agent-browser 0.37 upgrades a WebSocket from any origin. */
-export function agentBrowserStreamPorts(env: NodeJS.ProcessEnv = browserRuntimeEnv({ AGENT_BROWSER_SESSION: "omb" })): number[] {
+export function agentBrowserStreamPorts(env: NodeJS.ProcessEnv = browserRuntimeEnv({ AGENT_BROWSER_SESSION: "hezuo" })): number[] {
   const directory = dirname(browserDaemonFile(env, ".stream"));
   try { return readdirSync(directory).filter((name) => name.endsWith(".stream")).flatMap((name) => portInFile(join(directory, name))); }
   catch { return []; }
@@ -282,7 +283,7 @@ export async function prepareBrowserSessionState(
 }
 
 export type BrowserEngineStatus =
-  /** `managed`: the engine OMB installed (bundled or pinned), not one named by OMB_AGENT_BROWSER_PATH or found on PATH. */
+  /** `managed`: the engine OMB installed (bundled or pinned), not one named by HEZUO_AGENT_BROWSER_PATH or found on PATH. */
   | { kind: "ready"; binaryPath: string; version: string; managed: boolean; warning?: string }
   | { kind: "unavailable"; reason: string; installable: boolean };
 
@@ -343,8 +344,8 @@ export function isMusl(platform: NodeJS.Platform = process.platform, exists: (p:
   return platform === "linux" && (exists("/lib/ld-musl-x86_64.so.1") || exists("/lib/ld-musl-aarch64.so.1"));
 }
 
-export function pinnedBinaryPath(dataDir = DATA_DIR, platform: NodeJS.Platform = process.platform, arch: string = process.arch): string {
-  const version = agentBrowserReleaseVersion(resolveAgentBrowserReleaseAsset(platform, arch));
+export function pinnedBinaryPath(dataDir = DATA_DIR, platform: NodeJS.Platform = process.platform, arch: string = process.arch, env: NodeJS.ProcessEnv = process.env): string {
+  const version = agentBrowserReleaseVersion(resolveAgentBrowserReleaseAsset(platform, arch, isMusl(platform), env));
   return join(dataDir, ENGINE_DIR, version, executableName(platform));
 }
 
@@ -373,10 +374,10 @@ interface BrowserLookupOptions {
 }
 
 function packagedBrowser(options: BrowserLookupOptions) {
-  const resources = (options.env ?? process.env).OMB_RESOURCES_PATH;
+  const resources = (options.env ?? process.env).HEZUO_RESOURCES_PATH;
   if (!resources) return null;
   try {
-    return browserBundlePaths(join(resolve(resources), "browser-engine"), `${options.platform ?? process.platform}-${options.arch ?? process.arch}`);
+    return browserBundlePaths(join(resolve(resources), "browser-engine"), `${options.platform ?? process.platform}-${options.arch ?? process.arch}`, options.env ?? process.env);
   } catch {
     return null;
   }
@@ -390,12 +391,13 @@ export function resolveAgentBrowserBinary(options: BrowserLookupOptions = {}): s
   const env = options.env ?? process.env;
   const platform = options.platform ?? process.platform;
   const exists = options.exists ?? existsSync;
-  const override = env.OMB_AGENT_BROWSER_PATH?.trim();
+  const override = env.HEZUO_AGENT_BROWSER_PATH?.trim();
   if (override) return resolve(override) && exists(resolve(override)) ? resolve(override) : null;
   const bundle = packagedBrowser(options);
   if (bundle && exists(bundle.directory)) return completePackage(bundle, exists) ? bundle.engine : null;
-  const pinned = pinnedBinaryPath(options.dataDir, platform, options.arch);
-  if (exists(pinned)) return pinned;
+  const asset = resolveAgentBrowserReleaseAsset(platform, options.arch ?? process.arch, isMusl(platform), env);
+  const pinned = asset ? pinnedBinaryPath(options.dataDir, platform, options.arch, env) : null;
+  if (pinned && exists(pinned)) return pinned;
   if (options.managedOnly) return null;
   return onPath(env, platform, exists);
 }
@@ -403,6 +405,7 @@ export function resolveAgentBrowserBinary(options: BrowserLookupOptions = {}): s
 /** Verifies size and SHA-256 before the file gets its final name. */
 export async function installAgentBrowserBinary(options: {
   dataDir?: string;
+  env?: NodeJS.ProcessEnv;
   platform?: NodeJS.Platform;
   arch?: string;
   musl?: boolean;
@@ -411,9 +414,9 @@ export async function installAgentBrowserBinary(options: {
   log?: (line: string) => void;
 } = {}): Promise<string> {
   const platform = options.platform ?? process.platform;
-  const asset = options.asset ?? resolveAgentBrowserReleaseAsset(platform, options.arch ?? process.arch, options.musl ?? isMusl(platform));
-  if (!asset) throw new Error(`agent-browser publishes no build for ${platform}-${options.arch ?? process.arch}.`);
-  const destination = pinnedBinaryPath(options.dataDir, platform, options.arch);
+  const asset = options.asset ?? resolveAgentBrowserReleaseAsset(platform, options.arch ?? process.arch, options.musl ?? isMusl(platform), options.env ?? process.env);
+  if (!asset) throw new Error(missingAgentBrowserReleaseReason(platform, options.arch ?? process.arch));
+  const destination = join(options.dataDir ?? DATA_DIR, ENGINE_DIR, agentBrowserReleaseVersion(asset), executableName(platform));
   const directory = join(destination, "..");
   mkdirSync(directory, { recursive: true, mode: 0o700 });
   const url = agentBrowserReleaseUrl(asset);
@@ -526,9 +529,10 @@ export function browserEngineStatus(options: BrowserLookupOptions = {}): Browser
   const bundle = packagedBrowser(options);
   if (binaryPath) {
     const platform = options.platform ?? process.platform;
-    const managed = binaryPath === bundle?.engine || binaryPath === pinnedBinaryPath(options.dataDir, platform, options.arch);
+    const asset = resolveAgentBrowserReleaseAsset(platform, options.arch ?? process.arch, isMusl(platform), options.env ?? process.env);
+    const managed = binaryPath === bundle?.engine || (asset !== null && binaryPath === pinnedBinaryPath(options.dataDir, platform, options.arch, options.env ?? process.env));
     if (managed) {
-      const version = agentBrowserReleaseVersion(resolveAgentBrowserReleaseAsset(platform, options.arch));
+      const version = agentBrowserReleaseVersion(resolveAgentBrowserReleaseAsset(platform, options.arch, isMusl(platform), options.env ?? process.env));
       return { kind: "ready", binaryPath, version, managed };
     }
     const actual = options.versionOf ? options.versionOf(binaryPath) : cachedAgentBrowserVersion(binaryPath);
@@ -543,10 +547,10 @@ export function browserEngineStatus(options: BrowserLookupOptions = {}): Browser
   }
   const platform = options.platform ?? process.platform;
   const arch = options.arch ?? process.arch;
-  const asset = resolveAgentBrowserReleaseAsset(platform, arch, isMusl(platform));
+  const asset = resolveAgentBrowserReleaseAsset(platform, arch, isMusl(platform), options.env ?? process.env);
   return asset
     ? { kind: "unavailable", reason: "agent-browser is not installed on this machine yet", installable: true }
-    : { kind: "unavailable", reason: `agent-browser publishes no build for ${platform}-${arch}`, installable: false };
+    : { kind: "unavailable", reason: missingAgentBrowserReleaseReason(platform, arch), installable: false };
 }
 
 const PROFILE_CACHE_ARG = `--disk-cache-size=${64 * 1024 * 1024}`;

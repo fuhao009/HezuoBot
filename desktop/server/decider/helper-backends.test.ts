@@ -18,7 +18,7 @@ const ACCOUNT = "0123456789abcdef0123456789abcdef";
 const OR_KEY = "sk-or-v1-order-key-0123456789";
 const SHARED = "sk-or-v1-order-shared-0123456789";
 const RELAY = "https://cloud.example.test/api/cloud/services/decider";
-const INCLUDED = "omb_decide_order_included_token_0123456789";
+const INCLUDED = "hezuo_decide_order_included_token_0123456789";
 const CF_RUN = `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT}/ai/run/@cf/cloudflare`;
 
 type FetchMock = ReturnType<typeof vi.fn<typeof fetch>>;
@@ -37,8 +37,8 @@ const sent = (fetchImpl: FetchMock, index = 0) => {
 };
 const decider = (config: AppConfig, fetchImpl: FetchMock) => createDecider({ config: () => config, fetch: fetchImpl as unknown as typeof fetch });
 const cloud = () => {
-  vi.stubEnv("OMB_CLOUD_DECIDER_URL", RELAY);
-  vi.stubEnv("OMB_CLOUD_DECIDER_TOKEN", INCLUDED);
+  vi.stubEnv("HEZUO_CLOUD_DECIDER_URL", RELAY);
+  vi.stubEnv("HEZUO_CLOUD_DECIDER_TOKEN", INCLUDED);
 };
 
 afterEach(() => vi.unstubAllEnvs());

@@ -9,7 +9,8 @@ import { parseSmtpURL } from "./smtp.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const CONFIG_VERSION = 1;
-export const DEFAULT_DATA_DIR = path.join(ROOT, ".omb-scratch", "local-gateway");
+// Existing installations must supply their actual --config or data directory.
+export const DEFAULT_DATA_DIR = path.join(ROOT, ".hezuo-scratch", "local-gateway");
 export const DEFAULT_PORT = 8787;
 export const DEFAULT_MAX_OUTPUT_TOKENS = 1024;
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);
@@ -164,6 +165,7 @@ export function envValue(environment, name) {
   return typeof value === "string" && value.trim() !== "" ? value.trim() : undefined;
 }
 
+
 /** Reads a secret for `init`: flag file first, then environment. */
 function secretSource(label, fileOption, environment, envName) {
   if (fileOption) return readPrivateFile(fileOption, label).trim();
@@ -213,21 +215,21 @@ const EMAIL_VERIFICATION_MODES = new Set(["required", "off"]);
  */
 export function resolveGatewayConfig({ options = {}, environment = process.env, previous = null } = {}) {
   const pick = (flag, name) => options[flag] ?? envValue(environment, name);
-  const dataDir = path.resolve(pick("dataDir", "OMB_LOCAL_DATA_DIR") ?? previous?.dataDir ?? DEFAULT_DATA_DIR);
-  const host = pick("host", "OMB_LOCAL_HOST") ?? previous?.host ?? "127.0.0.1";
-  const publicHost = pick("publicHost", "OMB_LOCAL_PUBLIC_HOST") ?? previous?.publicHost ?? null;
+  const dataDir = path.resolve(pick("dataDir", "HEZUO_LOCAL_DATA_DIR") ?? previous?.dataDir ?? DEFAULT_DATA_DIR);
+  const host = pick("host", "HEZUO_LOCAL_HOST") ?? previous?.host ?? "127.0.0.1";
+  const publicHost = pick("publicHost", "HEZUO_LOCAL_PUBLIC_HOST") ?? previous?.publicHost ?? null;
   if (!LOOPBACK_HOSTS.has(host) && host !== "0.0.0.0" && host !== "::" && !publicHost) {
     fail("--public-host is required when binding a non-loopback address");
   }
-  const port = Number(pick("port", "OMB_LOCAL_PORT") ?? previous?.port ?? DEFAULT_PORT);
+  const port = Number(pick("port", "HEZUO_LOCAL_PORT") ?? previous?.port ?? DEFAULT_PORT);
   if (!Number.isInteger(port) || port < 1 || port > 65_535) fail("--port must be a TCP port");
 
-  const emailFrom = pick("emailFrom", "OMB_LOCAL_EMAIL_FROM") ?? previous?.emailFrom ?? null;
+  const emailFrom = pick("emailFrom", "HEZUO_LOCAL_EMAIL_FROM") ?? previous?.emailFrom ?? null;
   if (emailFrom !== null && !EMAIL.test(emailFrom)) fail("--email-from must be a valid address");
 
   // Secrets are copied into the data directory once and referenced by path.
   mkdirSync(path.join(dataDir, "secrets"), { recursive: true, mode: 0o700 });
-  const smtpInput = secretSource("--smtp-file", options.smtpFile, environment, "OMB_LOCAL_SMTP_URL");
+  const smtpInput = secretSource("--smtp-file", options.smtpFile, environment, "HEZUO_LOCAL_SMTP_URL");
   if (smtpInput !== null) {
     parseSmtpURL(smtpInput); // validated without echoing the credential
     writePrivateFile(secretPath(dataDir, SECRET_FILES.smtp), smtpInput);
@@ -236,7 +238,7 @@ export function resolveGatewayConfig({ options = {}, environment = process.env, 
   if (smtpConfigured && emailFrom === null) fail("an SMTP URL needs --email-from: sign-in codes must have a sender");
 
   // Mail is a deliberate choice, independent of whether SMTP is configured.
-  const modeInput = (pick("emailVerification", "OMB_LOCAL_EMAIL_VERIFICATION") ?? previous?.emailVerification ?? "")
+  const modeInput = (pick("emailVerification", "HEZUO_LOCAL_EMAIL_VERIFICATION") ?? previous?.emailVerification ?? "")
     .toLowerCase();
   if (modeInput !== "" && !EMAIL_VERIFICATION_MODES.has(modeInput)) {
     fail("--email-verification must be `required` or `off`");
@@ -246,36 +248,36 @@ export function resolveGatewayConfig({ options = {}, environment = process.env, 
     fail("--email-verification required needs a configured SMTP URL and --email-from");
   }
 
-  const upstreamBaseInput = pick("upstreamBase", "OMB_LOCAL_UPSTREAM_BASE");
+  const upstreamBaseInput = pick("upstreamBase", "HEZUO_LOCAL_UPSTREAM_BASE");
   const upstreamBase = upstreamBaseInput !== undefined
     ? readUpstreamBase(upstreamBaseInput, "--upstream-base")
     : previous?.upstreamBase ?? null;
 
-  const upstreamKeyInput = secretSource("--upstream-key-file", options.upstreamKeyFile, environment, "OMB_LOCAL_UPSTREAM_KEY");
+  const upstreamKeyInput = secretSource("--upstream-key-file", options.upstreamKeyFile, environment, "HEZUO_LOCAL_UPSTREAM_KEY");
   if (upstreamKeyInput !== null) {
     if (upstreamKeyInput.length < 8 || /\s/.test(upstreamKeyInput)) fail("the upstream key must be one non-whitespace token");
     writePrivateFile(secretPath(dataDir, SECRET_FILES.upstream), upstreamKeyInput);
   }
 
-  const modelFile = pick("models", "OMB_LOCAL_MODELS") ?? previous?.modelFile ?? null;
-  const openModelsFile = pick("openModels", "OMB_LOCAL_OPEN_MODELS") ?? previous?.openModelsFile ?? null;
-  const openModelsProvider = pick("openModelsProvider", "OMB_LOCAL_OPEN_MODELS_PROVIDER")
+  const modelFile = pick("models", "HEZUO_LOCAL_MODELS") ?? previous?.modelFile ?? null;
+  const openModelsFile = pick("openModels", "HEZUO_LOCAL_OPEN_MODELS") ?? previous?.openModelsFile ?? null;
+  const openModelsProvider = pick("openModelsProvider", "HEZUO_LOCAL_OPEN_MODELS_PROVIDER")
     ?? previous?.openModelsProvider ?? null;
-  const ratesSource = pick("rates", "OMB_LOCAL_RATES") ?? previous?.rates ?? null;
+  const ratesSource = pick("rates", "HEZUO_LOCAL_RATES") ?? previous?.rates ?? null;
   const rate = (() => {
-    const raw = pick("rate", "OMB_LOCAL_RATE") ?? previous?.rate ?? null;
+    const raw = pick("rate", "HEZUO_LOCAL_RATE") ?? previous?.rate ?? null;
     if (raw === null) return null;
     const value = Number(raw);
     if (!Number.isSafeInteger(value) || value <= 0) fail("--rate must be a positive integer of micro-points per million tokens");
     return value;
   })();
   const maxOutputTokens = (() => {
-    const value = Number(pick("maxOutputTokens", "OMB_LOCAL_MAX_OUTPUT_TOKENS") ?? previous?.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS);
+    const value = Number(pick("maxOutputTokens", "HEZUO_LOCAL_MAX_OUTPUT_TOKENS") ?? previous?.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS);
     if (!Number.isSafeInteger(value) || value < 1) fail("--max-output-tokens must be a positive integer");
     return value;
   })();
 
-  const requestedDefault = pick("defaultModel", "OMB_LOCAL_DEFAULT_MODEL") ?? null;
+  const requestedDefault = pick("defaultModel", "HEZUO_LOCAL_DEFAULT_MODEL") ?? null;
   let models = previous?.models ?? null;
   let upstreamBaseFromModels = null;
 
@@ -336,7 +338,7 @@ export function resolveGatewayConfig({ options = {}, environment = process.env, 
   }
 
   const operatorIds = (() => {
-    const raw = options.operatorId ?? envValue(environment, "OMB_LOCAL_OPERATOR_IDS");
+    const raw = options.operatorId ?? envValue(environment, "HEZUO_LOCAL_OPERATOR_IDS");
     if (raw === undefined) return previous?.operatorIds ?? [];
     return [...new Set(String(raw).split(",").map((value) => value.trim()).filter(Boolean))];
   })();
@@ -348,8 +350,8 @@ export function resolveGatewayConfig({ options = {}, environment = process.env, 
     host,
     port,
     publicHost,
-    certFile: pick("cert", "OMB_LOCAL_CERT") ?? previous?.certFile ?? null,
-    keyFile: pick("key", "OMB_LOCAL_KEY") ?? previous?.keyFile ?? null,
+    certFile: pick("cert", "HEZUO_LOCAL_CERT") ?? previous?.certFile ?? null,
+    keyFile: pick("key", "HEZUO_LOCAL_KEY") ?? previous?.keyFile ?? null,
     emailFrom,
     smtp: smtpConfigured,
     emailVerification,

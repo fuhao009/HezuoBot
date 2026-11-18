@@ -17,7 +17,7 @@ const candidate = path.resolve(process.argv[2] ?? "");
 if (!candidate.endsWith(".deb") || !fs.existsSync(candidate)) fail("pass the newly built DEB path");
 
 try {
-  const status = execFileSync("dpkg-query", ["-W", "-f=${db:Status-Abbrev}", "hezuo"], {
+  const status = execFileSync("dpkg-query", ["-W", "-f=${db:Status-Abbrev}", "hezuobot"], {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "ignore"],
   }).trim();
@@ -26,11 +26,11 @@ try {
   if (String(error?.message ?? error).includes("refusing to replace")) throw error;
 }
 
-const temporary = fs.mkdtempSync(path.join(path.resolve(runnerTemp), "omb-deb-upgrade-"));
+const temporary = fs.mkdtempSync(path.join(path.resolve(runnerTemp), "hezuo-deb-upgrade-"));
 if (path.dirname(temporary) !== path.resolve(runnerTemp)) fail("temporary fixture escaped RUNNER_TEMP");
 const legacyRoot = path.join(temporary, "legacy-package");
 const controlRoot = path.join(legacyRoot, "DEBIAN");
-const legacyApp = path.join(legacyRoot, "opt", "Hezuo");
+const legacyApp = path.join(legacyRoot, "opt", "HezuoBot");
 const legacyResources = path.join(legacyApp, "resources");
 const legacyDeb = path.join(temporary, "hezuo_0.1.7_amd64.deb");
 
@@ -42,7 +42,7 @@ try {
   fs.writeFileSync(
     path.join(controlRoot, "control"),
     [
-      "Package: hezuo",
+      "Package: hezuobot",
       "Version: 0.1.7",
       "Architecture: amd64",
       "Maintainer: Hezuo CI <ci@hezuo.invalid>",
@@ -57,7 +57,7 @@ try {
     stdio: "inherit",
   });
   execFileSync("dpkg", ["--install", legacyDeb], { stdio: "inherit" });
-  for (const directory of ["/opt/Hezuo", "/opt/Hezuo/resources"]) {
+  for (const directory of ["/opt/HezuoBot", "/opt/HezuoBot/resources"]) {
     const mode = fs.lstatSync(directory).mode & 0o777;
     if (mode !== 0o775) fail(`legacy fixture did not reproduce 0775 at ${directory}`);
   }
@@ -70,9 +70,9 @@ try {
     stdio: "inherit",
   });
   for (const directory of [
-    "/opt/Hezuo",
-    "/opt/Hezuo/resources",
-    "/opt/Hezuo/resources/cua-linux-x64",
+    "/opt/HezuoBot",
+    "/opt/HezuoBot/resources",
+    "/opt/HezuoBot/resources/cua-linux-x64",
   ]) {
     const details = fs.lstatSync(directory);
     if (!details.isDirectory() || details.isSymbolicLink()) fail(`unsafe upgraded directory: ${directory}`);
@@ -81,14 +81,14 @@ try {
     }
   }
   for (const executable of ["cua-driver", "cua-cursor-theme"]) {
-    const file = path.join("/opt/Hezuo/resources/cua-linux-x64", executable);
+    const file = path.join("/opt/HezuoBot/resources/cua-linux-x64", executable);
     const details = fs.lstatSync(file);
     if (!details.isFile() || details.isSymbolicLink()) fail(`unsafe upgraded executable: ${file}`);
     if (details.uid !== 0 || details.gid !== 0 || (details.mode & 0o777) !== 0o755) {
       fail(`upgraded executable is not root:root 0755: ${file}`);
     }
   }
-  const chromiumSandbox = "/opt/Hezuo/chrome-sandbox";
+  const chromiumSandbox = "/opt/HezuoBot/chrome-sandbox";
   const sandboxDetails = fs.lstatSync(chromiumSandbox);
   if (!sandboxDetails.isFile() || sandboxDetails.isSymbolicLink()) {
     fail(`unsafe upgraded Chromium sandbox: ${chromiumSandbox}`);
@@ -100,7 +100,7 @@ try {
   ) {
     fail(`upgraded Chromium sandbox is not root:root 4755: ${chromiumSandbox}`);
   }
-  const installedVersion = execFileSync("dpkg-query", ["-W", "-f=${Version}", "hezuo"], {
+  const installedVersion = execFileSync("dpkg-query", ["-W", "-f=${Version}", "hezuobot"], {
     encoding: "utf8",
   }).trim();
   console.log(

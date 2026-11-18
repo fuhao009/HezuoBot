@@ -30,7 +30,7 @@ const PROTOCOLS = new Set(["chat", "responses"]);
 const LEDGER_KINDS = new Set(["request", "enable", "disable", "grant", "settle"]);
 const LEDGER_STATES = new Set(["reserved", "streaming", "review", "settled"]);
 /** The gateway's model credential shape. */
-const PRODUCT_AI_TOKEN = /^omb_product_ai_[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}$/;
+const PRODUCT_AI_TOKEN = /^hezuo_product_ai_[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}$/;
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]"]);
 const MAX_MODELS = 256;
 

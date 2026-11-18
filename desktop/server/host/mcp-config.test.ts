@@ -21,13 +21,11 @@ function fixture(options: { refuse?: (name: string) => string | undefined } = {}
     sessions: { isLive: () => true },
     mcpOAuth,
     teamConnections: { personMcp: () => [], people: {} as TeamConnectionsHost["people"] },
-    cloudHome: null,
     fallbackPublicUrl: null,
     mcpConfigBusy: { get: () => busy, set: (value) => { busy = value; } },
     mcpServerResponse: () => ({ servers: listMcpServers(cfg.mcpServers) }),
     mcpPolicyRefusal: (name) => options.refuse?.(name),
     persistMcpServers: (next) => { cfg.mcpServers = next; },
-    savedCustomDomain: () => null,
     changed,
   });
   return { cfg, config, changed, forget, setBusy: (value: boolean) => { busy = value; } };

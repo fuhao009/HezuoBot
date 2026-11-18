@@ -30,7 +30,7 @@ export function ReadyBotGallery({ search, onDialog, onAdded }: {
   const [adding, setAdding] = useState<string | null>(null);
   const open = (id: string | null) => {
     // A paired device may not read the host's New bot defaults that the review is filled from.
-    if (id !== null && window.ogb?.remoteClient?.active) { dispatch({ type: "newBot", onCreated: onAdded }); return; }
+    if (id !== null && window.hezuo?.remoteClient?.active) { dispatch({ type: "newBot", onCreated: onAdded }); return; }
     setAdding(id); onDialog(id !== null);
   };
   const visible = READY_BOTS.filter((bot) => (!category || bot.category === category) && matchesReadyBot(bot, search));

@@ -16,7 +16,7 @@ import { isRemoteMcpServer, parseStoredMcpServer } from "../mcp-registry.ts";
 import { personKey } from "../person-key.ts";
 import { provesSameOrigin, requestOrigin, type RequestAuth } from "../request-auth.ts";
 import { APP_SLUG, appLabel, MCP_NAME, personKeyHeader } from "../team-connections.ts";
-import { sessionMember } from "./team-phone.ts";
+import { sessionMember } from "../session-membership.ts";
 import { PASS, type RouteHandler } from "./table.ts";
 import type * as Composio from "../composio.ts";
 
@@ -74,22 +74,15 @@ export function createTeamConnectionRoutes(deps: TeamConnectionRouteDeps): Route
     if (!member || auth.kind !== "session") return json(res, 403, { error: `Sign in to ${team.name} to connect your own apps.` });
     const person = personKey({ id: "", email: member.member.email });
     const email = member.member.email;
-    const cfg = deps.cfg();
 
     if (path === MY_CONNECTIONS_PATH) {
       if (method !== "GET") return json(res, 405, { error: "method not allowed" });
       const apps = deps.host.personApps();
-      const access = deps.host.people.appsAccess(person);
-      const states = access && apps.length ? await deps.composio.connectedServices(cfg, access).catch(() => null) : null;
       return json(res, 200, {
         team: { id: team.id, name: team.name },
         link: deps.host.link(),
         email,
-        apps: apps.map((slug) => {
-          const state = states?.[slug];
-          return { slug, name: appLabel(slug), connected: state?.connected === true,
-            accounts: (state?.accounts ?? []).map((account) => ({ id: account.id, alias: account.alias?.trim() || null, status: account.status })) };
-        }),
+        apps: apps.map((slug) => ({ slug, name: appLabel(slug), connected: false, accounts: [] })),
         mcp: deps.host.personMcp().flatMap((name) => {
           const stored = server(name);
           if (!stored || !isRemoteMcpServer(stored)) return [];
@@ -110,18 +103,9 @@ export function createTeamConnectionRoutes(deps: TeamConnectionRouteDeps): Route
       if (app[2] && method === "POST") {
         const refused = deps.policy?.appRefusal(slug);
         if (refused) return json(res, 403, { error: refused, code: "managed_policy" });
-        const access = await deps.host.people.ensureAppsAccess(person, email);
-        if (!access) return json(res, 503, { error: "Connected apps aren't available on this Cloud right now. Try again in a minute." });
-        try {
-          return json(res, 200, await deps.composio.authorizeService(cfg, slug, null, access));
-        } catch (error) {
-          const status = (error as { status?: number }).status;
-          return json(res, typeof status === "number" && status >= 400 && status < 500 ? status : 502, { error: error instanceof Error ? error.message : "The app's sign-in couldn't start." });
-        }
+        return json(res, 503, { error: "Per-person connected apps are unavailable on this Cloud." });
       }
       if (!app[2] && method === "DELETE") {
-        const access = deps.host.people.appsAccess(person);
-        if (access) await deps.composio.removeService(cfg, slug, access);
         return json(res, 200, { ok: true });
       }
       return json(res, 405, { error: "method not allowed" });

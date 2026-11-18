@@ -22,7 +22,7 @@ function journalWorker(dataDir: string, source: string) {
     "--eval",
     source,
   ], {
-    env: { ...process.env, OMB_DATA_DIR: dataDir },
+    env: { ...process.env, HEZUO_DATA_DIR: dataDir },
     stdio: ["pipe", "pipe", "pipe"],
   });
   let stderr = "";
@@ -132,7 +132,7 @@ describe("Boat create idempotency", () => {
     });
     await new Promise<void>((resolve) => api.listen(0, "127.0.0.1", resolve));
     const port = (api.address() as AddressInfo).port;
-    vi.stubEnv("OMB_BOAT_API", `http://127.0.0.1:${port}/api/v1`);
+    vi.stubEnv("HEZUO_BOAT_API", `http://127.0.0.1:${port}/api/v1`);
   });
 
   beforeEach(() => {
@@ -179,7 +179,7 @@ describe("Boat create idempotency", () => {
     expect(createKeys).toHaveLength(2);
     expect(createKeys[0]).toMatch(/^[0-9a-f-]{36}$/);
     expect(new Set(createKeys).size).toBe(1);
-    expect(renameBodies).toEqual([{ name: expect.stringMatching(/^ogb-[0-9a-f]{12}-lostres-[0-9a-f]{6}$/) }]);
+    expect(renameBodies).toEqual([{ name: expect.stringMatching(/^hezuo-[0-9a-f]{12}-lostres-[0-9a-f]{6}$/) }]);
   });
 
   it("reuses the durable key after a 5xx and module restart", async () => {
@@ -205,7 +205,7 @@ describe("Boat create idempotency", () => {
     expect(result.boxId).toBe("bx_abcdefgh");
     expect(createKeys).toHaveLength(3);
     expect(new Set(createKeys).size).toBe(1);
-    expect(renameBodies).toEqual([{ name: expect.stringMatching(/^ogb-[0-9a-f]{12}-restart-[0-9a-f]{6}$/) }]);
+    expect(renameBodies).toEqual([{ name: expect.stringMatching(/^hezuo-[0-9a-f]{12}-restart-[0-9a-f]{6}$/) }]);
   });
 
   it("waits for an in-progress idempotent create and keeps the same key", async () => {
@@ -305,7 +305,7 @@ describe("Boat create idempotency", () => {
     expect(boatCreateRecoverySnapshot().find((record) => record.botId === botId)).toBeUndefined();
   });
 
-  it("adopts the same legacy Boat once, supersedes pending state, and refuses conflicting ownership", async () => {
+  it("adopts the same recorded Boat once, supersedes pending state, and refuses conflicting ownership", async () => {
     vi.resetModules();
     const {
       adoptResolvedBoat,
@@ -316,7 +316,7 @@ describe("Boat create idempotency", () => {
     const hasUnresolvedBoatCreate = (owner: string) =>
       boatCreateRecoverySnapshot().some((record) => record.botId === owner && !record.resolved);
     const boxId = "bx_56789abc";
-    const botId = "legacy-journal-owner";
+    const botId = "recorded-journal-owner";
     try {
       beginBoatCreate(botId, JSON.stringify({ ttlSeconds: 7_200, noEnv: true }));
       expect(hasUnresolvedBoatCreate(botId)).toBe(true);
@@ -331,7 +331,7 @@ describe("Boat create idempotency", () => {
       expect(boatCreateRecoverySnapshot().filter((record) => record.botId === botId)).toEqual([
         { botId, boxId: "bx_6789abcd", resolved: true },
       ]);
-      expect(() => adoptResolvedBoat("other-legacy-owner", "bx_6789abcd")).toThrow(/another bot/i);
+      expect(() => adoptResolvedBoat("other-recorded-owner", "bx_6789abcd")).toThrow(/another bot/i);
       expect(boatCreateRecoverySnapshot().filter((record) => record.botId === botId)).toEqual([
         { botId, boxId: "bx_6789abcd", resolved: true },
       ]);
@@ -342,7 +342,7 @@ describe("Boat create idempotency", () => {
   });
 
   it("serializes two processes that primed independent journal caches", async () => {
-    const dataDir = mkdtempSync(join(tmpdir(), "omb-box-journal-processes-"));
+    const dataDir = mkdtempSync(join(tmpdir(), "hezuo-box-journal-processes-"));
     const requestBody = JSON.stringify({ ttlSeconds: 7_200, noEnv: true });
     const source = `
       const journal = await import(${JSON.stringify(JOURNAL_MODULE_URL)});
@@ -393,7 +393,7 @@ describe("Boat create idempotency", () => {
   });
 
   it("safely retires a complete lock left by an exited process", async () => {
-    const dataDir = mkdtempSync(join(tmpdir(), "omb-box-journal-stale-"));
+    const dataDir = mkdtempSync(join(tmpdir(), "hezuo-box-journal-stale-"));
     const exited = spawn(process.execPath, ["--eval", ""], { stdio: "ignore" });
     const exitedPid = exited.pid;
     expect(exitedPid).toBeTypeOf("number");
@@ -425,7 +425,7 @@ describe("Boat create idempotency", () => {
   });
 
   it("recovers when an elected stale-lock reaper also exited", async () => {
-    const dataDir = mkdtempSync(join(tmpdir(), "omb-box-journal-dead-reaper-"));
+    const dataDir = mkdtempSync(join(tmpdir(), "hezuo-box-journal-dead-reaper-"));
     const exitedOwner = spawn(process.execPath, ["--eval", ""], { stdio: "ignore" });
     const exitedOwnerPid = exitedOwner.pid;
     expect(exitedOwnerPid).toBeTypeOf("number");
@@ -467,7 +467,7 @@ describe("Boat create idempotency", () => {
   });
 
   it("bounds retries when a lock disappears between EEXIST and owner read", async () => {
-    const dataDir = mkdtempSync(join(tmpdir(), "omb-box-journal-vanishing-lock-"));
+    const dataDir = mkdtempSync(join(tmpdir(), "hezuo-box-journal-vanishing-lock-"));
     const lockPath = join(dataDir, "box-create-requests.lock");
     const source = `
       import fs from "node:fs";
@@ -523,7 +523,7 @@ describe("Boat create idempotency", () => {
   });
 
   it("bounds retries when every successfully reaped lock is replaced", async () => {
-    const dataDir = mkdtempSync(join(tmpdir(), "omb-box-journal-replaced-lock-"));
+    const dataDir = mkdtempSync(join(tmpdir(), "hezuo-box-journal-replaced-lock-"));
     const exited = spawn(process.execPath, ["--eval", ""], { stdio: "ignore" });
     const exitedPid = exited.pid;
     expect(exitedPid).toBeTypeOf("number");
@@ -586,7 +586,7 @@ describe("Boat create idempotency", () => {
   });
 
   it("never bypasses a live elected reaper when contenders race", async () => {
-    const dataDir = mkdtempSync(join(tmpdir(), "omb-box-journal-live-reaper-"));
+    const dataDir = mkdtempSync(join(tmpdir(), "hezuo-box-journal-live-reaper-"));
     const exitedOwner = spawn(process.execPath, ["--eval", ""], { stdio: "ignore" });
     const exitedOwnerPid = exitedOwner.pid;
     expect(exitedOwnerPid).toBeTypeOf("number");
@@ -646,7 +646,7 @@ describe("Boat create idempotency", () => {
   });
 
   it("fails closed instead of replacing an ownerless or corrupt lock", async () => {
-    const dataDir = mkdtempSync(join(tmpdir(), "omb-box-journal-corrupt-lock-"));
+    const dataDir = mkdtempSync(join(tmpdir(), "hezuo-box-journal-corrupt-lock-"));
     writeFileSync(join(dataDir, "box-create-requests.lock"), "not-json\n");
     const source = `
       const journal = await import(${JSON.stringify(JOURNAL_MODULE_URL)});

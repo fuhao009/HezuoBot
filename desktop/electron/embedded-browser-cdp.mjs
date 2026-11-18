@@ -70,7 +70,7 @@ export function createEmbeddedBrowserBroker({ createView, sessionFor, send, vers
     else void terminate(lease, "The browser event queue exceeded its limit.");
   }
   function removeRoute(lease, route, notify = true) {
-    for (const child of [...lease.routes.values()]) if (child.parent === route.id) removeRoute(lease, child, notify);
+    for (const child of Array.from(lease.routes.values())) if (child.parent === route.id) removeRoute(lease, child, notify);
     if (!lease.routes.delete(route.id)) return;
     if (route.native) route.target.native.delete(route.native);
     if (notify && route.target.published) event(lease, "Target.detachedFromTarget", { sessionId: route.id, targetId: route.target.info.targetId }, route.parent ?? undefined);
@@ -79,7 +79,7 @@ export function createEmbeddedBrowserBroker({ createView, sessionFor, send, vers
     if (!lease.targets.delete(target.info.targetId)) return;
     for (const off of target.offs) off();
     removeRoute(lease, target.primary);
-    for (const route of [...lease.routes.values()]) if (route.target === target) removeRoute(lease, route);
+    for (const route of Array.from(lease.routes.values())) if (route.target === target) removeRoute(lease, route);
     if (lease.active === target.info.targetId) lease.active = lease.targets.keys().next().value;
     if (!lease.closed) void saveTabs(lease);
     if (lease.discover) event(lease, "Target.targetDestroyed", { targetId: target.info.targetId });
@@ -207,7 +207,7 @@ export function createEmbeddedBrowserBroker({ createView, sessionFor, send, vers
         lease.offDownload?.();
         lease.session?.setPermissionCheckHandler(() => false);
         lease.session?.setPermissionRequestHandler((_, __, callback) => callback(false));
-        for (const target of [...lease.targets.values()]) {
+        for (const target of Array.from(lease.targets.values())) {
           for (const off of target.offs) off();
           try { if (target.view.webContents.debugger.isAttached()) target.view.webContents.debugger.detach(); } catch {}
           try { await closeView(target.view); } catch {}

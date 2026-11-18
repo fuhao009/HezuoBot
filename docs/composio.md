@@ -25,7 +25,7 @@ A Hezuo Cloud plan includes connected apps: there is no key to add. At every sta
 - The file never goes into a backup or a move to another computer, and a restore keeps the Cloud's own (`desktop/server/workspace-backup-policy.ts`): its connected accounts belong to that installation.
 - A Composio project key the owner saves under **Self-host connected apps** still wins; clearing it returns to the included service.
 
-The built image uses the default service; `OMB_COMPOSIO_BROKER_URL` names another (a staging service, or a closed port in CI). The server run from source registers only with an explicitly named service, so development and tests never create installations on the real one.
+The built image uses the default service; `HEZUO_COMPOSIO_BROKER_URL` names another (a staging service, or a closed port in CI). The server run from source registers only with an explicitly named service, so development and tests never create installations on the real one.
 
 ## App events
 
@@ -50,7 +50,7 @@ the desktop, a headless server and a Cloud alike:
 | --- | --- | --- |
 | Events kept per day (UTC) | 500 | 2,000 |
 
-A Cloud counts as paid once its server presents the Admin's signed grant (`OMB_CLOUD_CONNECTED_APPS_GRANT`).
+A Cloud counts as paid once its server presents the Admin's signed grant (`HEZUO_CLOUD_CONNECTED_APPS_GRANT`).
 Events over the limit are not run; the automation shows how many were skipped today and why.
 
 Gmail and other polled apps are checked every 15 minutes, the minimum for Composio-managed sign-ins. A server
@@ -136,7 +136,7 @@ after ten minutes, retry requests a fresh link, as required by
 
 A label is required only when the app already has an `ACTIVE` account (or one
 whose status Composio did not report). While no account works, an alias-less
-retry gets a unique `omb-retry-…` alias and leaves the other accounts alone.
+retry gets a unique `hezuo-retry-…` alias and leaves the other accounts alone.
 Asking again for a label held only by an account that is not active (for
 example an `INITIATED` sign-in that was abandoned, or a `FAILED` or `EXPIRED`
 one) revokes and deletes that account, then links a new one under the same
@@ -157,7 +157,7 @@ retried once and then answered with the last list the connection service gave.
 
 ## Renderer-neutral connection inventory
 
-Desktop, web, and mobile clients can load the complete account inventory in one request:
+Desktop and web clients can load the complete account inventory in one request:
 
 ```http
 GET /api/connectors/connected
@@ -201,4 +201,4 @@ A bot with no grant record at all keeps the legacy behavior: every tool on every
 
 **Gmail and Google Calendar by name.** Besides Composio's search-and-run tools, a bot with Gmail or Google Calendar connected and granted gets plain tools for the common reads and writes, the same on every engine: `gmail.search_emails`, `gmail.read_email`, `gmail.read_email_thread`, `gmail.create_draft`, `gmail.send_email`, `googlecalendar.list_events` and `googlecalendar.list_calendars` (writes only where the bot may write). Claude Code finds them by those names (`select:gmail.search_emails`); other engines show them as `gmail_search_emails` behind their own prefix. Each one runs its Composio tool through the multi-execute tool, so its grant, read or write level and approval rules are that tool's. A routine written on one engine keeps working when its bot moves to another.
 
-Grants are enforced on the real tool names at call time (including batches inside the MULTI_EXECUTE meta-tool), the tool list offered to the model is filtered to the granted set, and every allow/deny writes a decision-log row. Refusals do not enumerate what else is granted. Paired phones see each bot's grants read-only in its profile (What this bot does → App tools); grants are assigned on the computer, never from a phone.
+Grants are enforced on the real tool names at call time (including batches inside the MULTI_EXECUTE meta-tool), the tool list offered to the model is filtered to the granted set, and every allow/deny writes a decision-log row. Refusals do not enumerate what else is granted. Companion access must not broaden a bot's grants; grants are assigned on the computer.

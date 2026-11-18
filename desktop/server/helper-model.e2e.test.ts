@@ -42,7 +42,7 @@ async function boot(extraConfig: Record<string, unknown>) {
   for (const name of FAKES) chmodSync(fake(name), 0o755);
   const port = 18800 + Math.floor(Math.random() * 10_000);
   const base = `http://127.0.0.1:${port}`;
-  const home = mkdtempSync(join(tmpdir(), "omb-helper-model-"));
+  const home = mkdtempSync(join(tmpdir(), "hezuo-helper-model-"));
   mkdirSync(join(home, ".hezuo"), { recursive: true });
   const routes = join(home, "one-shot-routes.json");
   writeFileSync(routes, JSON.stringify({
@@ -60,7 +60,7 @@ async function boot(extraConfig: Record<string, unknown>) {
     ...extraConfig,
   }));
   let stderr = "";
-  const env: NodeJS.ProcessEnv = { HOME: home, USERPROFILE: home, OMB_PORT: String(port), FAKE_CLAUDE_TEXT_ROUTES: routes };
+  const env: NodeJS.ProcessEnv = { HOME: home, USERPROFILE: home, HEZUO_PORT: String(port), FAKE_CLAUDE_TEXT_ROUTES: routes };
   if (process.env.PATH) env.PATH = process.env.PATH;
   const child: ChildProcess = spawn(process.execPath, [join(SERVER_DIR, "index.ts")], { cwd: join(SERVER_DIR, "..", ".."), env, stdio: ["ignore", "pipe", "pipe"] });
   child.stderr!.on("data", (chunk) => (stderr += chunk));

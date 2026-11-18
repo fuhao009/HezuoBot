@@ -6,7 +6,7 @@ const requests: Array<{ path: string; method?: string; body?: unknown }> = [];
 let failing = false;
 let remote = false;
 
-const stubWindow = () => vi.stubGlobal("window", { ogb: remote ? { remoteClient: { active: true } } : undefined, location: { origin: "http://127.0.0.1" } });
+const stubWindow = () => vi.stubGlobal("window", { hezuo: remote ? { remoteClient: { active: true } } : undefined, location: { origin: "http://127.0.0.1" } });
 const stubFetch = () => vi.stubGlobal("fetch", async (path: string, init: RequestInit = {}) => {
   requests.push({ path: String(path), method: init.method, body: init.body ? JSON.parse(String(init.body)) : undefined });
   if (failing) return new Response(JSON.stringify({ error: "List every department exactly once" }), { status: 400, headers: { "content-type": "application/json" } });

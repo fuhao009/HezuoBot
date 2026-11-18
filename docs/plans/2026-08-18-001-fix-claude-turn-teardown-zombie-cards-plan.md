@@ -5,9 +5,9 @@ execution: code
 product_contract_source: ce-plan-bootstrap
 ---
 
-# fix: Kill the child process and drop late asks on Claude turn teardown
+# fix: Kill the child process and drop late asks on Claude turn teardown — Hezuo
 
-**Origin issue:** [milind-soni/OpenMausBot#211](https://github.com/milind-soni/OpenMausBot/issues/211) — "Turn teardown discards the permission broker without ensuring child CLI/MCP exit — late approval requests become dead 'zombie' cards"
+**Origin issue:** historical issue #211 — "Turn teardown discards the permission broker without ensuring child CLI/MCP exit — late approval requests become dead 'zombie' cards"
 
 ---
 
@@ -17,7 +17,7 @@ When a Claude-driven turn ends, `desktop/server/drivers/claude.ts`'s `settle()` 
 
 ## Problem Frame
 
-`sendTurn()` in `desktop/server/drivers/claude.ts` spawns the `claude` CLI per turn and wires a `createPermissionBroker()` instance to a per-turn unix socket (named pipe on Windows). The CLI's own spawned MCP `ogb` process (`desktop/server/permission-proxy.ts`) forwards `approve`/`ask_user` tool calls over that socket to the broker, which the harness renders as `request.opened` cards.
+`sendTurn()` in `desktop/server/drivers/claude.ts` spawns the `claude` CLI per turn and wires a `createPermissionBroker()` instance to a per-turn unix socket (named pipe on Windows). The CLI's own spawned MCP `hezuo` process (`desktop/server/permission-proxy.ts`) forwards `approve`/`ask_user` tool calls over that socket to the broker, which the harness renders as `request.opened` cards.
 
 Two independent gaps compound into the reported symptom:
 
@@ -132,4 +132,4 @@ Rationale: fix A's contract is about the OS process, not just emitted events —
 - [ ] New `result-then-hang` fake-CLI mode added; new tests for both units pass.
 - [ ] All pre-existing tests in `desktop/server/drivers/claude.test.ts` and `desktop/server/kill-tree.test.ts` still pass (R3).
 - [ ] No changes to `codex.ts`, `acp/core.ts`, `antigravity.ts`, or the issue's point-3 startup sweep — explicitly deferred.
-- [ ] Changes committed with a message referencing milind-soni/OpenMausBot#211.
+- [ ] Changes committed with a message referencing historical issue #211.

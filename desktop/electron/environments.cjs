@@ -82,12 +82,12 @@ function workspaceSummary(state) {
 /** Native identity must not depend on a hosted renderer's version/title. `homeOrigin`: My Cloud once it is the person's
  * home: alone, it is simply the app; with a team or another place besides, the window names the place it shows. */
 function workspaceWindowTitle(state, companion, homeOrigin = null) {
-  if (companion) return `Hezuo — Connected to: ${companion.serverName} (${new URL(companion.endpoint).host})`;
+  if (companion) return `HezuoBot — Connected to: ${companion.serverName} (${new URL(companion.endpoint).host})`;
   const active = activeEnvironment(state);
-  if (listedPlace(active)) return `Hezuo — ${active.name}`;
-  if (active && active.kind !== "local" && active.origin !== homeOrigin) return `Hezuo — Hosted: ${active.name} (${new URL(active.origin).host})`;
-  if (active && homeOrigin && active.origin === homeOrigin && otherPlaces(state, homeOrigin) > 0) return `Hezuo — ${active.name}`;
-  return "Hezuo";
+  if (listedPlace(active)) return `HezuoBot — ${active.name}`;
+  if (active && active.kind !== "local" && active.origin !== homeOrigin) return `HezuoBot — Hosted: ${active.name} (${new URL(active.origin).host})`;
+  if (active && homeOrigin && active.origin === homeOrigin && otherPlaces(state, homeOrigin) > 0) return `HezuoBot — ${active.name}`;
+  return "HezuoBot";
 }
 
 /** Switching is a main-process action; a cloud page must not navigate itself onto the local bridge. */
@@ -221,8 +221,7 @@ function withOwnCloud(state, cloud, makeId) {
   return { ...state, environments: existing ? state.environments.map((entry) => (entry === existing ? next : entry)) : [...state.environments, next] };
 }
 
-/** The person's other own Clouds the verified session lists (cloud-list.mjs ownCloudPlaces), as saved places: one the
- * session no longer lists is gone. Null (an Admin without the list, or no verified word) changes nothing. */
+/** Reconciles saved places against the verified account list; an unavailable list changes nothing. */
 function reconcileOwnClouds(state, clouds, makeId, homeOrigin = null) {
   if (!Array.isArray(clouds)) return state;
   const wanted = new Map();
@@ -249,8 +248,7 @@ function placesLine({ cloudName = "My Cloud", onCloud, localBots }) {
   return names ? `These bots live on this computer: ${names}. ${cloudName} has its own.` : `This computer has no bots of its own yet. ${cloudName} has its own.`;
 }
 
-/** One line under My Cloud: what of this computer's is not on it yet, with Send (Send to My Cloud, cloud-send.mjs), or
- * the way to the side-by-side page when nothing waits. */
+/** Summarizes pending changes for the environment switcher. */
 function sendLine({ cloudName = "My Cloud", waiting }) {
   const total = waiting?.total ?? 0, bots = waiting?.bots ?? 0;
   if (!total) return null;

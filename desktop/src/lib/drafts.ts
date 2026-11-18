@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState, useSyncExternalStore, type SetStateAction } from "react";
 import { isAttachment, type Attachment } from "./composer-attachments.js";
 
-const KEY = "omb-drafts";
-const ATTACHMENTS_KEY = "omb-draft-attachments";
-const SEND_IDS_KEY = "omb-draft-send-ids";
-const CHANNEL_MODES_KEY = "omb-draft-channel-modes";
+const KEY = "hezuo-drafts";
+const ATTACHMENTS_KEY = "hezuo-draft-attachments";
+const SEND_IDS_KEY = "hezuo-draft-send-ids";
+const CHANNEL_MODES_KEY = "hezuo-draft-channel-modes";
 // Outside React, so a late failure from an unmounted composer cannot overwrite a newer draft.
 const draftRevisions = new Map<string, number>();
 const replyDrafts = new Map<string, string>();

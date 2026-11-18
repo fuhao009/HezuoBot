@@ -657,7 +657,7 @@ The shipped build graph contains exactly the following MPL-2.0 components. Their
 
 ${mplSourceRows.join("\n")}
 
-The complete MPL-2.0 text and package copyright notices appear in \`THIRD_PARTY_LICENSES.html\`. These files remain under their original licenses; OpenMausBot's and Cua's MIT licenses do not replace them.
+The complete MPL-2.0 text and package copyright notices appear in \`THIRD_PARTY_LICENSES.html\`. These files remain under their original licenses; the application's and Cua's MIT licenses do not replace them.
 
 ## Scope and method
 

@@ -51,8 +51,8 @@ function createFixture(policy: ManagedModelPolicy) {
     presetStore: { resolve: () => null },
     orgInstallStatuses: () => new Map<string, OrgInstallStatus>(),
     hostedWorkspace: false, hostedFullAccessRefusal: "not here", desktopManaged: true,
-    maxWorkspaceBots: 100, cloudOwnerKey: null,
-    hostedModels: policy, cloudRoutineAuthors: null,
+    maxWorkspaceBots: 100,
+    hostedModels: policy,
     routines: () => null,
     storedAvatarExists: () => false,
     defaultSelection: async () => policy.select(),
@@ -61,7 +61,6 @@ function createFixture(policy: ManagedModelPolicy) {
       if (!selection) return { ok: false, status: 400, error: "modelSelection.instanceId and model are required" };
       return policy.allows(selection) ? { ok: true, selection } : { ok: false, status: 400, error: policy.error() };
     },
-    cloudOwnerSession: () => false,
     // The route only relays this value; the test reads the stored record, never the wire projection.
     wireBot: (bot: BotRecord): WireBot => bot as unknown as WireBot,
   };

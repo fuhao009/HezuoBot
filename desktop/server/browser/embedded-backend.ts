@@ -177,8 +177,8 @@ export function createEmbeddedBrowserBackend(options: {
         waiting.reject(new Error("The desktop browser link closed while opening."));
       }
       pending.clear();
-      for (const lease of [...leases.values()]) lease.end("The desktop browser link closed.", true);
-      for (const release of [...releases.values()]) release.finish(false);
+      for (const lease of Array.from(leases.values())) lease.end("The desktop browser link closed.", true);
+      for (const release of Array.from(releases.values())) release.finish(false);
     },
   };
 }

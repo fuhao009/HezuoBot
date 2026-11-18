@@ -1,9 +1,12 @@
+import { createRequire } from "node:module";
 import type { IncomingHttpHeaders, IncomingMessage } from "node:http";
 import { describe, expect, it } from "vitest";
 import { desktopUiAccessAllowed } from "./desktop-ui-access.ts";
 
+const { desktopServerHeaders } = createRequire(import.meta.url)("../electron/desktop-server-auth.cjs");
+
 const ownerToken = "desktop-owner-secret";
-const cookieName = "omb_session_test";
+const cookieName = "hezuo_session_test";
 const owner = { "x-hezuo-desktop-owner": ownerToken };
 const browser = { "sec-fetch-site": "same-origin", "sec-fetch-dest": "empty" };
 function allowed(path: string, headers: IncomingHttpHeaders = {}, method = "GET", token: string | null = ownerToken): boolean {
@@ -13,6 +16,18 @@ function allowed(path: string, headers: IncomingHttpHeaders = {}, method = "GET"
 }
 
 describe("managed desktop UI access", () => {
+  it("accepts the packaged Electron owner capability using the actual wire header", () => {
+    const token = "a".repeat(43);
+    const headers = Object.fromEntries(Object.entries(desktopServerHeaders({}, { packaged: true, token }))
+      .map(([name, value]) => [name.toLowerCase(), value])) as IncomingHttpHeaders;
+    for (const path of ["/", "/assets/app.js", "/api/bots"]) {
+      expect(allowed(path, { ...browser, ...headers }, "GET", token)).toBe(true);
+      expect(allowed(path, { ...browser, ...headers }, "GET", "b".repeat(43))).toBe(false);
+      expect(allowed(path, { ...browser, ...headers, origin: "https://outside.example" }, "GET", token)).toBe(false);
+      expect(allowed(path, browser, "GET", token)).toBe(false);
+    }
+  });
+
   it("requires the actual owner header for every static page, SPA path and asset, for every method", () => {
     for (const path of ["/", "/settings", "/pair", "/rail", "/assets/app.js", "/favicon.ico", "/api"]) {
       for (const method of ["GET", "HEAD", "POST", "OPTIONS"]) {
@@ -41,8 +56,8 @@ describe("managed desktop UI access", () => {
   });
 
   it("closes browser API, cookie and stream-ticket access before ordinary session authentication", () => {
-    for (const path of ["/api/bots", "/api/auth/pair", "/api/auth/email/start", "/api/events"]) {
-      for (const headers of [browser, { cookie: `${cookieName}=valid-session` }, { ...browser, authorization: "Bearer omb_sess_valid" }]) {
+    for (const path of ["/api/bots", "/api/auth/pair", "/api/events"]) {
+      for (const headers of [browser, { cookie: `${cookieName}=valid-session` }, { ...browser, authorization: "Bearer hezuo_sess_valid" }]) {
         expect(allowed(path, headers)).toBe(false);
         expect(allowed(path, { ...headers, ...owner })).toBe(true);
       }
@@ -54,7 +69,7 @@ describe("managed desktop UI access", () => {
   });
 
   it("preserves native APIs, bearer clients, companion traffic and capability endpoints", () => {
-    for (const headers of [{}, { authorization: "Bearer omb_sess_native" }, { "x-hezuo-companion-auth": "relay", "x-hezuo-companion": "1" }, { "sec-fetch-mode": "cors" }]) {
+    for (const headers of [{}, { authorization: "Bearer hezuo_sess_native" }, { "x-hezuo-companion-auth": "relay", "x-hezuo-companion": "1" }, { "sec-fetch-mode": "cors" }]) {
       expect(allowed("/api/bots", headers)).toBe(true);
     }
     expect(allowed("/api/internal/browser/mcp", browser, "POST")).toBe(true);

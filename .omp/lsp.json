@@ -1,0 +1,11 @@
+{
+  "servers": {
+    "typescript-language-server": {
+      "command": "/Users/a1234/.local/nodejs/node-v24.16.0-darwin-arm64/bin/node",
+      "args": ["/Users/a1234/.local/share/hezuobot-lsp/node_modules/typescript-language-server/lib/cli.mjs", "--stdio"],
+      "fileTypes": [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts"],
+      "rootMarkers": ["package.json", "tsconfig.json"],
+      "warmupTimeoutMs": 20000
+    }
+  }
+}

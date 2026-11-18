@@ -29,8 +29,8 @@ export function isServerPairingLink(input: string): boolean {
 }
 
 export function RemoteComputerSection({ hideWhenUnavailable = false }: { hideWhenUnavailable?: boolean }) {
-  const bridge = window.ogb?.remoteClient;
-  const environments = window.ogb?.environments;
+  const bridge = window.hezuo?.remoteClient;
+  const environments = window.hezuo?.environments;
   const [state, setState] = useState<DesktopRemoteClientState>({ active: bridge?.active === true });
   const [connection, setConnection] = useState<"server" | "companion">(environments ? "server" : "companion");
   const [serverLink, setServerLink] = useState("");
@@ -191,7 +191,6 @@ export function RemoteComputerSection({ hideWhenUnavailable = false }: { hideWhe
                 <input
                   value={endpoint}
                   onChange={(event) => setEndpoint(event.target.value)}
-                  placeholder="https://…openmausbot.com or computer.tailnet.ts.net"
                   disabled={busy}
                   autoCapitalize="none"
                   autoCorrect="off"

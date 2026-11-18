@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-// scripts/mcp-server.ts snapshots process.env at import time: scrub ambient OMB_* / HEZUO_* values first.
-import "./testing/scrub-ambient-omb-env.ts";
+// scripts/mcp-server.ts snapshots process.env at import time: scrub ambient HEZUO_* values first.
+import "./testing/scrub-ambient-hezuo-env.ts";
 
 import {
   handleToolCall,
@@ -730,7 +730,7 @@ describe("connection security and discovery", () => {
 
   it("requires an explicit destination before sending a bearer token", async () => {
     process.env.HEZUO_TOKEN = "proxy-token";
-    await expect(resolveBaseUrl()).rejects.toThrow("HEZUO_URL or OMB_PORT");
+    await expect(resolveBaseUrl()).rejects.toThrow("HEZUO_URL or HEZUO_PORT");
   });
 
   it("validates direct tool arguments", () => {

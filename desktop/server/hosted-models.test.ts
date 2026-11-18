@@ -18,29 +18,29 @@ afterEach(async () => {
   vi.unstubAllGlobals();
   for (const directory of directories.splice(0)) await removeTempDir(directory);
 });
-const directory = () => { const value = mkdtempSync(join(tmpdir(), "omb-hosted-models-")); directories.push(value); return value; };
-const token = `omb_workspace_${"a".repeat(43)}`;
-const env = () => ({ OMB_ADMIN_URL: "https://admin.example.test", OMB_PUBLIC_URL: "https://fixture.example.test", OMB_ADMIN_WORKSPACE: "fixture", OMB_ADMIN_MEMBERSHIP: "portal",
-  OMB_HOSTED_MODEL_TOKEN: token, OMB_HOSTED_MODELS: JSON.stringify({ anthropic: ["claude-fixture"], openai: ["gpt-fixture"], openrouter: ["provider/fixture"] }) });
+const directory = () => { const value = mkdtempSync(join(tmpdir(), "hezuo-hosted-models-")); directories.push(value); return value; };
+const token = `hezuo_workspace_${"a".repeat(43)}`;
+const env = () => ({ HEZUO_ADMIN_URL: "https://admin.example.test", HEZUO_PUBLIC_URL: "https://fixture.example.test", HEZUO_ADMIN_WORKSPACE: "fixture", HEZUO_ADMIN_MEMBERSHIP: "portal",
+  HEZUO_HOSTED_MODEL_TOKEN: token, HEZUO_HOSTED_MODELS: JSON.stringify({ anthropic: ["claude-fixture"], openai: ["gpt-fixture"], openrouter: ["provider/fixture"] }) });
 
 it("requires an explicit complete hosted policy and leaves normal desktops alone", () => {
   expect(hostedModelPolicy(directory(), {})).toBeNull();
-  expect(hostedModelPolicy(directory(), { OMB_ADMIN_URL: "https://admin.example.test" })).toBeNull();
-  for (const invalid of [ { ...env(), OMB_ADMIN_MEMBERSHIP: "local" }, { ...env(), OMB_HOSTED_MODEL_TOKEN: "secret" },
-    { ...env(), OMB_ADMIN_URL: "http://admin.example.test" }, { ...env(), OMB_DESKTOP_PARENT: "1" },
-    { ...env(), OMB_HOSTED_MODELS: "{}" } ]) expect(() => hostedModelPolicy(directory(), invalid)).toThrow();
+  expect(hostedModelPolicy(directory(), { HEZUO_ADMIN_URL: "https://admin.example.test" })).toBeNull();
+  for (const invalid of [ { ...env(), HEZUO_ADMIN_MEMBERSHIP: "local" }, { ...env(), HEZUO_HOSTED_MODEL_TOKEN: "secret" },
+    { ...env(), HEZUO_ADMIN_URL: "http://admin.example.test" }, { ...env(), HEZUO_DESKTOP_PARENT: "1" },
+    { ...env(), HEZUO_HOSTED_MODELS: "{}" } ]) expect(() => hostedModelPolicy(directory(), invalid)).toThrow();
 });
 
 it("preserves allowed choices, normalizes legacy routes, and replaces only unassigned choices", () => {
   const policy = hostedModelPolicy(directory(), env())!;
   expect(policy.select({ instanceId: "claude", model: "claude-fixture", effort: "high" })).toEqual({ instanceId: "claude", model: "claude-fixture", effort: "high" });
-  expect(policy.select({ instanceId: "codex", model: "omb-managed-openai::gpt-fixture" })).toEqual({ instanceId: "codex", model: "gpt-fixture" });
-  expect(policy.select({ instanceId: "opencode", model: "omb-managed-openrouter/provider/fixture" })).toEqual({ instanceId: "opencode", model: "provider/fixture" });
+  expect(policy.select({ instanceId: "codex", model: "hezuo-managed-openai::gpt-fixture" })).toEqual({ instanceId: "codex", model: "gpt-fixture" });
+  expect(policy.select({ instanceId: "opencode", model: "hezuo-managed-openrouter/provider/fixture" })).toEqual({ instanceId: "opencode", model: "provider/fixture" });
   expect(policy.select({ instanceId: "codex", model: "removed-model" })).toEqual({ instanceId: "codex", model: "gpt-fixture" });
   expect(policy.select({ instanceId: "other", model: "personal" })).toEqual({ instanceId: "claude", model: "claude-fixture" });
   expect(policy.allows({ instanceId: "codex", model: "personal" })).toBe(false);
   expect(policy.allows({ instanceId: "other", model: "gpt-fixture" })).toBe(false);
-  const empty = hostedModelPolicy(directory(), { ...env(), OMB_HOSTED_MODELS: JSON.stringify({ anthropic: [], openai: [], openrouter: [] }) })!;
+  const empty = hostedModelPolicy(directory(), { ...env(), HEZUO_HOSTED_MODELS: JSON.stringify({ anthropic: [], openai: [], openrouter: [] }) })!;
   expect(empty.select({ instanceId: "codex", model: "personal" })).toEqual({ instanceId: "", model: "" });
   expect(empty.configs()).toEqual({});
   expect(empty.error()).toContain("No company models");
@@ -98,8 +98,8 @@ it("reconciles saved choices without touching names, titles or history, and leav
 
 it("locks native and OpenRouter instances to assigned catalogs and fixed gateway routes", async () => {
   const root = directory(), policy = hostedModelPolicy(root, { ...env(),
-    OMB_HOSTED_CLAUDE_CLI: join(import.meta.dirname, "testing/fake-claude-cli.ts"),
-    OMB_HOSTED_CODEX_CLI: join(import.meta.dirname, "testing/fake-codex-app-server.ts"),
+    HEZUO_HOSTED_CLAUDE_CLI: join(import.meta.dirname, "testing/fake-claude-cli.ts"),
+    HEZUO_HOSTED_CODEX_CLI: join(import.meta.dirname, "testing/fake-codex-app-server.ts"),
   })!;
   const configs = policy.configs();
   expect(Object.keys(configs)).toEqual(["claude", "codex", "opencode"]);
@@ -127,7 +127,7 @@ it("uses bundled executable names unless the operator explicitly overrides them"
 });
 
 it("sends a hosted Claude turn and helper through the approved model with synthetic CLI only", async () => {
-  const root = directory(), policy = hostedModelPolicy(root, { ...env(), OMB_HOSTED_CLAUDE_CLI: join(import.meta.dirname, "testing/fake-claude-cli.ts") })!;
+  const root = directory(), policy = hostedModelPolicy(root, { ...env(), HEZUO_HOSTED_CLAUDE_CLI: join(import.meta.dirname, "testing/fake-claude-cli.ts") })!;
   const configs = policy.configs();
   const dump = join(root, "claude-spawn.json");
   configs.claude.environment!.FAKE_CLAUDE_DUMP = dump;

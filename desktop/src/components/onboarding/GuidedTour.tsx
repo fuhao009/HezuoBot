@@ -12,8 +12,6 @@ import { Spotlight } from "./Spotlight";
 const MASCOT: Record<TourStep["id"], HezuoState> = {
   "tour.composer": "happy",
   "tour.model": "curious",
-  "tour.computer": "working",
-  "tour.computer-browser": "curious",
   "tour.tools": "curious",
   "tour.apps": "happy",
   "tour.apps-panel": "proud",
@@ -65,12 +63,6 @@ export function GuidedTour() {
   const run = useCallback(
     (effect: TourEffect | undefined) => {
       switch (effect) {
-        case "openComputer":
-          if (!state.computerOpen) dispatch({ type: "toggleComputer", open: true });
-          return;
-        case "closeComputer":
-          dispatch({ type: "toggleComputer", open: false });
-          return;
         case "openTools": {
           const trigger = visible("tools");
           if (trigger && trigger.getAttribute("aria-expanded") !== "true") trigger.click();
@@ -92,7 +84,7 @@ export function GuidedTour() {
           return;
       }
     },
-    [dispatch, state.computerOpen],
+    [dispatch],
   );
 
   const save = useCallback(
@@ -121,7 +113,7 @@ export function GuidedTour() {
       void save(false, step.id).then(() => {
         // Move the interface only after progress is saved; a queued skip owns cleanup and must not have its panels
         // reopened.
-        if (!closed.current && !(fromAnchor && step.onExit && ANCHOR_EFFECTS.has(step.onExit))) run(step.onExit);
+        if (!closed.current && !(fromAnchor && step.onExit && ANCHOR_EFFECTS[step.onExit])) run(step.onExit);
       }).catch(() => setFailed(true)).finally(() => { saving.current = false; });
     },
     [step, run, save],
@@ -131,12 +123,11 @@ export function GuidedTour() {
     if (closed.current) return;
     closed.current = true;
     setDismissed(true);
-    if (state.computerOpen) run("closeComputer");
     if (state.pluginsOpen) run("closeApps");
     run("backToChat");
     void save(true).catch(() => {});
     dispatch({ type: "toggleTour", open: false });
-  }, [state.computerOpen, state.pluginsOpen, run, save, dispatch]);
+  }, [state.pluginsOpen, run, save, dispatch]);
 
   // Only ever started from Settings (Replay app tour): the welcome no longer hands over to it, now or after a reload.
   const active = !dismissed && state.tourOpen && Boolean(record?.completedAt) && !state.welcomeOpen && step !== null;
@@ -177,7 +168,7 @@ export function GuidedTour() {
   }, [active, step, advance]);
 
   if (!active || !step) return null;
-  if (window.ogb?.remoteClient?.active === true) return null;
+  if (window.hezuo?.remoteClient?.active === true) return null;
 
   const { current, total } = stepNumber(step);
   const closing = step.id === "tour.done";

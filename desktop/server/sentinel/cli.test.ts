@@ -10,11 +10,11 @@ import { parseSentinelArgs, runSentinelCli } from "./cli.ts";
 import { runScan } from "./scan.ts";
 import { fixtureDataDir, turnCompleted, type FixtureDataDir } from "./testing.ts";
 
-const ENTRY = join(dirname(fileURLToPath(import.meta.url)), "..", "hezuo.ts");
+const ENTRY = `import { runSentinelCli } from ${JSON.stringify(new URL("./cli.ts", import.meta.url).href)}; process.exitCode = runSentinelCli(process.argv.slice(1));`;
 const PRIVATE = "Example Client Ltd";
 
 function sentinel(...args: string[]): { status: number | null; stdout: string; stderr: string } {
-  const result = spawnSync(process.execPath, ["--experimental-strip-types", "--no-warnings", ENTRY, "sentinel", ...args], { encoding: "utf8" });
+  const result = spawnSync(process.execPath, ["--experimental-strip-types", "--no-warnings", "--input-type=module", "-e", ENTRY, "--", ...args], { encoding: "utf8" });
   return { status: result.status, stdout: result.stdout, stderr: result.stderr };
 }
 
@@ -22,7 +22,7 @@ describe("hezuo sentinel", () => {
   let dir: string;
   let fixture: FixtureDataDir;
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), "omb-sentinel-cli-"));
+    dir = mkdtempSync(join(tmpdir(), "hezuo-sentinel-cli-"));
     fixture = fixtureDataDir(join(dir, "data"), [{ id: "b1", name: "Probe", threadId: "t1" }]);
   });
   afterEach(() => {
@@ -88,7 +88,7 @@ describe("hezuo sentinel", () => {
     const parsed = parseSentinelArgs(["--data-dir", "/data/omb"], {});
     expect(parsed).toMatchObject({ dataDir: expect.stringMatching(/omb$/), out: expect.stringMatching(/hezuo-sentinel[\\/]data-[0-9a-f]{12}$/), json: false });
     expect("out" in parsed && parsed.out.includes(join("data", "omb"))).toBe(false);
-    expect(parseSentinelArgs(["--queue-wait", "600", "--cost", "2.5", "--json"], { OMB_DATA_DIR: "/d" })).toMatchObject({ queueWaitMs: 600_000, costUsd: 2.5, json: true });
+    expect(parseSentinelArgs(["--queue-wait", "600", "--cost", "2.5", "--json"], { HEZUO_DATA_DIR: "/d" })).toMatchObject({ queueWaitMs: 600_000, costUsd: 2.5, json: true });
     expect(parseSentinelArgs(["--cost", "-1"], {})).toEqual({ error: expect.stringContaining("--cost"), json: false });
     // an unset variable in a script is an error, not a threshold of 0
     expect(parseSentinelArgs(["--cost", ""], {})).toEqual({ error: expect.stringContaining("--cost"), json: false });

@@ -7,15 +7,14 @@ import path from "node:path";
 import { normalizeProductCa, productCaBindsOrigin } from "../desktop/electron/product-ca.mjs";
 import { validateProductOrigin } from "../desktop/electron/product-service.mjs";
 
-export const PRODUCT_NAME = "Hezuo";
-export const PRODUCT_APP_ID = "com.hezuo.product";
-export const PRODUCT_PROTOCOL = "hezuo-product";
-export const PRODUCT_ARTIFACT_PREFIX = "Hezuo";
+export const PRODUCT_NAME = "HezuoBot";
+export const PRODUCT_APP_ID = "com.hezuobot.app";
+export const PRODUCT_PROTOCOL = "hezuobot";
+export const PRODUCT_ARTIFACT_PREFIX = "HezuoBot";
 export const PRODUCT_SERVICE_RESOURCE = "product-service.json";
 
 /** Domains owned by the upstream open-source project. A product build must
  * never point at them: its operator owns a different service. */
-export const AUTHOR_DOMAINS = ["openmausbot.com", "hezuo.si"];
 
 /** Names that can never identify the operator's service: the RFC 2606/6761
  * reserved names (`.invalid`, `.test`, `.example`, `.local`, `localhost`) and
@@ -24,11 +23,6 @@ export const AUTHOR_DOMAINS = ["openmausbot.com", "hezuo.si"];
  * into a shipped app; only the compile-only dry run accepts them. */
 const RESERVED_SUFFIXES = ["invalid", "test", "example", "localhost", "local"];
 const RESERVED_HOSTS = new Set(["example.com", "example.net", "example.org"]);
-
-export function isAuthorDomain(hostname) {
-  const host = String(hostname ?? "").toLowerCase().replace(/\.$/, "");
-  return AUTHOR_DOMAINS.some((domain) => host === domain || host.endsWith(`.${domain}`));
-}
 
 // The reserved registrable domains cover their subdomains too; the suffix list
 // is matched per DNS label so `example.internal` stays a legitimate host.
@@ -75,7 +69,7 @@ export function isPrivateLanHost(hostname) {
  *
  * Throws a stable reason code for the caller's message.
  */
-export function operatorOrigin(value, { allowReserved = false, allowLoopback = false, allowPrivateLan = false } = {}) {
+export function operatorOrigin(value, { allowReserved = false, allowLoopback = false, allowPrivateLan = false, allowedHosts = [] } = {}) {
   const origin = validateProductOrigin(String(value ?? "").trim());
   const url = new URL(origin);
   if (isLoopbackHost(url.hostname)) {
@@ -86,9 +80,11 @@ export function operatorOrigin(value, { allowReserved = false, allowLoopback = f
   if (!url.hostname.includes(".") || /^[0-9.]+$/.test(url.hostname) || url.hostname.includes(":")) {
     throw new Error("product_origin_public_host");
   }
-  if (isAuthorDomain(url.hostname)) throw new Error("product_origin_author_domain");
   if (!allowReserved && isReservedHost(url.hostname)) throw new Error("product_origin_reserved_host");
   if (url.port && url.port !== "443") throw new Error("product_origin_port");
+  const hostname = url.hostname.toLowerCase().replace(/\.$/, "");
+  const approved = allowedHosts.some((host) => host.trim().toLowerCase().replace(/\.$/, "") === hostname);
+  if (!approved && !(allowReserved && isReservedHost(hostname))) throw new Error("product_origin_unapproved_host");
   return origin;
 }
 
@@ -201,7 +197,7 @@ export async function verifyProductApp({ appDir, resourcesDir, removeFeed = fals
   const asarFile = path.join(resourcesDir, "app.asar");
   if (!(await exists(asarFile))) throw new Error(`product_app_missing_asar: ${asarFile}`);
   const metadata = await readAsarPackageJson(asarFile);
-  if (metadata.ombProductManaged !== true) throw new Error(`product_app_not_managed: ${appDir}`);
+  if (metadata.hezuoProductManaged !== true) throw new Error(`product_app_not_managed: ${appDir}`);
   if (metadata.main !== "desktop/electron/main.mjs") throw new Error(`product_app_unexpected_main: ${String(metadata.main)}`);
   if (typeof metadata.productName === "string" && metadata.productName !== PRODUCT_NAME) {
     throw new Error(`product_app_product_name: ${metadata.productName}`);

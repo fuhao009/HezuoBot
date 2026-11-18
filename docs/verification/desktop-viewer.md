@@ -7,7 +7,7 @@ pnpm build
 node --experimental-strip-types scripts/verify-desktop-viewer.ts
 ```
 
-To reuse installed browser tools, set `OMB_AGENT_BROWSER_PATH` and
+To reuse installed browser tools, set `HEZUO_AGENT_BROWSER_PATH` and
 `AGENT_BROWSER_EXECUTABLE_PATH` explicitly. The fixture prints its temporary
 data directory and persistent server log. It launches the standard fake-engine
 server, synthetic Docker/SSH executables restricted to the fixture, and
@@ -20,7 +20,7 @@ recipe does not cover Windows. It is a manual smoke command, not part of
 
 The fixture reuses the shared HTTP and browser helpers. Keyboard and clipboard
 checks wait for received RFB events, with bounded waits. Set
-`OMB_UI_EVIDENCE_DIR` to retain screenshots in a chosen directory, as in the
+`HEZUO_UI_EVIDENCE_DIR` to retain screenshots in a chosen directory, as in the
 other renderer recipes; otherwise they stay beside the printed server log.
 
 The script pairs the browser through the real HTTP API, follows the same
@@ -40,8 +40,9 @@ status and WebSocket routes as a remote admin, and verifies:
   hiding or showing them moves focus to the opposite toggle.
 - The clipboard header keeps its title centered beside a compact close button.
 - Panels use the app's shared menu motion, including reduced-motion behavior.
-- The panels fit phone and short landscape viewports; dark and light screenshots
-  show the built UI using the app's skin tokens.
+- The desktop renderer panels fit narrow and short landscape viewports; dark
+  and light screenshots show the built UI using the app's skin tokens, not a
+  native mobile client.
 - Reconnect opens a new working desktop connection.
 - Page exit aborts a pending connection request; a persisted-page restore
   opens a fresh connection.

@@ -1,4 +1,4 @@
-# My Chrome on My Cloud Implementation Plan
+# My Chrome on My Cloud Implementation Plan — Hezuo
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -225,7 +225,7 @@ export function lentChromeGuidance(problem: LentChromeProblem, lender: ChromeLen
   - `"each way of not reaching Chrome is recorded"`: a table of route outcomes → problem: `null` route → `offline`, `{ gone: true }` → `offline`, `{ refused: "not-lent" }` → `not-lent`, `{ refused: "port" }` → `unreachable`, `{ failed: "no-chrome" }` → `no-chrome`, `{ failed: "timeout" }` → `unreachable`. Each answer starts `HTTP/1.1 50`. A later joined connection clears the problem.
   - `"drop ends the session's open connections and nothing else's"`: with s1 and s2 joined, after `drop("s1")` s1's client sees close and s2 still echoes.
   - `"a connection unused for the idle time is closed"`: with `idleMs: () => 50` and `sweepMs: 10`, the client sees close within 1 s.
-  - `"guidance names the computer and what to do"`: `lentChromeGuidance("offline", { name: "Omkar's MacBook", device: "Mac", online: false })` contains `Omkar's MacBook` and `open Hezuo on that Mac`. `lentChromeGuidance("no-chrome", null)` contains `chrome://inspect/#remote-debugging`.
+  - `"guidance names the computer and what to do"`: `lentChromeGuidance("offline", { name: "maintainer's MacBook", device: "Mac", online: false })` contains `maintainer's MacBook` and `open Hezuo on that Mac`. `lentChromeGuidance("no-chrome", null)` contains `chrome://inspect/#remote-debugging`.
 
 - [ ] **Step 2: Run, expect FAIL**: `npx vitest run desktop/server/browser/lent-chrome.test.ts`
 
@@ -323,7 +323,7 @@ export function lentChromeGuidance(problem: LentChromeProblem, lender: ChromeLen
 
 **Files:**
 - Create: `desktop/server/cloud-lending-chrome.e2e.test.ts` (modelled on `desktop/server/cloud-lending-browser.e2e.test.ts`: a real Cloud home server, the real `createComputerSharing` connector)
-- Modify: `docs/cloud-pro.md` (the lending scopes section, and the bullet that refuses DevTools on a lent screen, which should say Chrome is lent only by its own switch, over the device link, to the port the computer finds itself), `docs/plans/browser-engine.md` ("Where it applies"), `docs/browser-packaging.md` (the "on Cloud and servers profiles stay built-in" line)
+- Modify: the retired cloud-pro guide (historical only) (the lending scopes section, and the bullet that refuses DevTools on a lent screen, which should say Chrome is lent only by its own switch, over the device link, to the port the computer finds itself), `docs/plans/browser-engine.md` ("Where it applies"), `docs/browser-packaging.md` (the "on Cloud and servers profiles stay built-in" line)
 
 **Interfaces:**
 - Consumes everything above.

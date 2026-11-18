@@ -24,7 +24,7 @@ if [ -n "${HEZUO_POSTINSTALL_TEST_ROOT:-}" ]; then
   APPARMOR_STATUS=$APP_ROOT/test-system/apparmor_status
   USERNS_RESTRICTION=$APP_ROOT/test-system/apparmor_restrict_unprivileged_userns
 else
-  APP_ROOT=/opt/Hezuo
+  APP_ROOT=/opt/HezuoBot
   EXPECTED_OWNER=root:root
   TEST_MODE=0
   APPARMOR_DIR=/etc/apparmor.d
@@ -106,7 +106,7 @@ secure_browser_tree() {
 }
 
 install_browser_apparmor_profile() {
-  profile=$APP_ROOT/resources/hezuo-browser.apparmor
+  profile=$APP_ROOT/resources/hezuobot-browser.apparmor
   if [ -L "$profile" ] || [ ! -f "$profile" ] || [ "$(stat -c '%h' -- "$profile")" != 1 ]; then
     echo "Hezuo browser AppArmor profile is missing or unsafe: $profile" >&2
     exit 1
@@ -150,7 +150,7 @@ install_browser_apparmor_profile() {
     echo "Hezuo AppArmor policy directory is unsafe: $APPARMOR_DIR" >&2
     exit 1
   fi
-  target=$APPARMOR_DIR/hezuo-browser
+  target=$APPARMOR_DIR/hezuobot-browser
   if [ -L "$target" ] || { [ -e "$target" ] && [ ! -f "$target" ]; }; then
     echo "Hezuo AppArmor profile target is unsafe: $target" >&2
     exit 1

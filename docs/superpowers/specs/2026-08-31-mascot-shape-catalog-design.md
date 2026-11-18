@@ -1,39 +1,6 @@
 # Mascot shape catalog
 
-> **Naming note (2026-09-01):** the code vocabulary for this feature is `body`, not
-> `shape` — `mascotBody`, `MASCOT_BODIES`, `MascotBodyId`, `packages/shared/mascot-bodies.ts`,
-> `scripts/mascot-bodies/`, `HezuoBodies.swift`. The repo enforces
-> `anti-slop/no-shape-in-symbol-names` as an error, and `body` is the word this document
-> already uses in prose. Identifiers written as `mascotShape` etc. below are the original
-> design text and are stale; the ids themselves (`cursor`, `blob`, …) are unchanged.
-
-Ten selectable body shapes for the mascot, per bot, identical on desktop and
-phone.
-
-> **Dropped (2026-09-01):** this design originally carried a second
-> deliverable — "custom images as a living body", a `face` crop that filled the
-> mascot's silhouette with the bot's own picture and painted the live animated
-> face on top. It was built on `feat/mascot-shape-catalog` across desktop,
-> server and iOS, reviewed visually, and rejected: a custom image should be
-> shown as it is, with no eyes or mouth drawn over it. The mode and its `face`
-> crop were removed forward, and the sections describing them deleted from this
-> document. Custom images behave exactly as they did before this branch —
-> `circle` / `rounded` / `square`, flat, no mascot. The ten bodies stay and
-> apply to the gradient mascot.
-
 ## Problem
-
-The mascot has one body. `CursorAvatar` already accepts a `silhouette` prop —
-`{ name, fit, body, clip, anchor }` — but exactly one silhouette is ever passed,
-built inline in `Avatar.tsx`. On the phone, `HezuoSilhouette` hardcodes the same
-outline as a 4KB string with hand-tuned transforms, and `HezuoFaceData.anchor` is
-a single tuple. So a bot's identity is carried entirely by its colour.
-
-The two platforms have already drifted. Desktop places the face at
-`{ x: 93, y: 101, scale: 0.74 }`; iOS at `(87.04, 98.65, 0.84)`. The phone's
-face is about 14% larger and sits higher on the same body. This is the failure
-`HezuoAvatar.swift`'s own header predicts: "starts close and drifts every time
-either side is touched."
 
 ## What we are building
 
@@ -66,14 +33,6 @@ is the persisted value and must stay stable.
 
 A catalog entry is `{ id, name, body, clip, fit, anchor }` — the `CursorSilhouette`
 the desktop renderer already consumes, plus an id.
-
-`cursor` is the default, so an existing bot keeps its body. Its **outline** is
-byte-identical to today's. Its **anchor** is re-solved rather than copied, and may
-land slightly away from either platform's current value — which is the point: the
-two disagree today (`0.74` against `0.84`), so at least one has to move. The
-desktop face may grow a little and the phone face shrink a little as they meet in
-the middle. Expected and desired; called out here so it is not read as a
-regression during review.
 
 ### Face scale is clamped
 
@@ -126,15 +85,6 @@ Outputs, both checked in:
 
 - `packages/shared/mascot-shapes.ts` — the TypeScript catalog, the id union, and the zod
   schema.
-- `mobile/ios/Sources/CompanionCore/HezuoBodies.swift` — the Swift catalog, keyed by the same ids.
-
-Both carry a "generated, do not hand-edit" header, matching the existing
-convention in `HezuoFaceData.swift`.
-
-Why absolute cubics: the iOS path parser in `HezuoSilhouette.parse()` understands
-only `M`, `C` and `Z`. Emitting cubics keeps that twenty-line parser untouched.
-Quadratics convert to cubics exactly; arcs use the standard four-segment cubic
-approximation.
 
 ### Desktop
 
@@ -154,20 +104,6 @@ The picker lives in `BotProfileAvatarCard.tsx`, in a row beside the existing
 colour swatches and expression grid. Each swatch is a live miniature rendered in
 that bot's own colour, so the choice is previewed rather than described.
 
-### iOS
-
-`HezuoShapes.swift` holds the ten outlines and their anchors. `HezuoSilhouette`
-becomes a lookup over that catalog rather than a single static path;
-`HezuoFaceData.anchor` likewise.
-
-The existing parse-once caching is preserved **per shape** — a dictionary of
-lazily parsed `Path` values, one per id. This matters: the current code caches
-because a chat list redraws hundreds of avatars per frame, and a per-draw parse
-would reintroduce that cost.
-
-`HezuoAvatar` gains `shape: String = "cursor"`. `BotAvatarView` passes
-`bot.mascotShape`. An unrecognised id falls back to `cursor`.
-
 ### Schema and sync
 
 The field follows `avatarCrop`'s existing path end to end:
@@ -180,8 +116,6 @@ The field follows `avatarCrop`'s existing path end to end:
 - `desktop/server/team-manifest.ts`, `desktop/server/bot-package.ts`, `desktop/server/package-export.ts`
   — carried inside `appearance`, beside `color` and `mascotExpression`.
 - `desktop/server/index.ts` — added to the profile broadcast key list (~line 4048).
-- iOS `Sources/CompanionCore/Models.swift` — `Bot.mascotShape: String?` and the
-  corresponding `BotProfilePatch` field and coding key.
 
 An absent or unrecognised value resolves to `cursor` on read, on both platforms.
 An older client that does not know the field ignores it and keeps rendering the
@@ -201,10 +135,6 @@ default body, and an older server drops it on write — neither is a corrupt sta
   `desktop/server/bot-avatar.test.ts`.
 - **Patch test**: an invalid shape returns the readable error, mirroring
   `desktop/server/bot-profile.test.ts`.
-- **iOS parse test**: every generated path parses to a closed, non-empty `Path`
-  whose bounds fall inside the face box.
-- **Manual**: all ten shapes rendered on desktop and phone side by side, across a
-  few states, confirming the two platforms now agree.
 
 ## Risks
 
@@ -217,6 +147,3 @@ produce a wrong distance field and a wrong anchor. Mitigated by the clearance
 assertion, which tests the actual rendered geometry rather than the intermediate
 field, and by `cursor` acting as a known-good fixture: it must solve to a face
 that matches today's rendering.
-
-**Ten outlines are ten more things to keep parsing on iOS.** Mitigated by the
-per-shape lazy cache; only shapes actually rendered are ever parsed.

@@ -60,6 +60,12 @@ export class ViewerHold {
     this.#clock.used();
   }
 
+  /** Only the current authorized driver may extend its existing human hold. Never acquires or transfers control. */
+  renew(viewer: Viewer): void {
+    if (viewer.closed || !viewer.options.canOperate || !this.#viewers.has(viewer) || !this.controls(viewer)) return;
+    this.#clock.used();
+  }
+
   opened(viewer: Viewer): void {
     if (this.owns(viewer)) this.#clock.watched(true);
   }

@@ -3,7 +3,7 @@
 Every Hezuo desktop build can play either role:
 
 - **Host mode** is the normal app. It owns the agents, conversations, credentials, routines, and computers.
-- **Client mode** controls a paired host through the same authenticated, default-deny companion API used by the phone app.
+- **Client mode** controls a paired host through the same authenticated, default-deny companion API retained for remote clients.
 
 The roles are platform-independent. A Windows, macOS, or Ubuntu build can host, and any other desktop build can be its client. One app installation uses one role at a time; disconnecting a client returns that installation to host mode without deleting its local host data.
 
@@ -19,14 +19,10 @@ below. The two connection types intentionally do not share credentials.
 
 ## Pair over secure HTTPS
 
-1. On the host, open **Settings → Remote access** and finish **Secure HTTPS pairing**.
-2. Open a pairing window so the host displays a six-digit code.
-3. On the client, open **Settings → Remote access → Connect to another computer**
-   and choose **Desktop companion**.
-4. Enter the host's managed companion address (`https://c-….openmausbot.com` or `https://c-….mausbot.si`) and the six-digit code.
-5. Choose **Pair and switch to client mode**. The client restarts and opens the host's bot UI.
-
-The HTTPS address uses the host's managed outbound tunnel. TLS is verified by the operating system, and the client does not need Tailscale. HTTPS is intentionally restricted to the names Hezuo issues (`c-` and 32 hexadecimal characters under `openmausbot.com` or `mausbot.si`) so a typo, or any other host in those domains, cannot receive the pairing code or a paired-device token. Desktop releases up to 0.1.103 accept only `openmausbot.com` names; update the client to pair with a host whose address is on `mausbot.si`, or pair over Tailscale.
+Managed HTTPS pairing requires an operator-provisioned tunnel service and a
+matching client host allowlist. No Hezuo-managed pairing domain is established
+by this document. Do not send pairing codes or device tokens to an arbitrary
+HTTPS host. Use the Tailscale procedure below when managed pairing is unavailable.
 
 ## Pair over Tailscale
 

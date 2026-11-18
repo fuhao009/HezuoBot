@@ -21,6 +21,8 @@ import type { ToolSchemaProfile } from "../tool-schema-profile.ts";
 import { allowsTool, canUseMcpServer, parseToolScope, type ToolScope } from "../../../packages/shared/tool-scope.ts";
 import { OWN_APPS_SERVER } from "../../../packages/shared/own-apps.ts";
 import { CHAT_TOOL_LIMIT, type ToolBudget } from "../../../packages/shared/tool-budget.ts";
+import { browserApprovalTarget } from "./browser-approval-target.ts";
+import type { BrowserApprovalTarget } from "../../../packages/shared/runtime-events.ts";
 
 export interface ChatToolDefinition {
   type: "function";
@@ -29,7 +31,7 @@ export interface ChatToolDefinition {
 export interface ChatToolResult { text: string; ok: boolean; images?: ChatImagePart[] }
 /** How a call is shown and granted. A grant names the exact tool on the server as launched; the
  * person's own computer never gets a session-wide one. */
-export interface ChatToolCallView { title: string; input: Record<string, unknown>; ask: boolean; grant?: string }
+export interface ChatToolCallView { title: string; input: Record<string, unknown>; ask: boolean; grant?: string; browserTarget?: BrowserApprovalTarget; approvalSummary?: string }
 /** A dispatched operation may already have taken effect: never retry it through a new round. */
 export class ChatToolSessionError extends Error {}
 export interface SkippedChatMcpServer { server: string; reason: string }
@@ -178,7 +180,10 @@ export class ChatMcpClient {
       const entry = this.pending.get(message.id);
       if (!entry) continue;
       this.pending.delete(message.id);
-      if ("error" in message) entry.reject(new McpRequestRefused("MCP request failed; inspect the configured integration"));
+      if ("error" in message) {
+        const code = object(message.error) && Number.isSafeInteger(message.error.code) ? ` (code ${message.error.code})` : "";
+        entry.reject(new McpRequestRefused(`MCP request failed${code}; inspect the configured integration`));
+      }
       else if (!("result" in message)) entry.reject(new Error("MCP response has no result"));
       else entry.resolve(message.result);
     }
@@ -409,7 +414,6 @@ export async function mountChatTools(integrations: SendTurnInput["integrations"]
   if (integrations?.composio && eligible("composio")) servers.push(["composio", integrations.composio]);
   if (integrations?.composioOwn && eligible(OWN_APPS_SERVER)) servers.push([OWN_APPS_SERVER, integrations.composioOwn]);
   if (integrations?.data && eligible("data")) servers.push(["data", integrations.data]);
-  if (integrations?.highlevel && eligible("highlevel")) servers.push(["highlevel", integrations.highlevel]);
   if (integrations?.device && eligible("device")) servers.push(["device", integrations.device]);
   const builtIns = servers.length;
   const besideBrowser = servers.some(([, descriptor]) => descriptor === integrations?.browser);
@@ -511,7 +515,10 @@ export async function mountChatTools(integrations: SendTurnInput["integrations"]
     for (const [index, mount] of mounts.entries()) {
       if (signal.aborted || closed) throw aborted();
       if (index < builtIns) {
-        if (mount.status === "rejected") throw mount.reason;
+        if (mount.status === "rejected") {
+          if (mount.reason instanceof McpRequestRefused) throw new McpRequestRefused(`MCP server "${servers[index]![0]}" refused initialization: ${mount.reason.message}`);
+          throw mount.reason;
+        }
         offered.push(mount.value);
         continue;
       }
@@ -607,7 +614,10 @@ export async function mountChatTools(integrations: SendTurnInput["integrations"]
     const runs = target(tool, args);
     if (runs === undefined || tool.agents) return { title, input: args, ask: false };
     const grant = !tool.hostComputer ? JSON.stringify([tool.server, tool.launch, runs]) : undefined;
-    if (!tool.searched || tool.name !== CALL_TOOL) return { title, input: args, ask: true, ...(grant ? { grant } : {}) };
+    const browserTarget = browserApprovalTarget(tool.builtInBrowser, tool.name, args);
+    const approvalSummary = tool.builtInBrowser && tool.name === "agent_browser_open"
+      ? JSON.stringify(browserTarget ?? { operation: "open" }) : undefined;
+    if (!tool.searched || tool.name !== CALL_TOOL) return { title, input: args, ask: true, ...(grant ? { grant } : {}), ...(browserTarget ? { browserTarget } : {}), ...(approvalSummary ? { approvalSummary } : {}) };
     return { title: chatToolName(tool.server, runs), input: object(args.arguments) ? args.arguments : {}, ask: true, ...(grant ? { grant } : {}) };
   };
   const view = (name: string, args: Record<string, unknown>): ChatToolCallView => {

@@ -5,9 +5,7 @@ export function windowBackground(prefersDark) {
   return prefersDark ? "#121212" : "#fcfcfc";
 }
 
-/** macOS: where the traffic lights (14px) sit. In the frame's 28px top bar, 12px in, while the page beside the rail draws
- * that frame (src/components/WindowFrameBar.tsx); where an older page made room for them otherwise. The window opens with
- * them in the bar, and main moves them as each page says (chrome-rail.mjs). */
+/** macOS traffic-light positions with and without the app's custom window frame. */
 export const TRAFFIC_LIGHTS = { framed: { x: 12, y: 7 }, unframed: { x: 16, y: 16 } };
 
 /** `frame`: the window draws its own frame (the person may turn it off): on macOS the traffic lights open where it puts

@@ -10,6 +10,7 @@ import {
   type HezuoAvatarProps,
 } from "./Avatar";
 import { MASCOT_BODIES } from "../../../packages/shared/mascot-bodies";
+import { botAvatarProfile, botAvatarUrlSchema } from "../../../packages/shared/bot-avatar";
 
 const render = (props: Partial<HezuoAvatarProps>) =>
   renderToStaticMarkup(createElement(HezuoAvatar, { color: "green", animated: false, ...props }));
@@ -107,6 +108,30 @@ describe("BotAvatar's two avatar outcomes", () => {
 
   it("falls back to the gradient mascot when a flat crop has no valid image", () => {
     const markup = renderBot({ avatarUrl: undefined, avatarCrop: "circle" });
+    expect(markup).not.toContain("<img");
+    expect(markup).toContain("<svg");
+  });
+
+  it.each([
+    "blob:http://localhost/draft-avatar",
+    "https://evil.example/tracker.svg",
+    "//evil.example/tracker.png",
+    "javascript:alert(1)",
+    "data:image/svg+xml,<svg onload='alert(1)'/>",
+  ])("rejects untrusted persisted avatar URL %s", (avatarUrl) => {
+    expect(botAvatarUrlSchema.safeParse(avatarUrl).success).toBe(false);
+    expect(botAvatarProfile({ avatarUrl, avatarCrop: "circle" }).avatarUrl).toBeUndefined();
+    const markup = renderBot({ avatarUrl, avatarCrop: "circle" });
+    expect(markup).not.toContain("<img");
+    expect(markup).toContain("<svg");
+  });
+
+  it("does not allow a remote URL through the temporary preview prop", () => {
+    const markup = renderToStaticMarkup(createElement(BotAvatar, {
+      bot: { color: "green", avatarCrop: "circle" },
+      temporaryPreviewUrl: "https://evil.example/tracker.svg",
+      animated: false,
+    }));
     expect(markup).not.toContain("<img");
     expect(markup).toContain("<svg");
   });

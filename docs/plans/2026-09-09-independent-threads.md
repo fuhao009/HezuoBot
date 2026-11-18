@@ -29,13 +29,6 @@ picker stays in the chat header, while Ask/Auto stays inside the composer;
 both apply to the visible thread. There is no
 second "Tasks" area for the same bot conversations.
 
-The sidebar borrows T3's compact searchable conversation hierarchy: quiet
-bot/group headings, indented thread rows, restrained active styling, and
-working/waiting/unread indicators. No required dashboard or project-creation
-step. Threads is the user-facing navigation term on desktop and mobile. Native
-clients pin the viewed thread independently of another device's selection;
-native folder navigation is a follow-up, not silently claimed as implemented.
-
 ## Execution and resource ownership
 
 Each bot defaults to three direct threads at once. Settings → General → Parallel
@@ -83,8 +76,6 @@ part of this change.
 - Independent multi-bot group member execution: retain the existing
   serialized room behavior until that orchestration has its own conformance
   tests. Direct threads must not imply parallel control of one physical VM.
-- Native mobile organization should use the same records and pinned
-  controls, not invent a separate mobile thread model.
 
 ## References and verification
 

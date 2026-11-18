@@ -19,8 +19,9 @@ import {
   withoutDesktopCompanionAccess,
 } from "./desktop-companion-client.mjs";
 
-const token = `omb_${"a".repeat(43)}`;
+const token = `hezuo_${"a".repeat(43)}`;
 // The one opaque label the control plane puts in front of a managed domain.
+const MANAGED_DOMAIN = "companion.example.test";
 const LABEL = "c-0123456789abcdef0123456789abcdef";
 const deviceId = "123e4567-e89b-12d3-a456-426614174000";
 const access = {
@@ -35,6 +36,7 @@ const sockets = [];
 const tempDirs = [];
 
 afterEach(async () => {
+  vi.unstubAllEnvs();
   for (const socket of sockets.splice(0)) socket.destroy();
   await Promise.all(servers.splice(0).map((server) => new Promise((resolve) => server.close(resolve))));
   for (const directory of tempDirs.splice(0)) fs.rmSync(directory, { recursive: true, force: true });
@@ -43,10 +45,10 @@ afterEach(async () => {
 describe("desktop companion endpoint", () => {
   it("preserves the local-origin boundary while marking companion client mode", () => {
     expect(desktopCompanionRendererArguments("http://127.0.0.1:8799", null)).toEqual([
-      "--omb-local-origin=http://127.0.0.1:8799",
+      "--hezuo-local-origin=http://127.0.0.1:8799",
     ]);
     expect(desktopCompanionRendererArguments("http://127.0.0.1:8798", access)).toEqual([
-      "--omb-local-origin=http://127.0.0.1:8798",
+      "--hezuo-local-origin=http://127.0.0.1:8798",
       "--hezuo-remote-client",
     ]);
   });
@@ -58,64 +60,58 @@ describe("desktop companion endpoint", () => {
     expect(normalizeTailscaleCompanionEndpoint("http://HOST.example-tailnet.ts.net:9910/")).toBe(
       "http://host.example-tailnet.ts.net:9910",
     );
-    expect(normalizeDesktopCompanionEndpoint(`https://${LABEL}.openmausbot.com`)).toBe(
-      `https://${LABEL}.openmausbot.com`,
+    vi.stubEnv("HEZUO_MANAGED_COMPANION_ORIGIN", `https://${MANAGED_DOMAIN}`);
+    expect(normalizeDesktopCompanionEndpoint(`https://${LABEL}.${MANAGED_DOMAIN}`)).toBe(
+      `https://${LABEL}.${MANAGED_DOMAIN}`,
     );
-    expect(normalizeDesktopCompanionEndpoint(`${LABEL}.openmausbot.com`)).toBe(
-      `https://${LABEL}.openmausbot.com`,
-    );
-    // The control plane's second Cloudflare account gives addresses here.
-    expect(normalizeDesktopCompanionEndpoint(`https://${LABEL}.mausbot.si`)).toBe(
-      `https://${LABEL}.mausbot.si`,
-    );
-    expect(normalizeDesktopCompanionEndpoint(` ${LABEL.toUpperCase()}.Mausbot.SI/ `)).toBe(
-      `https://${LABEL}.mausbot.si`,
+    expect(normalizeDesktopCompanionEndpoint(` ${LABEL.toUpperCase()}.${MANAGED_DOMAIN.toUpperCase()}/ `)).toBe(
+      `https://${LABEL}.${MANAGED_DOMAIN}`,
     );
     for (const endpoint of [
       "https://unrelated.example.com",
-      `http://${LABEL}.openmausbot.com`,
+      `https://${LABEL}.example.test`,
+      `https://${LABEL}.unconfigured.example.test`,
+      `http://${LABEL}.${MANAGED_DOMAIN}`,
       "http://10.0.0.4:8810",
       "http://host.local:8810",
       "https://10.0.0.4",
       "http://host.example-tailnet.ts.net/path",
-      `https://${LABEL}.openmausbot.com/path`,
       "http://user@host.example-tailnet.ts.net",
       "http://host.example-tailnet.ts.net.evil.test",
-      `https://${LABEL}.openmausbot.com.evil.test`,
-      `http://${LABEL}.mausbot.si`,
-      `https://${LABEL}.mausbot.si/path`,
-      `https://${LABEL}.mausbot.si.evil.test`,
-      "https://mausbot.si",
-      "mausbot.si",
-      "https://evilmausbot.si",
-      `https://${LABEL}.evilmausbot.si`,
-      "https://www.mausbot.si",
-      "https://app.mausbot.si",
-      "https://accounts.openmausbot.com",
-      "https://c-opaque.openmausbot.com",
-      "https://c-opaque.mausbot.si",
-      `https://${LABEL.slice(0, -1)}.mausbot.si`,
-      `https://${LABEL}0.mausbot.si`,
-      `https://${LABEL.replace("c-", "d-")}.mausbot.si`,
-      `https://${LABEL}.extra.mausbot.si`,
-      `https://www.${LABEL}.mausbot.si`,
+      `https://${LABEL}.${MANAGED_DOMAIN}/path`,
+      `https://${LABEL}.${MANAGED_DOMAIN}/other/..`,
+      `https://${LABEL}.${MANAGED_DOMAIN}?`,
+      `https://${LABEL}.${MANAGED_DOMAIN}#`,
+      `https://user@${LABEL}.${MANAGED_DOMAIN}`,
+      `https://${LABEL}.${MANAGED_DOMAIN}:8443`,
+      `https://${LABEL}.${MANAGED_DOMAIN}.evil.test`,
+      `https://${MANAGED_DOMAIN}`,
+      `https://c-opaque.${MANAGED_DOMAIN}`,
+      `https://${LABEL.slice(0, -1)}.${MANAGED_DOMAIN}`,
+      `https://${LABEL}0.${MANAGED_DOMAIN}`,
+      `https://${LABEL.replace("c-", "d-")}.${MANAGED_DOMAIN}`,
+      `https://${LABEL}.extra.${MANAGED_DOMAIN}`,
+      `https://www.${LABEL}.${MANAGED_DOMAIN}`,
     ]) {
       expect(normalizeDesktopCompanionEndpoint(endpoint), endpoint).toBe("");
     }
   });
 
+  it("fails closed if the managed origin is missing or invalid", () => {
+    for (const origin of [undefined, `http://${MANAGED_DOMAIN}`, `https://user@${MANAGED_DOMAIN}`,
+      `https://${MANAGED_DOMAIN}/path`, `https://${MANAGED_DOMAIN}:8443`, `https://*.${MANAGED_DOMAIN}`]) {
+      vi.stubEnv("HEZUO_MANAGED_COMPANION_ORIGIN", origin);
+      expect(normalizeDesktopCompanionEndpoint(`https://${LABEL}.${MANAGED_DOMAIN}`)).toBe("");
+      expect(normalizeDesktopCompanionEndpoint(access.endpoint)).toBe(access.endpoint);
+    }
+  });
+
   it("validates, adds, and removes the encrypted credential document field", () => {
-    const hostedAccess = { ...access, endpoint: `https://${LABEL}.openmausbot.com` };
-    expect(desktopCompanionAccess({ [DESKTOP_COMPANION_FIELD]: hostedAccess })).toEqual(
-      hostedAccess,
-    );
-    const secondDomain = { ...access, endpoint: `https://${LABEL}.mausbot.si` };
-    expect(desktopCompanionAccess({ [DESKTOP_COMPANION_FIELD]: secondDomain })).toEqual(
-      secondDomain,
-    );
-    expect(
-      desktopCompanionAccess({ [DESKTOP_COMPANION_FIELD]: { ...access, endpoint: "https://app.mausbot.si" } }),
-    ).toBeNull();
+    const hostedAccess = { ...access, endpoint: `https://${LABEL}.${MANAGED_DOMAIN}` };
+    vi.stubEnv("HEZUO_MANAGED_COMPANION_ORIGIN", `https://${MANAGED_DOMAIN}`);
+    expect(desktopCompanionAccess({ [DESKTOP_COMPANION_FIELD]: hostedAccess })).toEqual(hostedAccess);
+    vi.stubEnv("HEZUO_MANAGED_COMPANION_ORIGIN", undefined);
+    expect(desktopCompanionAccess({ [DESKTOP_COMPANION_FIELD]: hostedAccess })).toBeNull();
 
     expect(desktopCompanionAccess({ [DESKTOP_COMPANION_FIELD]: access })).toEqual(access);
     expect(desktopCompanionAccess({ [DESKTOP_COMPANION_FIELD]: { ...access, token: "bad" } })).toBeNull();
@@ -158,6 +154,7 @@ describe("desktop companion pairing", () => {
   });
 
   it("pairs through a managed HTTPS companion address", async () => {
+    vi.stubEnv("HEZUO_MANAGED_COMPANION_ORIGIN", `https://${MANAGED_DOMAIN}`);
     const fetchImpl = vi.fn(async () =>
       new Response(JSON.stringify({ token, device: { id: deviceId }, serverName: "Office computer" }), {
         status: 201,
@@ -165,41 +162,28 @@ describe("desktop companion pairing", () => {
       }),
     );
     const paired = await pairDesktopCompanion({
-      endpoint: `https://${LABEL}.openmausbot.com`,
+      endpoint: `https://${LABEL}.${MANAGED_DOMAIN}`,
       code: "654321",
       deviceName: "Desktop client",
       requestId: "request-https-01",
       fetchImpl,
     });
-    expect(paired).toEqual({ ...access, endpoint: `https://${LABEL}.openmausbot.com` });
+    expect(paired).toEqual({ ...access, endpoint: `https://${LABEL}.${MANAGED_DOMAIN}` });
     expect(fetchImpl).toHaveBeenCalledWith(
-      `https://${LABEL}.openmausbot.com/api/pair`,
-      expect.objectContaining({ method: "POST" }),
-    );
-
-    const secondDomain = await pairDesktopCompanion({
-      endpoint: `${LABEL}.mausbot.si`,
-      code: "654321",
-      deviceName: "Desktop client",
-      requestId: "request-https-02",
-      fetchImpl,
-    });
-    expect(secondDomain).toEqual({ ...access, endpoint: `https://${LABEL}.mausbot.si` });
-    expect(fetchImpl).toHaveBeenLastCalledWith(
-      `https://${LABEL}.mausbot.si/api/pair`,
-      expect.objectContaining({ method: "POST" }),
+      `https://${LABEL}.${MANAGED_DOMAIN}/api/pair`,
+      expect.objectContaining({ method: "POST", redirect: "error" }),
     );
 
     await expect(
       pairDesktopCompanion({
-        endpoint: "https://app.mausbot.si",
+        endpoint: `https://${LABEL}.unconfigured.example.test`,
         code: "654321",
         deviceName: "Desktop client",
         requestId: "request-https-03",
         fetchImpl,
       }),
-    ).rejects.toThrow("Hezuo HTTPS companion address");
-    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    ).rejects.toThrow("HezuoBot HTTPS companion address");
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
   it("rejects bad codes and surfaces a sidecar error without returning secrets", async () => {
@@ -228,7 +212,7 @@ describe("desktop companion loopback relay", () => {
   });
 
   it("serves the UI only on loopback and never includes the bearer in the page", async () => {
-    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "omb-desktop-client-"));
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "hezuo-desktop-client-"));
     tempDirs.push(directory);
     fs.writeFileSync(path.join(directory, "index.html"), "<h1>Remote client</h1>");
     const relay = await startDesktopCompanionRelay({ access, staticDir: directory, ports: [0] });
@@ -349,7 +333,7 @@ describe("desktop companion loopback relay", () => {
   });
 
   it("answers a request target that is not a URL with 400 and keeps serving", async () => {
-    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "omb-desktop-client-"));
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "hezuo-desktop-client-"));
     tempDirs.push(directory);
     fs.writeFileSync(path.join(directory, "index.html"), "<h1>Remote client</h1>");
     const relay = await startDesktopCompanionRelay({ access, staticDir: directory, ports: [0] });

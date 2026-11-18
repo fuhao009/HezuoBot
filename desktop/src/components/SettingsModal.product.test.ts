@@ -4,16 +4,19 @@ import type { AppSettingsSection } from "@/state/store";
 import { KEY_CATALOG, keyEntry } from "./keys/key-catalog";
 import type { KeySectionId } from "./keys/key-catalog";
 
-// What a managed account's workspace offers: its AI is the account's, and the personal models, provider keys, decision
-// model, organization, Cloud and server pages would only lead to setups the server refuses. Apps and computers stay.
+// A managed account uses the account's AI; personal model providers, decision models,
+// organization and server setup are unavailable. Apps and computers stay.
 const PRODUCT_KEYS: ReadonlySet<KeySectionId> = new Set<KeySectionId>(["apps", "computers", "voice"]);
 
 const everything = new Set<AppSettingsSection>([...SECTIONS.map((entry) => entry.id), "updates"]);
 const productAvailable = new Set([...everything].filter((id) => !PRODUCT_HIDDEN_SECTIONS.includes(id)));
 
 describe("Settings for a managed account", () => {
-  it("hides the provider, key, decision model, organization, Cloud and server pages, and keeps everything else", () => {
-    for (const id of ["engines", "decisionModel", "organization", "cloudAccount", "desktopWorkspaces", "workspaces"] as const) {
+  it("hides provider, decision model, organization and server setup, and keeps the remaining pages", () => {
+    expect(PRODUCT_HIDDEN_SECTIONS).toEqual(["engines", "decisionModel", "organization", "desktopWorkspaces"]);
+    expect(SECTIONS.map((entry) => entry.id)).not.toContain("cloudAccount");
+    expect(SECTIONS.map((entry) => entry.id)).not.toContain("workspaces");
+    for (const id of ["engines", "decisionModel", "organization", "desktopWorkspaces"] as const) {
       expect(PRODUCT_HIDDEN_SECTIONS).toContain(id);
       expect(productAvailable.has(id), `${id} must not be offered`).toBe(false);
     }

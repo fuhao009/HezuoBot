@@ -82,8 +82,8 @@ use an appropriate event/webhook workflow instead of a fake weekly schedule.
   a sleeping Mac. The desktop app does the one thing it can: while plugged
   in, it keeps the computer from idle-sleeping for the hour before a due
   routine and while one runs (Automations → *Keep this computer awake for
-  routines*, on by default; a closed lid still sleeps). For true 24/7, run
-  Hezuo on a VPS — see [deploy-vps.md](deploy-vps.md).
+  routines*, on by default; a closed lid still sleeps). The former VPS deployment
+  guide has been retired; this page does not establish a supported 24/7 server mode.
 - Existing catch-up policy remains: up to 12 hours late, one missed occurrence
   can be dispatched; older work receives a missed-run receipt. The next date
   advances without replaying every missed minute. Queued/running/waiting work
@@ -112,8 +112,8 @@ use an appropriate event/webhook workflow instead of a fake weekly schedule.
     checking every 30 s, for up to an hour.
   - A usage limit with another AI that can carry on, or a signed-out AI with a
     backup AI of the bot's own (or the app-wide one while Automatic recovery is
-    on): the run starts again on that AI after a short wait (see "When an engine runs out" and "When an engine is signed
-    out" in self-hosting.md), and the owner hears once that the bot is using it.
+    on): the run starts again on that AI after a short wait, and the owner hears
+    once that the bot is using it.
   - Signed out, out of credit, payment required, a usage limit nothing can carry
     on from, or an engine that needs setting up: no retry. The owner gets one
     notification per bot and cause saying what to do, and no more until one of
@@ -124,7 +124,7 @@ use an appropriate event/webhook workflow instead of a fake weekly schedule.
     Completed"), and each routine shows "N of M runs OK this week".
 - Existing one-time, daily/weekday and interval schedules are not migrated or
   reinterpreted. Team exports retain cron expressions and zones; imports remain
-  paused until enabled. Older phone apps safely treat cron as a newer schedule;
+  paused until enabled. Older clients safely treat cron as a newer schedule;
   use chat or the desktop/web editor for it, rather than converting it to daily.
 
 Cron series are edited through the routine editor rather than calendar dragging,

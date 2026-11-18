@@ -322,7 +322,7 @@ test("a purge of a missing folder still removes the entry (rm runs with force)",
 });
 
 function switchFixture(t, { startResults = [], releaseLeaseThrows = false, stopUtilityServer = async () => true } = {}) {
-  const targetDir = mkdtempSync(join(tmpdir(), "omb-switch-fixture-"));
+  const targetDir = mkdtempSync(join(tmpdir(), "hezuo-switch-fixture-"));
   t.after(() => rmSync(targetDir, { recursive: true, force: true }));
   const forks = [];
   let forkIndex = 0;

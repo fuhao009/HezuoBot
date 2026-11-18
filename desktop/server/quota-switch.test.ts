@@ -30,12 +30,12 @@ function engine(instanceId: string, driverKind: string, displayName: string, ove
 describe("quotaSwitchEnabled", () => {
   afterEach(() => rmSync(DATA_DIR, { recursive: true, force: true }));
 
-  it("is on unless OMB_QUOTA_SWITCH=0 switches it off", () => {
+  it("is on unless HEZUO_QUOTA_SWITCH=0 switches it off", () => {
     // On by default: the card is only an offer, and nothing changes until it is answered.
     expect(quotaSwitchEnabled({})).toBe(true);
-    expect(quotaSwitchEnabled({ OMB_QUOTA_SWITCH: "0" })).toBe(false);
-    expect(quotaSwitchEnabled({ OMB_QUOTA_SWITCH: " 0 " })).toBe(false);
-    for (const other of ["1", "", "false", "off", "no"]) expect(quotaSwitchEnabled({ OMB_QUOTA_SWITCH: other }), JSON.stringify(other)).toBe(true);
+    expect(quotaSwitchEnabled({ HEZUO_QUOTA_SWITCH: "0" })).toBe(false);
+    expect(quotaSwitchEnabled({ HEZUO_QUOTA_SWITCH: " 0 " })).toBe(false);
+    for (const other of ["1", "", "false", "off", "no"]) expect(quotaSwitchEnabled({ HEZUO_QUOTA_SWITCH: other }), JSON.stringify(other)).toBe(true);
   });
 
   it("takes nothing from config.json, which has no key for it", () => {
@@ -145,7 +145,7 @@ describe("quota switch", () => {
       host: {
         validate: () => undefined, busy: () => teammateSays === undefined, run: async () => teammateSays!,
         report: () => {}, changed: () => {}, park: () => parked(),
-        names: (node, parent) => ({ requester: parent?.botId ?? "Omkar", assignee: node.botId, person: "Omkar" }),
+        names: (node, parent) => ({ requester: parent?.botId ?? "Morgan", assignee: node.botId, person: "Morgan" }),
         levelOf: () => ({ level: "ask" }), chiefOf: () => false,
       },
     });

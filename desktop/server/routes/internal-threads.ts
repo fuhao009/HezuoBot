@@ -2,7 +2,7 @@ import { chiefTidies } from "../chief-of-staff.ts";
 import type { Coordinator } from "../coordinator.ts";
 import { reachablePeers } from "../peer-roster.ts";
 import type { BotRecord, Store, TaskRecord } from "../store.ts";
-import { PASS, type RouteHandler } from "./table.ts";
+import { PASS, type InternalRouteHandler } from "./table.ts";
 import { conversationLanguage, serverLine } from "../server-lines.ts";
 
 type ThreadState = "running" | "waiting-on-you" | "queued" | "idle" | "closed";
@@ -25,7 +25,7 @@ export function createInternalThreadRoutes(deps: {
   shown(threadId: string): boolean;
   threadBusy(botId: string, threadId: string): boolean;
   queuedThreadPosition(botId: string, threadId: string): number | null;
-}): RouteHandler {
+}): InternalRouteHandler {
   const { store, coordinator, from, fromThreadId } = deps;
   return async ({ res, path, method, json }) => {
     // list_threads: the caller's own threads plus, on reachable peers, only threads it opened; a peer's other threads are its own business.

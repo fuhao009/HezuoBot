@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import {
   canonicalJson,
   downgradeToV1,
+  isPackageDocument,
   NEWER_PACKAGE_MESSAGE,
   PACKAGE_MAX_BYTES,
   packageBytes,
@@ -43,14 +44,22 @@ function refusal(value: unknown): PackageFormatError {
 }
 
 describe("package fixtures", () => {
-  it("migrates a historical package identity and execution targets without changing its contents", () => {
-    const current = parsePackageDocument(fixture("full-team.v2.json"));
+  it.each(["legacy-team.v1.json", "full-team.v2.json"])("rejects the historical identity in %s without changing the input", (name) => {
+    const current = fixture(name);
     const legacy = { ...current, format: "openmaus.package", package: {
       ...current.package,
-      routines: current.package.routines?.map((routine) => ({ ...routine, runOn: routine.runOn === "hezuo" ? "maus" : routine.runOn })),
+      routines: current.package.routines?.map((routine: { runOn?: string }) => ({ ...routine, runOn: routine.runOn === "hezuo" ? "maus" : routine.runOn })),
     } };
-    expect(parsePackageDocument(legacy)).toEqual(current);
-    expect(legacy.format).toBe("openmaus.package");
+    const original = structuredClone(legacy);
+
+    expect(isPackageDocument(legacy)).toBe(false);
+    expect(refusal(legacy).code).toBe("not_a_package");
+    if (legacy.version === 1) expect(() => parsePackageV1(legacy)).toThrow(PackageFormatError);
+    expect(legacy).toEqual(original);
+  });
+
+  it.each(["legacy-team.v1.json", "full-team.v2.json", "legacy-package.v1.md"])("recognizes the current package format or Markdown in %s", (name) => {
+    expect(isPackageDocument(fixture(name))).toBe(true);
   });
 
   it.each(Object.keys(manifest.fixtures))("%s matches manifest.json", (name) => {
@@ -80,7 +89,7 @@ describe("package fixtures", () => {
 
   it("reads v1 JSON and BotMRR Markdown as the same v2 document", () => {
     const json = parsePackageDocument(fixture("legacy-team.v1.json"));
-    const markdown = parsePackageDocument(fixture("legacy-botmrr.v1.md"));
+    const markdown = parsePackageDocument(fixture("legacy-package.v1.md"));
     expect(markdown).toEqual(json);
     expect(json.version).toBe(2);
     expect(json.package.team).toEqual({ name: "Signal Desk", leader: "scout" });

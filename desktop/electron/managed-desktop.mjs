@@ -240,7 +240,7 @@ export function createManagedDesktopClient({ store, applyConnection, applyPolicy
       if (persisted.status === "fulfilled") { cleanupGrant = null; cleanupNeeded = false; }
       if (!current(stamp)) return snapshot();
       const warnings = [];
-      if (runtime.status === "rejected") warnings.push("The local runtime did not confirm stopping Company tasks. Quit and reopen Hezuo before using Company models again.");
+      if (runtime.status === "rejected") warnings.push("The local runtime did not confirm stopping Company tasks. Quit and reopen HezuoBot before using Company models again.");
       if (revoked.status === "rejected") warnings.push("The portal was unreachable; ask your administrator to revoke this device there too.");
       if (persisted.status === "rejected") return publish({ status: "unavailable", message: [
         "The saved company sign-in could not be cleared. Unlock your system keychain and Disconnect again before reconnecting.", ...warnings,
@@ -256,7 +256,7 @@ export function createManagedDesktopClient({ store, applyConnection, applyPolicy
     await sendIdentity(grant);
     await Promise.resolve().then(() => applyPolicy(null)).catch(() => {});
     try { await applyConnection(null); }
-    catch { message += " Quit and reopen Hezuo to confirm Company tasks have stopped."; }
+    catch { message += " Quit and reopen HezuoBot to confirm Company tasks have stopped."; }
     return current(stamp) ? publish({ status: "reauth-required", message }) : snapshot();
   }
   async function renew(stamp) {
@@ -385,7 +385,7 @@ export function createManagedDesktopClient({ store, applyConnection, applyPolicy
       schedule(poll, attempt.interval);
     }
   }
-  const RESTORE_FAILED = "The saved company sign-in can't be read right now. Hezuo tries again every minute.";
+  const RESTORE_FAILED = "The saved company sign-in can't be read right now. HezuoBot tries again every minute.";
   /** A record that may only be locked in the keychain is kept, never removed, and read again shortly. */
   async function restoreFailed(stamp, unreadable) {
     if (unreadable) {

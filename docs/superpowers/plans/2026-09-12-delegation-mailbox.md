@@ -35,9 +35,8 @@ Each of these was found while reading the code for this plan:
 ## Global Constraints
 
 - Work only in the worktree `~/Desktop/hezuo/OpenGrokBot-mailbox`, on branch `feat/delegation-mailbox`. Never touch `~/Desktop/hezuo/OpenGrokBot`.
-- Commit locally after each task. **Never push. Never open a PR.** Omkar owns publishing.
+- Commit locally after each task. **Never push. Never open a PR.** maintainer owns publishing.
 - End every commit message with: `Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>`
-- Server-only change. No edits under `desktop/src/`, `mobile/ios/`, `mobile/android/`.
 - No new persisted file. `delegations.json` gains one numeric field per item. Receipts stay bounded by `MAX_RECEIPTS` / `RECEIPT_MAX_AGE_MS`.
 - `DELEGATION_TTL_MS = 24 * 60 * 60 * 1000`.
 - `MAX_QUEUED_PER_THREAD = 4` and `MAX_COMMS_DEPTH = 1` are unchanged.
@@ -1025,9 +1024,9 @@ Expected: spec + plan + 5 feature commits. Only these files changed:
 - `desktop/server/index.ts`
 - `docs/superpowers/*`
 
-- [ ] **Step 4: Stop for Omkar's manual check**
+- [ ] **Step 4: Stop for maintainer's manual check**
 
-Do not push. Report the branch state, and hand over this checklist for an OMB2 side-by-side build (the `test-locally` skill):
+Do not push. Report the branch state, and hand over this checklist for an Hezuo side-by-side build (the `test-locally` skill):
 
 1. Bot A delegates to Bot B while B is mid-task → one "waiting — they're busy" chip in A's chat. It's delivered when B finishes.
 2. Open an approval card on B, then have A delegate → A's chip says B is waiting on you, and A's `list_bots` shows "waiting on the user".

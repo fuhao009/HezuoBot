@@ -14,8 +14,8 @@ Open a bot's model picker or Settings → Engines.
 ## Driving it
 
 ```sh
-pnpm control:omb doctor --url http://127.0.0.1:PORT
-pnpm control:omb models --url http://127.0.0.1:PORT
+pnpm control:hezuo doctor --url http://127.0.0.1:PORT
+pnpm control:hezuo models --url http://127.0.0.1:PORT
 ```
 
 `doctor.ok` is true only when the endpoint is Hezuo and at least one
@@ -99,7 +99,7 @@ with `muse login`. It spends that account's Muse usage, so it runs only when
 asked:
 
 ```sh
-OMB_LIVE_MUSE=1 pnpm exec vitest run desktop/server/drivers/muse-code.live.test.ts
+HEZUO_LIVE_MUSE=1 pnpm exec vitest run desktop/server/drivers/muse-code.live.test.ts
 ```
 
 It lists the account's models (Muse Wonder 1.0), answers on Muse Wonder, runs

@@ -4,7 +4,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, realpathSync, rmSyn
 import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
-import { launchVerificationServer, type VerificationServer } from "../../scripts/control-omb.ts";
+import { launchVerificationServer, type VerificationServer } from "../../scripts/control-hezuo.ts";
 import { createComputerSharing, type SharedFolder } from "../electron/computer-sharing.mjs";
 import { sessionCookieName } from "./request-auth.ts";
 
@@ -61,7 +61,7 @@ beforeAll(async () => {
   const opened = await api("POST", "/api/auth/pairing", { label: "Desktop fixture", scopes: ["client"] });
   expect(opened.status).toBe(200);
   pairing = (await api("POST", "/api/auth/pair", { code: opened.body.code })).body;
-  expect(pairing.token).toMatch(/^omb_sess_/);
+  expect(pairing.token).toMatch(/^hezuo_sess_/);
   connector = createComputerSharing({
     file: grantFile, environments: () => [env], cuaConnection: async () => null,
     enabled: async () => localSharingEnabled,
@@ -97,7 +97,7 @@ async function proxyForTurn(start: () => Promise<void>): Promise<ChildProcess> {
   await start();
   await vi.waitFor(() => expect(existsSync(dump)).toBe(true), { timeout: 15_000 });
   const agents = JSON.parse(readFileSync(dump, "utf8")).mcpConfig.mcpServers.agents;
-  expect(agents.env.OMB_COMMS_TOKEN).toBeTruthy();
+  expect(agents.env.HEZUO_COMMS_TOKEN).toBeTruthy();
   return spawn(agents.command, agents.args, {
     env: { PATH: process.env.PATH, HOME: fixture.info.dataDir, ...agents.env }, stdio: ["pipe", "pipe", "pipe"],
   });
@@ -151,13 +151,13 @@ it("explicit edits and terminal work; old credentials and other sessions cannot 
   const grant = storedGrant();
   const auth = { authorization: `Bearer ${pairing.token}` };
   expect((await api("POST", `/api/shared-computers/${grant.id}/lease`, {}, auth)).status).toBe(403);
-  expect((await api("POST", `/api/shared-computers/${old.id}/lease`, {}, { ...auth, "x-omb-computer-secret": old.secret })).status).toBe(403);
+  expect((await api("POST", `/api/shared-computers/${old.id}/lease`, {}, { ...auth, "x-hezuo-computer-secret": old.secret })).status).toBe(403);
   const second = await api("POST", "/api/auth/pairing", { label: "Other desktop" });
   const other = (await api("POST", "/api/auth/pair", { code: second.body.code })).body;
-  expect((await api("POST", `/api/shared-computers/${grant.id}/lease`, {}, { authorization: `Bearer ${other.token}`, "x-omb-computer-secret": grant.secret })).status).toBe(403);
+  expect((await api("POST", `/api/shared-computers/${grant.id}/lease`, {}, { authorization: `Bearer ${other.token}`, "x-hezuo-computer-secret": grant.secret })).status).toBe(403);
   expect((await api("POST", "/api/desktop/shared-computer-control", { id: randomUUID(), action: "acquire" }, { authorization: `Bearer ${other.token}` })).status).toBe(403);
   const cookie = `${sessionCookieName(Number(new URL(env.origin).port), grant.environmentId)}=${pairing.token}`;
-  expect((await api("POST", `/api/shared-computers/${grant.id}/lease`, {}, { cookie, origin: "https://evil.invalid", "x-omb-computer-secret": grant.secret })).status).toBe(403);
+  expect((await api("POST", `/api/shared-computers/${grant.id}/lease`, {}, { cookie, origin: "https://evil.invalid", "x-hezuo-computer-secret": grant.secret })).status).toBe(403);
   evidence.push("explicit hash-guarded edit and real terminal; cross-session, stale-secret, CSRF, local-control gate refusals");
 }, 60_000);
 

@@ -12,12 +12,12 @@ node gateway/local/local-gateway.mjs init \
   --default-model gpt-6-astra \
   --rate 1000000000 \
   --operator-id <your account id, after whoami>
-node gateway/local/local-gateway.mjs start --config .omb-scratch/local-gateway/gateway.json
-node gateway/local/local-gateway.mjs status --config .omb-scratch/local-gateway/gateway.json
-node gateway/local/local-gateway.mjs stop  --config .omb-scratch/local-gateway/gateway.json
+node gateway/local/local-gateway.mjs start --config .hezuo-scratch/local-gateway/gateway.json
+node gateway/local/local-gateway.mjs status --config .hezuo-scratch/local-gateway/gateway.json
+node gateway/local/local-gateway.mjs stop  --config .hezuo-scratch/local-gateway/gateway.json
 ```
 
-`init` writes `.omb-scratch/local-gateway/gateway.json` (mode 0600), which is
+`init` writes `.hezuo-scratch/local-gateway/gateway.json` (mode 0600), which is
 also the default `--config`. Nothing is committed and no secret is printed.
 
 ## What "persistent" means
@@ -55,7 +55,7 @@ No secret is accepted on the command line and none is stored in the config.
 
 * a private file (`--smtp-file`, `--upstream-key-file`; regular file, mode 0600,
   never a symlink);
-* the environment (`OMB_LOCAL_SMTP_URL`, `OMB_LOCAL_UPSTREAM_KEY`);
+* the environment (`HEZUO_LOCAL_SMTP_URL`, `HEZUO_LOCAL_UPSTREAM_KEY`);
 * the OMP `models.yml` named by `--open-models` (its provider `apiKey`), which
   is read again at `start` so exactly one copy exists.
 
@@ -64,7 +64,7 @@ and every write refuses an existing symlink. A config or secret file readable
 by another account is rejected, never repaired.
 
 The operator's own password is never stored: `whoami` reads
-`OMB_LOCAL_OPERATOR_PASSWORD` for that one run, or falls back to an emailed
+`HEZUO_LOCAL_OPERATOR_PASSWORD` for that one run, or falls back to an emailed
 code. `--operator-email` is the only account-related argument it takes.
 
 ## Origin, TLS, and binding
@@ -147,7 +147,7 @@ file or mock mailbox outside the explicit fixture.
 * The worker never logs an address, code, or body; the SMTP adapter returns a
   stable error code only.
 * A private SMTP CA (a relay with its own certificate) is trusted per
-  connection with `OMB_LOCAL_SMTP_CA=<ca.pem>`; verification stays on.
+  connection with `HEZUO_LOCAL_SMTP_CA=<ca.pem>`; verification stays on.
 
 The full path was proven against a local TLS relay: sign-up with verification
 `required` issues no session, the Worker's own message arrives over SMTP with
@@ -182,7 +182,7 @@ What the installed job uses:
 
 | Piece | Where |
 | --- | --- |
-| LaunchAgent | `~/Library/LaunchAgents/com.openmausbot.gateway.plist` (0600) |
+| LaunchAgent | `~/Library/LaunchAgents/com.hezuo.gateway.plist` (0600) |
 | Node it runs | `<data-dir>/service/node` — an APFS clone (`cp -c`), not `/tmp` |
 | Log | `<data-dir>/logs/gateway.log` (0600, bounded — see below) |
 | Service command | the same `node <checkout>/gateway/local/local-gateway.mjs start --config …` |
@@ -272,8 +272,8 @@ AI permission or grants points:
 
 Enabling AI and granting balance remain separate, explicit calls to
 `gateway/scripts/account-ai-admin.mjs` (`enable`, then `grant`), as in the hosted
-deployment. That CLI signs in with `OMB_OPERATOR_TOKEN` when set, otherwise an
-account **password** (non-echoing prompt, or `OMB_OPERATOR_PASSWORD` for
+deployment. That CLI signs in with `HEZUO_OPERATOR_TOKEN` when set, otherwise an
+account **password** (non-echoing prompt, or `HEZUO_OPERATOR_PASSWORD` for
 unattended runs; never an argument), otherwise an emailed code. A deployment
 without mail answers `emailCode.enabled: false`, so the password form is chosen
 without needing `--password`.
@@ -377,26 +377,23 @@ restore only the config or run the backup as a second gateway.
 
 
 
-## Phone access
+## Remote companion relay
 
-The desktop Hezuo and the native phone app connect by signing into the **same
-Hezuo account** on this gateway. After the phone signs in, it can reach each
-desktop installation already registered to that account at:
+The gateway retains the account-authenticated companion relay at:
 
-```
+```text
 https://<public-host>:<port>/v1/companion/<installation-id>
 ```
 
-No pairing code, QR code, or iOS handoff code is required for this path, and
-it does not use a Cloudflare tunnel or Tailscale.
+The desktop registers an installation and opens its tunnel to the gateway.
+A remote client must authenticate to the same account and may access only
+installations owned by that account. This is a client-equivalent surface,
+not an admin session or a cloud copy of the desktop database.
 
-A phone cannot reach a loopback origin. Start the gateway with `--host` and
-`--public-host` set to an address the phone can resolve, and give the phone
-that HTTPS origin. For a generated certificate, paste the gateway CA
-(`<data-dir>/tls/gateway-cert.pem`) into the phone app's optional certificate
-field, or install that CA on the phone. Desktop sign-in on the same machine
-still uses the bundled or pinned CA described above.
+Remote clients cannot use the desktop's loopback address. Bind the gateway
+to an appropriate interface, publish a reachable HTTPS origin, and establish
+certificate trust without disabling TLS verification. See the certificate
+instructions above and the [device and relay API](gateway-client-devices.md).
 
-The phone holds an account session only. It does not create a desktop
-installation, and the companion surface it receives is the existing
-client-equivalent API — not an admin session.
+This transport contract is retained for desktop/gateway maintenance. It is
+not a native mobile installation guide or evidence of a shipped client.

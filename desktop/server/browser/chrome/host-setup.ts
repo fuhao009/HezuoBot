@@ -6,7 +6,7 @@
 //
 // OMB never turns Chrome's sandbox off by itself on a host. A host that cannot
 // give it one gets the setup command instead, and only an operator's explicit
-// OMB_BROWSER_SANDBOX=0 launches without it. The computer container image (also
+// HEZUO_BROWSER_SANDBOX=0 launches without it. The computer container image (also
 // run on a VPS) is the exception: it drops capabilities, so its Chrome runs
 // without its own sandbox and the container is the isolation boundary.
 
@@ -20,7 +20,7 @@ export const SETUP_COMMAND = "sudo hezuo browser setup";
 export const NO_SANDBOX_SIGNATURE = "No usable sandbox";
 
 export function sandboxDisabled(env: Readonly<Record<string, string | undefined>>): boolean {
-  return env.OMB_BROWSER_SANDBOX === "0";
+  return env.HEZUO_BROWSER_SANDBOX === "0";
 }
 
 /** Set on Ubuntu 23.10+: unprivileged user namespaces need an AppArmor profile. */

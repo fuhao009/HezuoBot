@@ -8,7 +8,7 @@ const RESTORE_ID = "7c9e6679-7425-40de-944b-e07fc1f90ae7";
 const WINDOWS = "C:\\Users\\Ada\\.hezuo";
 const scratch: string[] = [];
 function directory(): string {
-  const path = mkdtempSync(join(tmpdir(), "omb-moved-paths-"));
+  const path = mkdtempSync(join(tmpdir(), "hezuo-moved-paths-"));
   scratch.push(path);
   return path;
 }

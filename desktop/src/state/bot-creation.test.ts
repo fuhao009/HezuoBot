@@ -1,71 +1,29 @@
-import { createElement, type Dispatch } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { initialState, reducer, StoreProvider, useStore, type Action, type Bot } from "./store";
-
-const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
-const deferred = () => {
-  let resolve!: (value: Response) => void;
-  const promise = new Promise<Response>((done) => { resolve = done; });
-  return { promise, resolve };
-};
-const flush = async () => { for (let i = 0; i < 30; i++) await Promise.resolve(); };
-
-// Capture the real command handler without mounting live event effects.
-function mount(request: typeof fetch) {
-  vi.useFakeTimers();
-  vi.stubGlobal("fetch", request);
-  vi.stubGlobal("window", {});
-  let dispatch!: Dispatch<Action>;
-  function Capture() { dispatch = useStore().dispatch; return null; }
-  renderToStaticMarkup(createElement(StoreProvider, null, createElement(Capture)));
-  return dispatch;
-}
-afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals(); });
+import { describe, expect, it, vi } from "vitest";
+import { initialState, reducer, type Action, type Bot } from "./store";
 
 describe("New bot", () => {
-  const bot = { id: "created", threadId: "created-main", name: "Scout", messages: [] };
-  const defaults = { defaults: { profile: {}, memory: {}, skills: [], routines: [] }, modelSelection: { instanceId: "claude", model: "sonnet" }, suggestedName: "Scout" };
-  const server = (create: () => Promise<Response>) => vi.fn<typeof fetch>(async (input, init) => {
-    const path = String(input);
-    if (path === "/api/bot-defaults") return response(defaults);
-    if (path === "/api/bots" && init?.method === "POST") return create();
-    if (path === "/api/bots/created" && init?.method === "PATCH") return response({ bot });
-    return response({});
-  });
-  const creates = (request: ReturnType<typeof server>) => request.mock.calls.filter(([path, init]) => path === "/api/bots" && init?.method === "POST").length;
-
-  it("makes one bot from a double click", async () => {
-    const post = deferred();
-    const request = server(() => post.promise);
-    const dispatch = mount(request);
+  it("opens one review dialog from a double click without replacing its callbacks", () => {
     const onCreated = vi.fn();
-    dispatch({ type: "newBot", onCreated });
-    dispatch({ type: "newBot", onCreated });
-    await vi.waitFor(() => expect(creates(request)).toBe(1));
-    dispatch({ type: "newBot", onCreated });
-    post.resolve(response({ bot }));
-    await vi.waitFor(() => expect(onCreated).toHaveBeenCalledOnce());
-    await flush();
-    expect(creates(request)).toBe(1);
-  });
-
-  it("lets the next click try again after a failure", async () => {
-    let fail = true;
-    const request = server(async () => {
-      if (fail) { fail = false; throw new Error("offline"); }
-      return response({ bot });
-    });
-    const dispatch = mount(request);
     const onError = vi.fn();
-    const onCreated = vi.fn();
-    dispatch({ type: "newBot", onError, onCreated });
-    await vi.waitFor(() => expect(onError).toHaveBeenCalledWith("Couldn't make a new bot: offline"));
+    const action: Extract<Action, { type: "newBot" }> = { type: "newBot", onCreated, onError };
+    const opened = reducer(initialState, action);
+    expect(opened.pendingNewBot).toBe(action);
+    expect(opened.bots).toBe(initialState.bots);
+    expect(opened.selectedId).toBe(initialState.selectedId);
+    expect(opened.activeView).toBe(initialState.activeView);
+    expect(reducer(opened, { type: "newBot", onCreated: vi.fn() })).toBe(opened);
     expect(onCreated).not.toHaveBeenCalled();
-    await flush();
-    dispatch({ type: "newBot", onCreated });
-    await vi.waitFor(() => expect(onCreated).toHaveBeenCalledOnce());
-    expect(creates(request)).toBe(2);
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  it("lets a new click open another draft after the dialog closes", () => {
+    const opened = reducer(initialState, { type: "newBot" });
+    const closed = reducer(opened, { type: "closeNewBot" });
+    expect(closed.pendingNewBot).toBeNull();
+    const onCreated = vi.fn();
+    const action: Extract<Action, { type: "newBot" }> = { type: "newBot", onCreated };
+    expect(reducer(closed, action).pendingNewBot).toBe(action);
+    expect(onCreated).not.toHaveBeenCalled();
   });
 });
 
@@ -80,10 +38,15 @@ describe("setup navigation", () => {
     expect(reducer(state, { type: "botAdded", bot })).toMatchObject({ activeView: "chat", selectedId: "created" });
   });
 
-  it("puts the new bot's chat in front of any open settings, except from a department's own dialog", () => {
+  it("closes setup surfaces while retaining the department dialog's creation context", () => {
     const start = { ...initialState, settingsOpen: true, appSettingsOpen: true, pluginsOpen: true, shortcutsOpen: true, computerOpen: true };
-    expect(reducer(start, { type: "newBot" })).toMatchObject({ settingsOpen: false, appSettingsOpen: false, pluginsOpen: false, shortcutsOpen: false, computerOpen: true });
-    expect(reducer(start, { type: "newBot", section: "Sales", preserveSelection: true })).toBe(start);
+    expect(reducer(start, { type: "newBot" })).toMatchObject({ settingsOpen: false, appSettingsOpen: false, pluginsOpen: false, shortcutsOpen: false, computerOpen: true, pendingNewBot: { type: "newBot" } });
+    const action: Extract<Action, { type: "newBot" }> = { type: "newBot", section: "Sales", preserveSelection: true };
+    const next = reducer(start, action);
+    expect(next.pendingNewBot).toBe(action);
+    expect(next.selectedId).toBe(start.selectedId);
+    expect(next.activeView).toBe(start.activeView);
+    expect(next).toMatchObject({ settingsOpen: false, appSettingsOpen: false, pluginsOpen: false, shortcutsOpen: false, computerOpen: true });
   });
 
   it("opens the requested Plugins surface and remembers it on reopen", () => {

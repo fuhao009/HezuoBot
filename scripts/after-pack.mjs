@@ -1,15 +1,10 @@
-import { chmod, lstat, readFile, readdir } from "node:fs/promises";
+import { chmod, lstat } from "node:fs/promises";
 import path from "node:path";
 import { verifyProductApp, isProductResourceTree } from "./product-release.mjs";
 import { LICENSE_FILES } from "./cua-linux-release.mjs";
-import {
-  executableTarget,
-  verifyCloudflaredExecutable,
-} from "./prepare-cloudflared.mjs";
 import { fileURLToPath } from "node:url";
 import { verifyBrowserBundle } from "./prepare-browser.mjs";
 import { pinnedDuckdbVersion, pinnedOnePasswordVersion, pinnedResvgVersion, verifyDuckdbTree } from "./prepare-duckdb.mjs";
-import { LIPO_ARCH, isMachO, writeThinMachO } from "./mac-thin.mjs";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -29,48 +24,6 @@ async function requireRegularFile(file, mode) {
   if (mode !== undefined) await chmod(file, mode);
 }
 
-async function validateCloudflared(resources, platform, required) {
-  const root = path.join(resources, "cloudflared");
-  try {
-    await lstat(root);
-  } catch (error) {
-    // Unit fixtures for the older CUA-only hook do not carry every packaged
-    // resource. A real electron-builder context must fail closed because its
-    // copier only warns when an extraResources `from` path is missing.
-    if (error?.code === "ENOENT" && !required) return;
-    throw error;
-  }
-
-  const unixMode = platform === "win32" ? undefined : 0o755;
-  await requireRealDirectory(root, unixMode);
-  const executable = path.join(root, platform === "win32" ? "cloudflared.exe" : "cloudflared");
-  if (JSON.stringify(await readdir(root)) !== JSON.stringify([path.basename(executable)])) {
-    throw new Error(`Unexpected entries in packaged cloudflared resource: ${root}`);
-  }
-  await requireRegularFile(executable, unixMode);
-  const target = executableTarget(await readFile(executable));
-  const allowed = {
-    darwin: new Set(["darwin-arm64", "darwin-x64"]),
-    linux: new Set(["linux-x64"]),
-    win32: new Set(["win32-x64"]),
-  }[platform];
-  if (!allowed?.has(target)) {
-    throw new Error(`Packaged ${platform} app contains the wrong cloudflared target: ${target}`);
-  }
-  verifyCloudflaredExecutable(executable, target);
-
-  const licenses = path.join(resources, "licenses");
-  await requireRealDirectory(licenses, unixMode);
-  await requireRegularFile(
-    path.join(licenses, "cloudflared-LICENSE.txt"),
-    platform === "win32" ? undefined : 0o644,
-  );
-  await requireRegularFile(
-    path.join(licenses, "cloudflared-README.md"),
-    platform === "win32" ? undefined : 0o644,
-  );
-}
-
 // The DuckDB binding the server requires at runtime (desktop/server/data/engine.ts):
 // the pinned packages, the native binding beside its library, and on macOS
 // only this app's slice, so an Intel Mac never gets an arm64-only dylib.
@@ -88,24 +41,6 @@ async function validateDuckdb(resources, platform, arch, required) {
   await verifyDuckdbTree(duckdb, platform, arch, pinnedDuckdbVersion(root), pinnedResvgVersion(root), pinnedOnePasswordVersion(root));
 }
 
-// Google ships macOS Platform Tools universal, and the shared top-level
-// extraResources entry copies that tree into both single-arch apps. Keep only
-// this app's slice, before electron-builder signs the nested code.
-async function thinMacPlatformTools(resources, arch) {
-  const root = path.join(resources, "android-platform-tools", "darwin");
-  let entries;
-  try {
-    entries = await readdir(root, { recursive: true, withFileTypes: true });
-  } catch (error) {
-    if (error?.code === "ENOENT") return;
-    throw error;
-  }
-  if (!arch) throw new Error("Unsupported macOS package architecture for Android Platform Tools");
-  for (const entry of entries) {
-    const file = path.join(entry.parentPath, entry.name);
-    if (entry.isFile() && await isMachO(file)) await writeThinMachO(file, file, LIPO_ARCH[arch]);
-  }
-}
 
 // electron-builder normalizes copied resource directories to 0775. That is
 // unsafe for a root-owned executable path after DEB/AppImage installation, so
@@ -114,7 +49,7 @@ async function thinMacPlatformTools(resources, arch) {
 
 // The packaged .app is named after the build's productName: the upstream
 // distribution ships "Hezuo.app", while a managed product build ships
-// "Hezuo Product.app". Prefer electron-builder's own resolution, then
+// "HezuoBot.app". Prefer electron-builder's own resolution, then
 // the context's product filename, and keep the upstream name only as the
 // fallback for bare unit fixtures.
 function macResourcesDir(context) {
@@ -129,7 +64,6 @@ export default async function afterPack(context) {
       ? macResourcesDir(context)
       : path.join(context.appOutDir, "resources")
   );
-  await validateCloudflared(resources, context.electronPlatformName, Boolean(context.packager));
   const browserRoot = path.join(resources, "browser-engine");
   const hasBrowser = await lstat(browserRoot).then(() => true, (error) => {
     if (error?.code === "ENOENT") return false;
@@ -143,7 +77,6 @@ export default async function afterPack(context) {
     await verifyBrowserBundle(browserRoot, `${context.electronPlatformName}-${arch}`);
   }
   await validateDuckdb(resources, context.electronPlatformName, arch, Boolean(context.packager));
-  if (context.electronPlatformName === "darwin") await thinMacPlatformTools(resources, arch);
 
   // A managed product build carries product-service.json; its identity must be
   // right before signing, and the upstream update feed must not survive. A

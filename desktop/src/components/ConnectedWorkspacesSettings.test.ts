@@ -32,7 +32,7 @@ const flush = async () => { for (let i = 0; i < 20; i++) await Promise.resolve()
 const VPS = { id: "vps", name: "VPS", origin: "https://bots.example.test" };
 function stub(extra: Record<string, unknown> = {}) {
   vi.stubGlobal("window", {
-    ogb: { environments: { state: vi.fn().mockResolvedValue({ localOrigin: "http://127.0.0.1:1", remote: false, activeId: "local", environments: [VPS] }),
+    hezuo: { environments: { state: vi.fn().mockResolvedValue({ localOrigin: "http://127.0.0.1:1", remote: false, activeId: "local", environments: [VPS] }),
       switch: vi.fn(), forget: vi.fn(), addFromLink: vi.fn(), onOpenSettings: () => () => {} }, ...extra },
     location: { search: "", href: "http://127.0.0.1:1/settings" }, history: { replaceState: () => {} },
   });
@@ -50,10 +50,10 @@ const envState = (overrides: Record<string, unknown> = {}) => ({
   localOrigin: "http://127.0.0.1:1", remote: false, packaged: true, activeId: "local",
   environments: [LOCAL_ENV, GONE_ENV, VPS], ...overrides,
 });
-function stubEnvironments(stateOverrides: Record<string, unknown> = {}, bridgeExtra: Record<string, unknown> = {}, ogbExtra: Record<string, unknown> = {}) {
+function stubEnvironments(stateOverrides: Record<string, unknown> = {}, bridgeExtra: Record<string, unknown> = {}, hezuoExtra: Record<string, unknown> = {}) {
   const environments = { state: vi.fn().mockResolvedValue(envState(stateOverrides)), switch: vi.fn(),
     forget: vi.fn(), addFromLink: vi.fn(), create: vi.fn(), pickDir: vi.fn(), onOpenSettings: () => () => {}, ...bridgeExtra };
-  stub({ environments, ...ogbExtra });
+  stub({ environments, ...hezuoExtra });
   return environments;
 }
 const rowButton = (ariaLabel: string) => render().nodes.filter(n => n.type === "button" && n.props["aria-label"] === ariaLabel)[0];
@@ -174,10 +174,10 @@ it("offers no Forget for the environment this app is on", async () => {
 
 it("a Cloud of the person's own has no lending control here, since this computer is lent to it by itself; other servers keep Computer access", async () => {
   config.value = { features: { sharedComputers: true } };
-  const cloud = { id: "cloud", name: "My Cloud", origin: "https://omb-u-1.fly.dev", home: true };
-  const other = { id: "a", name: "Client A", origin: "https://omb-c-a.fly.dev", cloud: { id: "c-a", role: "owner" } };
+  const cloud = { id: "cloud", name: "My Cloud", origin: "https://hezuo-u-1.fly.dev", home: true };
+  const other = { id: "a", name: "Client A", origin: "https://hezuo-c-a.fly.dev", cloud: { id: "c-a", role: "owner" } };
   stub({ computerSharing: { state: vi.fn() } });
-  vi.mocked((globalThis.window as unknown as { ogb: { environments: { state: ReturnType<typeof vi.fn> } } }).ogb.environments.state)
+  vi.mocked((globalThis.window as unknown as { hezuo: { environments: { state: ReturnType<typeof vi.fn> } } }).hezuo.environments.state)
     .mockResolvedValue({ localOrigin: "http://127.0.0.1:1", remote: false, activeId: "local", environments: [VPS, cloud, other] });
   await mount();
   const labels = render().nodes.filter(node => node.type === "button").map(node => node.props["aria-label"] ?? Children.toArray(node.props.children).join(""));

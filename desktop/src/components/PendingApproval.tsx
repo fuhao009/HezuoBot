@@ -289,14 +289,14 @@ export function PendingApprovalActions({
     if (!showPrimary) return null;
     return (
       <>
-        {turnOn.getApp && (
-          <a key="get" {...marked("get-app")} href={DESKTOP_DOWNLOAD_URL} target="_blank" rel="noreferrer" className={ASK_SECONDARY_BUTTON}>{turnOn.getApp}</a>
-        )}
         <button key="deny" {...marked("deny")} type="button" onClick={() => decide("deny")} className={turnOn.turnOn ? ASK_SECONDARY_BUTTON : ASK_QUIET_ANSWER}>
           {t("computerAsk.action.notNow")}
         </button>
         {turnOn.turnOn && (
           <button key="allow" {...marked("allow")} type="button" onClick={() => decide("allow")} className={allow.className} style={allow.style}>{turnOn.turnOn}</button>
+        )}
+        {turnOn.getApp && (
+          <a href={DESKTOP_DOWNLOAD_URL} target="_blank" rel="noopener noreferrer" className={allow.className} style={allow.style}>{turnOn.getApp}</a>
         )}
       </>
     );

@@ -45,8 +45,8 @@ export interface TraceTool {
   endedAt?: number;
   status: TraceStatus;
   error?: string;
-  /** Who measured it: OMB's own tools are timed by the server on every engine. */
-  timedBy: "engine" | "omb";
+  /** Who measured it: Hezuo's own tools are timed by the server on every engine. */
+  timedBy: "engine" | "hezuo";
   running?: boolean;
 }
 
@@ -150,7 +150,7 @@ export function traceRootId(threadId: string, turnId: string): string {
 }
 
 const SERVER_ICONS: Readonly<Record<string, TraceToolIcon>> = { phone: "phone", data: "data", dweb: "web", browser: "browser", computer: "computer" };
-const OWN_SERVERS = new Set(["agents", "ogb", "composio", OWN_APPS_SERVER, ...Object.keys(SERVER_ICONS)]);
+const OWN_SERVERS: Readonly<Record<string, true>> = { agents: true, hezuo: true, composio: true, [OWN_APPS_SERVER]: true, ...Object.fromEntries(Object.keys(SERVER_ICONS).map((name) => [name, true as const])) };
 const COMPOSIO_ACTION = /^([A-Z][A-Z0-9]+)_[A-Z0-9_]+$/;
 const BUILT_IN_ICONS: ReadonlyArray<[RegExp, TraceToolIcon]> = [
   [/^(?:websearch|web_search|search_web|google_search|x_search|research)$/, "search"],
@@ -180,6 +180,6 @@ export function traceToolLook(name: string): { icon: TraceToolIcon; app?: string
   const lower = bare.toLowerCase();
   for (const [pattern, icon] of BUILT_IN_ICONS) if (pattern.test(lower)) return { icon };
   if (server && SERVER_ICONS[server]) return { icon: SERVER_ICONS[server]! };
-  if (server && !OWN_SERVERS.has(server)) return { icon: "mcp", server };
+  if (server && !Object.prototype.hasOwnProperty.call(OWN_SERVERS, server)) return { icon: "mcp", server };
   return { icon: "tool" };
 }

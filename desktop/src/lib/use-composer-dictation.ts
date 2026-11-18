@@ -21,7 +21,7 @@ export function useComposerDictation({ draftId, text, onText, available }: {
 
   useEffect(() => {
     if (!recording) return;
-    const bridge = window.ogb;
+    const bridge = window.hezuo;
     if (!bridge || session.current.draftId !== draftId) {
       setRecording(false);
       return;
@@ -77,7 +77,7 @@ export function useComposerDictation({ draftId, text, onText, available }: {
   }, [recording, draftId, onText]);
 
   const toggle = () => {
-    if (!available || !window.ogb) {
+    if (!available || !window.hezuo) {
       setSpeechError(t("composer.dictation.unavailable"));
     } else if (recording) {
       stop();

@@ -132,7 +132,7 @@ describe("Settings → Appearance", () => {
   });
 
   it("keeps the Advanced mode switch reachable from a paired remote client", () => {
-    vi.stubGlobal("window", { ogb: { remoteClient: { active: true } } });
+    vi.stubGlobal("window", { hezuo: { remoteClient: { active: true } } });
     expect(render()).toContain('aria-label="Advanced mode"');
   });
 
@@ -142,7 +142,7 @@ describe("Settings → Appearance", () => {
 
   it.each([true, false])("keeps the app language reachable from a paired remote client (Advanced %s)", (advanced) => {
     fixture.advancedMode = advanced;
-    vi.stubGlobal("window", { ogb: { remoteClient: { active: true } } });
+    vi.stubGlobal("window", { hezuo: { remoteClient: { active: true } } });
     const html = render();
     expect(html).not.toContain('<option value="general">');
     expect(html).toContain('aria-label="App language"');
@@ -171,17 +171,16 @@ describe("Settings → Appearance", () => {
     expect(html).not.toContain("Stop after no progress for");
   });
 
-  it("keeps the switch for the window's rail of places with the sidebar's rows, where this window has one", () => {
-    expect(render()).not.toContain("Show your computers");
-    fixture.rail = { available: true, hidden: true };
+  it.each([null, { available: false, hidden: true }, { available: true, hidden: true }, { available: true, hidden: false }])("does not revive the removed places rail for legacy state %j", (rail) => {
+    fixture.rail = rail;
     const html = render();
-    const at = html.indexOf('aria-label="Show your computers"');
-    expect(at).toBeGreaterThan(html.indexOf('aria-label="Choose tools layout"'));
-    expect(at).toBeLessThan(html.indexOf('aria-label="Show threads"'));
-    const toggle = fixture.switches.find((props) => props["aria-label"] === "Show your computers")!;
-    expect(toggle.checked).toBe(false);
-    toggle.onClick!({} as never);
-    expect(fixture.railHidden).toEqual([false]);
+    expect(html).not.toContain('aria-label="Show your computers"');
+    expect(html).not.toContain("A circle for each place your bots live");
+    expect(fixture.switches.some((props) => props["aria-label"] === "Show your computers")).toBe(false);
+    expect(fixture.railHidden).toEqual([]);
+    const tools = html.indexOf('aria-label="Choose tools layout"');
+    expect(tools).toBeGreaterThan(-1);
+    expect(html.indexOf('aria-label="Show threads"')).toBeGreaterThan(tools);
   });
 
   it.each([true, false])("only updates the local preference when the switch is %s", (enabled) => {
@@ -296,7 +295,7 @@ describe("Settings → Appearance", () => {
     ["wide", "Wide"],
     ["full", "Full width"],
   ])("shows the saved chat width (%s) alongside message colors", (width, label) => {
-    vi.stubGlobal("localStorage", { getItem: (key: string) => key === "omb-chat-width" ? width : null });
+    vi.stubGlobal("localStorage", { getItem: (key: string) => key === "hezuo-chat-width" ? width : null });
     const html = render();
     expect(html).toContain('aria-label="Chat width"');
     expect(html).toContain(`<option value="${width}" selected="">${label}</option>`);
@@ -350,7 +349,7 @@ describe("Settings → Appearance", () => {
   });
 
   it("makes local appearance available remotely without exposing server settings", () => {
-    vi.stubGlobal("window", { ogb: { remoteClient: { active: true } } });
+    vi.stubGlobal("window", { hezuo: { remoteClient: { active: true } } });
     const html = render();
     expect(html).toContain('<option value="appearance" selected="">Appearance</option>');
     expect(html).toContain('<option value="companion">Remote access</option>');
@@ -370,7 +369,7 @@ describe("Settings → Appearance", () => {
     const html = render();
     expect(html).toContain('<option value="backups" selected="">Backups</option>');
     expect(html).toContain("Export full backup");
-    expect(html).toContain('type="file" accept=".ombbackup"');
+    expect(html).toContain('type="file" accept=".hezuobackup"');
     expect(html).toContain("Older team backups and shareable templates");
   });
 
@@ -410,7 +409,7 @@ describe("Settings → Appearance", () => {
 
   it("offers desktop connections as a top-level page without exposing the list remotely", () => {
     fixture.section = "desktopWorkspaces";
-    vi.stubGlobal("window", { ogb: { environments: {} } });
+    vi.stubGlobal("window", { hezuo: { environments: {} } });
     const local = render();
     expect(local).toContain('<option value="desktopWorkspaces" selected="">Servers</option>');
     expect(local).toContain("Server address or pairing link");
@@ -418,30 +417,32 @@ describe("Settings → Appearance", () => {
     expect(local).toContain("Your servers");
     expect(local).toContain("npx hezuo pair --label");
     fixture.section = "general";
-    vi.stubGlobal("window", { ogb: { workspaces: {} } });
+    vi.stubGlobal("window", { hezuo: { workspaces: {} } });
     expect(render()).not.toContain('<option value="desktopWorkspaces"');
   });
 
   it("offers optional Organisation settings only through the local desktop bridge", () => {
     fixture.section = "organization";
-    vi.stubGlobal("window", { ogb: { organization: {} } });
+    vi.stubGlobal("window", { hezuo: { organization: {} } });
     const local = render();
     expect(local).toContain('<option value="organization" selected="">Organization</option>');
     expect(local).toContain("personal and local models");
     fixture.section = "appearance";
     vi.stubGlobal("window", {});
     expect(render()).not.toContain('<option value="organization"');
-    vi.stubGlobal("window", { ogb: { organization: {}, remoteClient: { active: true } } });
+    vi.stubGlobal("window", { hezuo: { organization: {}, remoteClient: { active: true } } });
     expect(render()).not.toContain('<option value="organization"');
     expect(render()).toContain("Midnight");
   });
-  it("offers personal Cloud separately and only through the local desktop bridge", () => {
-    fixture.section = "cloudAccount";
-    vi.stubGlobal("window", { ogb: { cloudAccount: {} } });
-    expect(render()).toContain('<option value="cloudAccount" selected="">');
+  it("keeps the retired personal Cloud page out of every desktop and browser picker", () => {
     fixture.section = "appearance";
-    vi.stubGlobal("window", {}); expect(render()).not.toContain('<option value="cloudAccount"');
-    vi.stubGlobal("window", { ogb: { cloudAccount: {}, remoteClient: { active: true } } });
-    expect(render()).not.toContain('<option value="cloudAccount"');
+    for (const host of [{}, { hezuo: { cloudAccount: {} } }, { hezuo: { cloudAccount: {}, remoteClient: { active: true } } }]) {
+      vi.stubGlobal("window", host);
+      const html = render();
+      expect(html).not.toContain('<option value="cloudAccount"');
+      expect(html).not.toContain('data-settings-section="cloudAccount"');
+      expect(html).toContain('<option value="appearance" selected="">Appearance</option>');
+      expect(html).toContain("Midnight");
+    }
   });
 });

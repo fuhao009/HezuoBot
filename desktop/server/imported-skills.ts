@@ -361,7 +361,7 @@ export interface SkillTurnEngine {
 }
 
 /** The skill folders a turn's engine loads in place: ~/.claude/skills for Claude Code with "Also use my Claude Code
- * skills" (or OMB_CLAUDE_INHERIT_USER_CONFIG), and $CODEX_HOME/skills for Codex on the person's own CODEX_HOME. */
+ * skills" (or HEZUO_CLAUDE_INHERIT_USER_CONFIG), and $CODEX_HOME/skills for Codex on the person's own CODEX_HOME. */
 export function nativeSkillFolders(
   engine: SkillTurnEngine | undefined,
   options: { claudeUserSkills: boolean; home?: string; env?: Record<string, string | undefined> },
@@ -371,7 +371,7 @@ export function nativeSkillFolders(
   const env = { ...(options.env ?? process.env), ...engine.environment };
   const absolute = (value: string | undefined) => (value && isAbsolute(value) ? value : null);
   if (engine.driverKind === "claudeAgent") {
-    if (env.OMB_CLAUDE_INHERIT_USER_CONFIG === "1") return [join(absolute(env.CLAUDE_CONFIG_DIR) ?? join(home, ".claude"), "skills")];
+    if (env.HEZUO_CLAUDE_INHERIT_USER_CONFIG === "1") return [join(absolute(env.CLAUDE_CONFIG_DIR) ?? join(home, ".claude"), "skills")];
     if (!options.claudeUserSkills) return [];
     const folder = join(home, ".claude", "skills");
     try {

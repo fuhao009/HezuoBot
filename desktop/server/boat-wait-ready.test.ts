@@ -1,11 +1,9 @@
-import { createHash } from "node:crypto";
 import { createServer, type Server, type ServerResponse } from "node:http";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 describe("waiting for a cloud computer", () => {
   const botId = "stalled-relay-bot";
-  const prefix = botId.slice(0, 8).toLowerCase().replace(/[^a-z0-9]/g, "");
-  const name = `ogb-${prefix}-${createHash("sha256").update(botId).digest("hex").slice(0, 6)}`;
+  let name = "";
   const held: ServerResponse[] = [];
   let stall: "read" | "resume" = "read";
   let api: Server;
@@ -28,10 +26,11 @@ describe("waiting for a cloud computer", () => {
       });
     });
     await new Promise<void>((resolve) => api.listen(0, "127.0.0.1", resolve));
-    vi.stubEnv("OMB_BOAT_API", `http://127.0.0.1:${(api.address() as { port: number }).port}/api/v1`);
-    vi.stubEnv("OMB_CLOUD_BOAT_TOKEN", undefined);
+    vi.stubEnv("HEZUO_BOAT_API", `http://127.0.0.1:${(api.address() as { port: number }).port}/api/v1`);
+    vi.stubEnv("HEZUO_CLOUD_BOAT_TOKEN", undefined);
     vi.resetModules();
     boat = await import("./boat.ts");
+    name = await boat.boatNameFor(botId);
   });
 
   afterAll(async () => {

@@ -3,12 +3,12 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, it } from "vitest";
-import { launchVerificationServer, runControlOmb } from "../../scripts/control-omb.ts";
+import { launchVerificationServer, runControlHezuo } from "../../scripts/control-hezuo.ts";
 
 it("starts a teammate's thread in the delegating bot's project folder by default, and refuses an explicit in_my_folder when there is none", async () => {
   const session = await launchVerificationServer(process.env, undefined, undefined, undefined, undefined, { scripted: true });
   const { url, dataDir } = session.info;
-  const cli = (...args: string[]) => runControlOmb([...args, "--url", url]) as Promise<any>;
+  const cli = (...args: string[]) => runControlHezuo([...args, "--url", url]) as Promise<any>;
   const api = async (method: string, path: string, body?: unknown) => {
     const response = await fetch(url + path, {
       method,
@@ -20,7 +20,7 @@ it("starts a teammate's thread in the delegating bot's project folder by default
     return value;
   };
   // A project lives outside Hezuo's data; folders inside it are bots' private workspaces.
-  const site = mkdtempSync(join(tmpdir(), "omb-site-"));
+  const site = mkdtempSync(join(tmpdir(), "hezuo-site-"));
   const evidence = () => {
     try { return readFileSync(join(dataDir, "room-plan.json.evidence.jsonl"), "utf8").trim().split("\n").filter(Boolean).map((line) => JSON.parse(line)); } catch { return []; }
   };

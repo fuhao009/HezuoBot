@@ -1,0 +1,1623 @@
+openapi: 3.1.0
+
+info:
+  title: Hezuo Gateway V2 · Bot Studio · Market
+  version: 2.0.0-draft
+  description: |
+    实现骨架。字段语义以 docs/gateway-v2/05-api-contract.md 为准；
+    两者冲突时以文档为准，本文件随后修正。
+
+    金额约定：所有 *MicroPoints / *MicroCurrency 字段为非负整数，
+    上限 9007199254740991（JSON number，非字符串）。
+
+    状态：未实现、未验证、未部署。
+
+servers:
+  - url: https://gateway.example.com
+    description: 生产
+  - url: https://gateway.test.internal
+    description: 验收环境
+
+security:
+  - accountSession: []
+
+tags:
+  - name: ai
+    description: 模型推理
+  - name: account
+    description: 账号与积分
+  - name: studio
+    description: Bot 开发平台
+  - name: market
+    description: Bot 市场
+  - name: operator
+    description: 运营者管理
+
+paths:
+  # ===========================================================================
+  # 推理
+  # ===========================================================================
+  /v1/ai/models:
+    get:
+      tags: [ai]
+      summary: 公开模型与路由组目录
+      security: [{ modelToken: [] }, { sandboxToken: [] }]
+      responses:
+        '200':
+          description: 调用者可用模型
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [models]
+                properties:
+                  models:
+                    type: array
+                    items: { $ref: '#/components/schemas/PublicModel' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/ai/quote:
+    post:
+      tags: [ai]
+      summary: 报价（不预占、不扣费、不发上游）
+      security: [{ modelToken: [] }, { sandboxToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [endpoint, request]
+              properties:
+                endpoint: { type: string, enum: [chat, responses] }
+                request: { type: object, additionalProperties: true }
+      responses:
+        '200':
+          description: 报价
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Quote' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /v1/ai/chat/completions:
+    post:
+      tags: [ai]
+      summary: Chat Completions（沿用现有协议）
+      security: [{ modelToken: [] }, { sandboxToken: [] }]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/ConversationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200':
+          description: 模型响应（JSON 或 SSE）
+          headers:
+            x-ai-request-id: { $ref: '#/components/headers/AiRequestId' }
+            x-ai-model: { $ref: '#/components/headers/AiModel' }
+            x-ai-pricing-version: { $ref: '#/components/headers/PricingVersion' }
+          content:
+            application/json: { schema: { type: object, additionalProperties: true } }
+            text/event-stream: { schema: { type: string } }
+        '402': { $ref: '#/components/responses/PaymentRequired' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  /v1/ai/responses:
+    post:
+      tags: [ai]
+      summary: Responses（沿用现有协议）
+      security: [{ modelToken: [] }, { sandboxToken: [] }]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/ConversationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200':
+          description: 模型响应（JSON 或 SSE）
+          headers:
+            x-ai-request-id: { $ref: '#/components/headers/AiRequestId' }
+            x-ai-model: { $ref: '#/components/headers/AiModel' }
+          content:
+            application/json: { schema: { type: object, additionalProperties: true } }
+            text/event-stream: { schema: { type: string } }
+        '402': { $ref: '#/components/responses/PaymentRequired' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+
+  # ===========================================================================
+  # 账号
+  # ===========================================================================
+  /v1/account/ai/ledger:
+    get:
+      tags: [account]
+      summary: 积分流水
+      security: [{ accountSession: [] }]
+      parameters:
+        - { name: cursor, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100 } }
+      responses:
+        '200':
+          description: 游标分页
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, nextCursor]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/LedgerEntry' }
+                  nextCursor: { type: [string, 'null'] }
+
+  /v1/account/ai/subscription:
+    get:
+      tags: [account]
+      summary: 分组与限制（只读）
+      security: [{ accountSession: [] }]
+      responses:
+        '200':
+          description: 分组信息
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Subscription' }
+
+  # ===========================================================================
+  # 运营者
+  # ===========================================================================
+  /v1/operator/providers:
+    get:
+      tags: [operator]
+      summary: 供应商列表
+      responses:
+        '200': { $ref: '#/components/responses/ProviderList' }
+    post:
+      tags: [operator]
+      summary: 创建供应商
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProviderInput' }
+      responses:
+        '201': { $ref: '#/components/responses/ProviderList' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /v1/operator/providers/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    patch:
+      tags: [operator]
+      summary: 修改供应商（revision 比较交换）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/RevisionedWrite'
+                - $ref: '#/components/schemas/ProviderInput'
+      responses:
+        '200': { $ref: '#/components/responses/ProviderList' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /v1/operator/providers/{id}/sync:
+    post:
+      tags: [operator]
+      summary: newapi 同步（返回建议值，不写入生效配置）
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: 建议值；部分失败也在 200 内报告
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SyncResult' }
+
+  /v1/operator/channels:
+    get:
+      tags: [operator]
+      summary: 渠道列表（不含密钥）
+      responses:
+        '200': { $ref: '#/components/responses/ChannelList' }
+    post:
+      tags: [operator]
+      summary: 创建渠道
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ChannelInput' }
+      responses:
+        '201': { $ref: '#/components/responses/ChannelList' }
+
+  /v1/operator/channels/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    patch:
+      tags: [operator]
+      summary: 修改渠道；改 baseUrl 必须带 key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/RevisionedWrite'
+                - $ref: '#/components/schemas/ChannelInput'
+      responses:
+        '200': { $ref: '#/components/responses/ChannelList' }
+        '400':
+          description: 含 key_required_on_url_change
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /v1/operator/channels/{id}/probe:
+    post:
+      tags: [operator]
+      summary: 探测已保存渠道的上游模型列表
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: 探测结果
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [models, latencyMs]
+                properties:
+                  models: { type: array, items: { type: string } }
+                  latencyMs: { type: integer, minimum: 0 }
+
+  /v1/operator/route-groups:
+    get:
+      tags: [operator]
+      summary: 路由组列表
+      responses:
+        '200': { $ref: '#/components/responses/RouteGroupList' }
+    post:
+      tags: [operator]
+      summary: 创建路由组（校验深度与环）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RouteGroupInput' }
+      responses:
+        '201': { $ref: '#/components/responses/RouteGroupList' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /v1/operator/route-groups/{id}/simulate:
+    post:
+      tags: [operator]
+      summary: 试算选路（不调用付费推理）
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SimulateRequest' }
+      responses:
+        '200':
+          description: 试算结果，含随机策略免责声明
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SimulateResult' }
+
+  /v1/operator/billing:
+    get:
+      tags: [operator]
+      summary: 计费策略与控制器
+      responses:
+        '200':
+          description: 策略
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BillingPolicyView' }
+    post:
+      tags: [operator]
+      summary: 保存策略（revision 比较交换）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BillingPolicyWrite' }
+      responses:
+        '200':
+          description: 新策略
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BillingPolicyView' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /v1/operator/billing/metrics:
+    get:
+      tags: [operator]
+      summary: 窗口指标
+      responses:
+        '200':
+          description: 指标
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BillingMetrics' }
+
+  /v1/operator/user-groups:
+    get:
+      tags: [operator]
+      summary: 用户分组
+      responses:
+        '200':
+          description: 分组列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/UserGroup' }
+    post:
+      tags: [operator]
+      summary: 创建或修改分组
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UserGroup' }
+      responses:
+        '200':
+          description: 分组
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserGroup' }
+
+  /v1/operator/requests:
+    get:
+      tags: [operator]
+      summary: 全局请求筛选（不含 prompt 与上游正文）
+      parameters:
+        - { name: state, in: query, schema: { type: string, enum: [reserved, streaming, review, settled] } }
+        - { name: model, in: query, schema: { type: string } }
+        - { name: channelId, in: query, schema: { type: string } }
+        - { name: userId, in: query, schema: { type: string } }
+        - { name: cursor, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: 分页
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/RequestSummary' }
+                  nextCursor: { type: [string, 'null'] }
+
+  /v1/operator/requests/{id}/attempts:
+    get:
+      tags: [operator]
+      summary: 故障切换明细
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: 尝试列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/RequestAttempt' }
+
+  /v1/operator/requests/{id}/settle:
+    post:
+      tags: [operator]
+      summary: 人工结算（review → settled，仅允许向下）
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [operationId, chargedMicroPoints, reason]
+              properties:
+                operationId: { type: string, maxLength: 128 }
+                chargedMicroPoints: { $ref: '#/components/schemas/MicroPoints' }
+                reason: { type: string, minLength: 1, maxLength: 500 }
+      responses:
+        '200':
+          description: 结算结果
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requestId: { type: string }
+                  chargedMicroPoints: { $ref: '#/components/schemas/MicroPoints' }
+                  replayed: { type: boolean }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /v1/operator/metrics/identity:
+    get:
+      tags: [operator]
+      summary: 最近一次账本恒等式校验结果
+      responses:
+        '200':
+          description: 校验结果
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  at: { type: string, format: date-time }
+                  passed: { type: boolean }
+                  violations:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        ownerUserId: { type: string }
+                        expected: { type: integer }
+                        actual: { type: integer }
+
+  /v1/operator/exam/suites:
+    get:
+      tags: [operator]
+      summary: 题库套件
+      responses:
+        '200':
+          description: 套件列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/ExamSuite' }
+    post:
+      tags: [operator]
+      summary: 创建套件
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ExamSuite' }
+      responses:
+        '201':
+          description: 套件
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExamSuite' }
+
+  /v1/operator/exam/cases:
+    post:
+      tags: [operator]
+      summary: 导入题目（完整校验，重复 ID 拒绝）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ExamCaseInput' }
+      responses:
+        '201':
+          description: 导入结果
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  caseId: { type: string }
+                  accepted: { type: boolean }
+                  findings:
+                    type: array
+                    items: { type: string }
+
+  /v1/operator/market/moderation:
+    post:
+      tags: [operator]
+      summary: 下架 / 封禁 / 申诉处理
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [objectType, objectId, action, reason]
+              properties:
+                objectType: { type: string, enum: [bot, bot_version, listing, author] }
+                objectId: { type: string }
+                action:
+                  type: string
+                  enum: [delist, restore, ban, unban, reject, approve, appeal_upheld, appeal_rejected]
+                reason: { type: string, minLength: 1, maxLength: 500 }
+      responses:
+        '200':
+          description: 动作结果
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  applied: { type: boolean }
+                  listingState:
+                    type: string
+                    enum: [unverified, failed, verified, stale, pending_review, delisted]
+
+  # ===========================================================================
+  # Studio
+  # ===========================================================================
+  /v1/studio/bots:
+    get:
+      tags: [studio]
+      summary: 本人 Bot
+      responses:
+        '200':
+          description: 列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Bot' }
+    post:
+      tags: [studio]
+      summary: 创建 Bot
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [slug, category]
+              properties:
+                slug: { type: string, pattern: '^[a-z0-9][a-z0-9-]{1,60}$' }
+                category: { $ref: '#/components/schemas/BotCategory' }
+      responses:
+        '201':
+          description: 已创建
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Bot' }
+        '409':
+          description: slug 已占用
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /v1/studio/bots/{id}/versions:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    get:
+      tags: [studio]
+      summary: 版本列表
+      responses:
+        '200':
+          description: 列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/BotVersion' }
+    post:
+      tags: [studio]
+      summary: 上传不可变版本
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [package]
+              properties:
+                package: { type: string, format: binary }
+      responses:
+        '201':
+          description: 版本与 lint 结果
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  version: { $ref: '#/components/schemas/BotVersion' }
+                  lint:
+                    type: object
+                    properties:
+                      passed: { type: boolean }
+                      findings: { type: array, items: { type: string } }
+                  claims:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        modelId: { type: string }
+                        claims: { type: array, items: { type: string } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '413':
+          description: payload_too_large
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /v1/studio/sessions:
+    post:
+      tags: [studio]
+      summary: 创建调试沙箱会话
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [botVersionId, modelId]
+              properties:
+                botVersionId: { type: string }
+                modelId: { type: string }
+                limits:
+                  type: object
+                  properties:
+                    maxTurns: { type: integer, minimum: 1, maximum: 200, default: 30 }
+                    maxCostPoints: { type: integer, minimum: 1, default: 500 }
+                    timeoutSeconds: { type: integer, minimum: 60, maximum: 7200, default: 1800 }
+      responses:
+        '201':
+          description: 会话
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StudioSession' }
+
+  /v1/studio/sessions/{id}/events:
+    get:
+      tags: [studio]
+      summary: 会话事件流（SSE，四种事件类型）
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: |
+            event: state | text | tool | approval_request
+          content:
+            text/event-stream: { schema: { type: string } }
+
+  /v1/studio/sessions/{id}/messages:
+    post:
+      tags: [studio]
+      summary: 追加消息
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text: { type: string, minLength: 1, maxLength: 65536 }
+      responses:
+        '202':
+          description: 已接受
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StudioSession' }
+
+  /v1/studio/sessions/{id}/stop:
+    post:
+      tags: [studio]
+      summary: 取消会话
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: 已停止
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StudioSession' }
+
+  /v1/studio/sessions/{id}/approvals/{approvalId}:
+    post:
+      tags: [studio]
+      summary: 审批工具调用
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: approvalId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: { type: string, enum: [allow, deny] }
+      responses:
+        '200':
+          description: 已记录
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StudioSession' }
+
+  /v1/studio/bots/{id}/versions/{v}/exams:
+    post:
+      tags: [studio]
+      summary: 申请考试（仅返回估价）
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: v, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [modelId]
+              properties:
+                modelId: { type: string }
+      responses:
+        '201':
+          description: 估价，15 分钟有效
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExamQuote' }
+        '402': { $ref: '#/components/responses/PaymentRequired' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /v1/studio/bots/{id}/versions/{v}/exams/{quoteId}/confirm:
+    post:
+      tags: [studio]
+      summary: 确认考试（幂等，重复确认返回同一 examRunId）
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: v, in: path, required: true, schema: { type: string } }
+        - { name: quoteId, in: path, required: true, schema: { type: string } }
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: 已入队
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [examRunId, state]
+                properties:
+                  examRunId: { type: string }
+                  state: { type: string, enum: [queued] }
+                  budgetMicroPoints: { $ref: '#/components/schemas/MicroPoints' }
+        '410':
+          description: quote_expired
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /v1/studio/exams/{id}:
+    get:
+      tags: [studio]
+      summary: 考试进度与成绩单（保密题只给 ID/类别/失败摘要）
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: 成绩单
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExamReport' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ===========================================================================
+  # 市场
+  # ===========================================================================
+  /v1/market/bots:
+    get:
+      tags: [market]
+      summary: 市场列表
+      parameters:
+        - { name: model, in: query, schema: { type: string } }
+        - { name: category, in: query, schema: { $ref: '#/components/schemas/BotCategory' } }
+        - { name: level, in: query, schema: { type: string, enum: [gold, silver, bronze] } }
+        - { name: sort, in: query, schema: { type: string, enum: [score, installs, updated] } }
+        - { name: cursor, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: 列表；按 model 筛选时只返回该模型 verified
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/MarketItem' }
+                  nextCursor: { type: [string, 'null'] }
+
+  /v1/market/bots/{slug}:
+    get:
+      tags: [market]
+      summary: 详情（含每模型分数与权限声明）
+      parameters:
+        - { name: slug, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: 详情
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MarketDetail' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/market/bots/{slug}/install:
+    post:
+      tags: [market]
+      summary: 记录安装并返回短期下载地址
+      parameters:
+        - { name: slug, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [modelId]
+              properties:
+                modelId: { type: string }
+      responses:
+        '200':
+          description: 下载地址（5 分钟有效）
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  downloadUrl: { type: string, format: uri }
+                  expiresAt: { type: string, format: date-time }
+
+  /v1/market/reports:
+    post:
+      tags: [market]
+      summary: 举报
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [category, reason]
+              properties:
+                listingId: { type: string }
+                botId: { type: string }
+                category: { type: string, enum: [safety, quality, other] }
+                reason: { type: string, minLength: 1, maxLength: 500 }
+      responses:
+        '201':
+          description: 已提交
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reportId: { type: integer }
+                  listingState:
+                    type: string
+                    enum: [unverified, failed, verified, stale, pending_review, delisted]
+
+components:
+  securitySchemes:
+    accountSession:
+      type: http
+      scheme: bearer
+      description: 账号会话；不能用于 /v1/ai/*
+    modelToken:
+      type: http
+      scheme: bearer
+      description: omb_product_ai_<lookup>.<secret>
+    sandboxToken:
+      type: http
+      scheme: bearer
+      description: sbx_...；仅允许模型调用
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema: { type: string, pattern: '^[A-Za-z0-9._:-]{1,255}$' }
+    ConversationId:
+      name: x-hezuo-conversation-id
+      in: header
+      required: false
+      schema: { type: string, maxLength: 128 }
+
+  headers:
+    AiRequestId:
+      description: 账本请求 ID；仅预占成功后出现
+      schema: { type: string }
+    AiModel:
+      description: 实际公开模型
+      schema: { type: string }
+    PricingVersion:
+      description: 价格版本串
+      schema: { type: string }
+
+  responses:
+    BadRequest:
+      description: 输入非法
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unauthorized:
+      description: 未认证
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: 无权限
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: 不存在或不可见（不区分以免泄露存在性）
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Conflict:
+      description: 冲突；含 currentRevision
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Error'
+              - type: object
+                properties:
+                  currentRevision: { type: integer }
+    PaymentRequired:
+      description: 余额不足或预算超限
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    TooManyRequests:
+      description: 限流或并发满
+      headers:
+        Retry-After: { schema: { type: integer } }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    ServiceUnavailable:
+      description: 暂不可用
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    ProviderList:
+      description: 供应商列表
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              items:
+                type: array
+                items: { $ref: '#/components/schemas/Provider' }
+    ChannelList:
+      description: 渠道列表
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              items:
+                type: array
+                items: { $ref: '#/components/schemas/Channel' }
+    RouteGroupList:
+      description: 路由组列表
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              items:
+                type: array
+                items: { $ref: '#/components/schemas/RouteGroup' }
+
+  schemas:
+    MicroPoints:
+      type: integer
+      minimum: 0
+      maximum: 9007199254740991
+      description: 微积分，1 积分 = 1,000,000 微积分
+
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string, pattern: '^[a-z0-9_]+$' }
+        message: { type: string }
+      additionalProperties: false
+
+    PublicModel:
+      type: object
+      required: [id, label, protocols, contextTokens, outputTokens, capabilities, pricingMode]
+      properties:
+        id: { type: string }
+        label: { type: string }
+        protocols:
+          type: array
+          items: { type: string, enum: [chat, responses] }
+        contextTokens: { type: integer }
+        outputTokens: { type: integer }
+        capabilities:
+          type: object
+          properties:
+            tools: { type: boolean }
+            vision: { type: boolean }
+        pricingMode: { type: string, enum: [passthrough, fixed] }
+        inputMicroPointsPerMillion:
+          type: [integer, 'null']
+          description: 路由组为 null
+        cachedInputMicroPointsPerMillion: { type: [integer, 'null'] }
+        outputMicroPointsPerMillion: { type: [integer, 'null'] }
+        pricingVersion: { type: [string, 'null'] }
+
+    Quote:
+      type: object
+      required:
+        - selectedModel
+        - complexity
+        - estimatedInputTokens
+        - estimatedMicroPoints
+        - reservedMicroPoints
+        - policyRevision
+        - currency
+        - pointsPerCurrency
+        - noPriceCommitment
+      properties:
+        selectedModel: { type: string }
+        complexity: { type: string, enum: [simple, standard, complex] }
+        score: { type: integer }
+        reasons: { type: array, items: { type: string } }
+        estimatedInputTokens: { type: integer }
+        estimatedMicroPoints: { $ref: '#/components/schemas/MicroPoints' }
+        reservedMicroPoints: { $ref: '#/components/schemas/MicroPoints' }
+        policyRevision: { type: integer }
+        currency: { type: string, enum: [USD] }
+        pointsPerCurrency: { type: integer }
+        rateSnapshot:
+          type: object
+          properties:
+            input: { type: integer }
+            cached: { type: integer }
+            output: { type: integer }
+        multiplierBreakdown:
+          type: object
+          description: 可选字段，老客户端忽略
+          properties:
+            controllerBps: { type: integer }
+            groupFactorBps: { type: integer }
+            modelFactorBps: { type: integer }
+            clampedBps: { type: integer }
+            floorBps: { type: integer }
+            effectiveBps: { type: integer }
+            subsidized: { type: boolean }
+        noPriceCommitment: { type: boolean, const: true }
+
+    LedgerEntry:
+      type: object
+      required: [id, kind, createdAt]
+      properties:
+        id: { type: string }
+        kind:
+          type: string
+          enum: [grant, expire, reserve, settle, settle_refund, substitute, enable, disable, adjust]
+          description: 老客户端遇到未知值必须忽略该条，不得崩溃
+        createdAt: { type: string, format: date-time }
+        model: { type: string }
+        state: { type: string, enum: [reserved, streaming, review, settled] }
+        amountMicroPoints: { type: integer }
+        reservedMicroPoints: { $ref: '#/components/schemas/MicroPoints' }
+        chargedMicroPoints: { $ref: '#/components/schemas/MicroPoints' }
+        inputTokens: { type: integer }
+        cachedInputTokens: { type: integer }
+        outputTokens: { type: integer }
+        reason: { type: string }
+
+    Subscription:
+      type: object
+      required: [group, groupFactorBps]
+      properties:
+        group: { type: string }
+        groupFactorBps: { type: integer }
+        limits:
+          type: object
+          properties:
+            concurrency: { type: integer }
+            dailyRequests: { type: integer }
+            dailyMicroPoints: { $ref: '#/components/schemas/MicroPoints' }
+
+    Provider:
+      type: object
+      required: [id, kind, name, baseUrl, enabled, revision]
+      properties:
+        id: { type: string }
+        kind: { type: string, enum: [openai, anthropic, gemini, openai_compatible, newapi] }
+        name: { type: string }
+        baseUrl: { type: string, format: uri }
+        enabled: { type: boolean }
+        revision: { type: integer }
+
+    ProviderInput:
+      type: object
+      required: [kind, name, baseUrl]
+      properties:
+        kind: { type: string, enum: [openai, anthropic, gemini, openai_compatible, newapi] }
+        name: { type: string, maxLength: 80 }
+        baseUrl: { type: string, format: uri, pattern: '^https://' }
+        enabled: { type: boolean }
+
+    RevisionedWrite:
+      type: object
+      required: [revision, reason]
+      properties:
+        revision: { type: integer }
+        reason: { type: string, minLength: 1, maxLength: 500 }
+
+    ChannelKey:
+      type: object
+      description: 永不返回明文、密文或末位字符
+      required: [id, hasKey, status, manualDisabled]
+      properties:
+        id: { type: string }
+        hasKey: { type: boolean }
+        status: { type: string, enum: [active, cooling, exhausted, disabled] }
+        manualDisabled: { type: boolean }
+        cooldownUntil: { type: [string, 'null'], format: date-time }
+        quotaHint: { type: [integer, 'null'] }
+
+    Channel:
+      type: object
+      required: [id, providerId, baseUrl, protocols, priority, weight, enabled, revision, keys, models]
+      properties:
+        id: { type: string }
+        providerId: { type: string }
+        baseUrl: { type: string, format: uri }
+        protocols:
+          type: array
+          items: { type: string, enum: [chat, responses] }
+        priority: { type: integer }
+        weight: { type: integer }
+        enabled: { type: boolean }
+        revision: { type: integer }
+        keys:
+          type: array
+          items: { $ref: '#/components/schemas/ChannelKey' }
+        models:
+          type: array
+          items:
+            type: object
+            properties:
+              upstreamModel: { type: string }
+              publicModelId: { type: string }
+              costRates:
+                type: object
+                properties:
+                  input: { type: integer }
+                  cached: { type: integer }
+                  output: { type: integer }
+                  write: { type: [integer, 'null'] }
+                  writeHour: { type: [integer, 'null'] }
+
+    ChannelInput:
+      type: object
+      properties:
+        providerId: { type: string }
+        baseUrl: { type: string, format: uri }
+        protocols:
+          type: array
+          items: { type: string, enum: [chat, responses] }
+        priority: { type: integer }
+        weight: { type: integer }
+        enabled: { type: boolean }
+        key:
+          type: string
+          description: 换 baseUrl 时必填，否则 400 key_required_on_url_change
+
+    SyncResult:
+      type: object
+      required: [syncedAt, models, failed]
+      properties:
+        syncedAt: { type: string, format: date-time }
+        models:
+          type: object
+          properties:
+            discovered: { type: array, items: { type: string } }
+            unmapped: { type: array, items: { type: string } }
+            suggested:
+              type: array
+              items:
+                type: object
+                properties:
+                  upstreamModel: { type: string }
+                  publicModelId: { type: string }
+                  costRates: { type: object, additionalProperties: true }
+        balance:
+          type: object
+          properties:
+            available: { type: number }
+            currency: { type: string }
+        failed:
+          type: array
+          items:
+            type: object
+            properties:
+              part: { type: string, enum: [models, prices, balance] }
+              reason: { type: string }
+
+    RouteGroup:
+      type: object
+      required: [id, label, strategy, pricingMode, enabled, revision]
+      properties:
+        id: { type: string, pattern: '^group/' }
+        label: { type: string }
+        strategy:
+          type: string
+          enum: [order, weighted, rotate, cost, latency, usage, quota]
+        pricingMode: { type: string, enum: [passthrough, fixed] }
+        fixedPriceMicroPoints: { type: [integer, 'null'] }
+        constraints:
+          type: object
+          properties:
+            needsTools: { type: boolean }
+            needsVision: { type: boolean }
+            minContextTokens: { type: integer }
+            protocol: { type: string, enum: [chat, responses] }
+        members:
+          type: array
+          items:
+            type: object
+            properties:
+              memberType: { type: string, enum: [model, group] }
+              memberId: { type: string }
+              weight: { type: integer }
+              position: { type: integer }
+        enabled: { type: boolean }
+        revision: { type: integer }
+
+    RouteGroupInput:
+      allOf:
+        - $ref: '#/components/schemas/RevisionedWrite'
+        - $ref: '#/components/schemas/RouteGroup'
+
+    SimulateRequest:
+      type: object
+      required: [protocol, simulatedRequestId]
+      properties:
+        hasTools: { type: boolean }
+        hasVision: { type: boolean }
+        estimatedInputTokens: { type: integer }
+        protocol: { type: string, enum: [chat, responses] }
+        simulatedRequestId: { type: string }
+        revision: { type: integer, description: 指定配置版本 }
+
+    SimulateResult:
+      type: object
+      required: [selectedMember, strategy, simulated, disclaimer]
+      properties:
+        selectedMember: { type: [string, 'null'] }
+        candidates:
+          type: array
+          items:
+            type: object
+            properties:
+              memberId: { type: string }
+              included: { type: boolean }
+              excludedReason: { type: [string, 'null'] }
+        strategy: { type: string }
+        simulated: { type: boolean }
+        disclaimer: { type: string }
+
+    BillingPolicy:
+      type: object
+      required:
+        - enabled
+        - currency
+        - pointsPerCurrency
+        - targetMarginBps
+        - overheadBps
+        - minMultiplierBps
+        - maxMultiplierBps
+        - maxStepBps
+        - minSamples
+        - cooldownSeconds
+        - windowMinutes
+      properties:
+        enabled: { type: boolean }
+        currency: { type: string, enum: [USD] }
+        pointsPerCurrency: { type: integer, minimum: 1, maximum: 1000000 }
+        targetMarginBps: { type: integer, minimum: 0, maximum: 9500 }
+        overheadBps: { type: integer, minimum: 0, maximum: 10000 }
+        minMultiplierBps: { type: integer, minimum: 10000, maximum: 1000000 }
+        maxMultiplierBps: { type: integer, minimum: 10000, maximum: 1000000 }
+        maxStepBps: { type: integer, minimum: 1, maximum: 10000 }
+        minSamples: { type: integer, minimum: 1, maximum: 1000 }
+        cooldownSeconds: { type: integer, minimum: 1, maximum: 86400 }
+        windowMinutes: { type: integer, minimum: 1, maximum: 10080 }
+        profiles:
+          type: array
+          maxItems: 50
+          items:
+            type: object
+            properties:
+              modelId: { type: string }
+              capacity: { type: string, enum: [simple, standard, complex] }
+              tools: { type: boolean }
+              vision: { type: boolean }
+
+    BillingPolicyView:
+      type: object
+      required: [revision, policy, controller]
+      properties:
+        revision: { type: integer }
+        policy: { $ref: '#/components/schemas/BillingPolicy' }
+        controller:
+          type: object
+          properties:
+            multiplierBps: { type: integer }
+            lastAdjustedAt: { type: [string, 'null'], format: date-time }
+            reason: { type: string }
+        floorBps:
+          type: integer
+          description: 成本下限；非补贴组 effective 不得低于此值
+
+    BillingPolicyWrite:
+      type: object
+      required: [revision, reason, policy]
+      properties:
+        revision: { type: integer }
+        reason: { type: string, minLength: 1, maxLength: 500 }
+        policy: { $ref: '#/components/schemas/BillingPolicy' }
+
+    BillingMetrics:
+      type: object
+      properties:
+        windowMinutes: { type: integer }
+        sampleCount: { type: integer }
+        settledCount: { type: integer }
+        reviewCount: { type: integer }
+        unknownCostCount: { type: integer }
+        chargedMicroPoints: { $ref: '#/components/schemas/MicroPoints' }
+        estimatedCostMicroCurrency: { type: integer }
+        estimatedRevenueMicroCurrency: { type: integer }
+        estimatedProfitMicroCurrency: { type: integer }
+        estimatedMarginBps: { type: [integer, 'null'] }
+        multiplierBps: { type: integer }
+        models:
+          type: array
+          items:
+            type: object
+            properties:
+              model: { type: string }
+              sampleCount: { type: integer }
+              settledCount: { type: integer }
+              reviewCount: { type: integer }
+              unknownCostCount: { type: integer }
+              chargedMicroPoints: { $ref: '#/components/schemas/MicroPoints' }
+
+    UserGroup:
+      type: object
+      required: [id, name, groupFactorBps, allowBelowFloor]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        groupFactorBps: { type: integer, minimum: 0, maximum: 100000 }
+        allowBelowFloor: { type: boolean }
+        limits:
+          type: object
+          properties:
+            concurrency: { type: integer }
+            dailyRequests: { type: integer }
+            dailyMicroPoints: { $ref: '#/components/schemas/MicroPoints' }
+        allowedModels:
+          type: array
+          items: { type: string }
+          description: 空数组表示全部
+
+    RequestSummary:
+      type: object
+      description: 不含 prompt、上游正文、密钥
+      properties:
+        id: { type: string }
+        userId: { type: string }
+        model: { type: string }
+        selectedModel: { type: string }
+        state: { type: string, enum: [reserved, streaming, review, settled] }
+        reservedMicroPoints: { $ref: '#/components/schemas/MicroPoints' }
+        chargedMicroPoints: { type: [integer, 'null'] }
+        costMicroUsd: { type: [integer, 'null'] }
+        costStatus: { type: [string, 'null'], enum: [estimated, conservative, unknown, null] }
+        channelId: { type: [string, 'null'] }
+        routeGroupId: { type: [string, 'null'] }
+        attemptsCount: { type: integer }
+        createdAt: { type: string, format: date-time }
+        latencyMs: { type: [integer, 'null'] }
+
+    RequestAttempt:
+      type: object
+      properties:
+        attemptNo: { type: integer, minimum: 1, maximum: 3 }
+        channelId: { type: string }
+        keyId: { type: string }
+        outcome:
+          type: string
+          enum: [success, partial, retryable_error, fatal_error, abandoned]
+        statusCode: { type: [integer, 'null'] }
+        ttfbMs: { type: [integer, 'null'] }
+        totalMs: { type: [integer, 'null'] }
+        affinityBroken: { type: boolean }
+        at: { type: string, format: date-time }
+
+    BotCategory:
+      type: string
+      enum: [coding, research, browser, writing, data, customer-service, other]
+
+    Bot:
+      type: object
+      required: [id, slug, category, status]
+      properties:
+        id: { type: string }
+        slug: { type: string }
+        category: { $ref: '#/components/schemas/BotCategory' }
+        status: { type: string, enum: [active, suspended, banned] }
+
+    BotVersion:
+      type: object
+      required: [id, semver, botHash, reviewState, createdAt]
+      properties:
+        id: { type: string }
+        semver: { type: string }
+        botHash: { type: string, pattern: '^[0-9a-f]{64}$' }
+        reviewState: { type: string, enum: [pending, accepted, rejected, manual_review] }
+        createdAt: { type: string, format: date-time }
+
+    StudioSession:
+      type: object
+      required: [id, state]
+      properties:
+        id: { type: string }
+        state:
+          type: string
+          enum: [queued, starting, running, needs_user, stopping, completed, failed, cancelled]
+        modelId: { type: string }
+        botVersionId: { type: string }
+
+    ExamQuote:
+      type: object
+      required: [quoteId, modelId, estimatedPoints, maxCostPoints, expiresAt, suiteVersion, caseCount]
+      properties:
+        quoteId: { type: string }
+        modelId: { type: string }
+        estimatedPoints: { type: integer }
+        maxCostPoints: { type: integer }
+        expiresAt: { type: string, format: date-time }
+        suiteVersion: { type: integer }
+        caseCount: { type: integer }
+
+    ExamReport:
+      type: object
+      required: [id, state]
+      properties:
+        id: { type: string }
+        state:
+          type: string
+          enum: [queued, running, scoring, completed, failed, cancelled, budget_exhausted]
+        totalScore: { type: [integer, 'null'], minimum: 0, maximum: 100 }
+        level: { type: [string, 'null'], enum: [gold, silver, bronze, null] }
+        gateFailed: { type: boolean }
+        dimensions:
+          type: object
+          properties:
+            correctness: { type: integer }
+            stability: { type: integer }
+            safety: { type: integer }
+            efficiency: { type: integer }
+        identity:
+          type: object
+          properties:
+            botHash: { type: string }
+            modelId: { type: string }
+            upstreamFingerprint: { type: string }
+            suiteVersion: { type: integer }
+        cases:
+          type: array
+          description: 保密题只给 caseId、category、failureSummary
+          items:
+            type: object
+            properties:
+              caseId: { type: string }
+              category: { type: string }
+              runs: { type: integer }
+              passed: { type: integer }
+              failureSummary: { type: [string, 'null'] }
+        validUntil: { type: [string, 'null'], format: date-time }
+
+    MarketItem:
+      type: object
+      required: [slug, category, modelScores]
+      properties:
+        slug: { type: string }
+        name: { type: string }
+        category: { $ref: '#/components/schemas/BotCategory' }
+        bestLevel: { type: [string, 'null'], enum: [gold, silver, bronze, null] }
+        bestScore: { type: [integer, 'null'] }
+        modelScores:
+          type: array
+          items:
+            type: object
+            properties:
+              modelId: { type: string }
+              score: { type: [integer, 'null'] }
+              level: { type: [string, 'null'], enum: [gold, silver, bronze, null] }
+              state:
+                type: string
+                enum: [unverified, failed, verified, stale, pending_review, delisted]
+        installCount: { type: integer }
+        updatedAt: { type: string, format: date-time }
+
+    MarketDetail:
+      allOf:
+        - $ref: '#/components/schemas/MarketItem'
+        - type: object
+          properties:
+            description: { type: string }
+            permissions:
+              type: object
+              properties:
+                tools: { type: array, items: { type: string } }
+                network: { type: array, items: { type: string } }
+                mcp: { type: array, items: { type: string } }
+            versions:
+              type: array
+              items: { $ref: '#/components/schemas/BotVersion' }
+            author:
+              type: object
+              properties:
+                displayName: { type: string }
+
+    ExamSuite:
+      type: object
+      required: [id, category, suiteVersion, status]
+      properties:
+        id: { type: string }
+        category: { type: string }
+        suiteVersion: { type: integer }
+        status: { type: string, enum: [active, retired] }
+
+    ExamCaseInput:
+      type: object
+      required: [id, suiteId, definition, weight, difficulty, visibility]
+      properties:
+        id: { type: string }
+        suiteId: { type: string }
+        definition: { type: object, additionalProperties: true }
+        weight: { type: integer, minimum: 1, maximum: 1000 }
+        difficulty: { type: integer, minimum: 1, maximum: 5 }
+        visibility: { type: string, enum: [public, hidden] }
+        tags: { type: array, items: { type: string } }

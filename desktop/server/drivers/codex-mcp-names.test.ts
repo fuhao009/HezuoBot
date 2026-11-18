@@ -35,7 +35,7 @@ trust_level = "trusted"
 
 describe("codexConfigMcpServerNames", () => {
   it("reads config.toml from CODEX_HOME, falling back to ~/.codex, and tolerates a missing file", () => {
-    const home = mkdtempSync(join(tmpdir(), "omb-codex-names-"));
+    const home = mkdtempSync(join(tmpdir(), "hezuo-codex-names-"));
     dirs.push(home);
     mkdirSync(join(home, ".codex"));
     writeFileSync(join(home, ".codex", "config.toml"), '[mcp_servers.home_one]\nurl = "https://a.test"\n');
@@ -58,7 +58,7 @@ describe("mountedMcpServerName", () => {
 
 describe("codexConfigRunsServer", () => {
   const configFor = (toml: string) => {
-    const home = mkdtempSync(join(tmpdir(), "omb-codex-runs-"));
+    const home = mkdtempSync(join(tmpdir(), "hezuo-codex-runs-"));
     dirs.push(home);
     writeFileSync(join(home, "config.toml"), toml);
     return codexConfigMcp({ CODEX_HOME: home });

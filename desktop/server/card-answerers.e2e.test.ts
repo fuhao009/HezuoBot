@@ -45,8 +45,8 @@ async function start(env: NodeJS.ProcessEnv = {}) {
     env: {
       ...(process.env.PATH ? { PATH: process.env.PATH } : {}),
       ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}),
-      HOME: home, USERPROFILE: home, OMB_PORT: String(PORT), OMB_WEBHOOK_PORT: String(PORT + 1),
-      OMB_TEST_INTERNAL_CAPABILITY_KEY: CAPABILITY_KEY, ...env,
+      HOME: home, USERPROFILE: home, HEZUO_PORT: String(PORT), HEZUO_WEBHOOK_PORT: String(PORT + 1),
+      HEZUO_TEST_INTERNAL_CAPABILITY_KEY: CAPABILITY_KEY, ...env,
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -108,7 +108,7 @@ const refusal = /Only the person who started this conversation or sent this requ
 posixOnly("who may answer a card on a shared workspace", () => {
   beforeAll(async () => {
     chmodSync(FAKE_CLI, 0o755);
-    home = mkdtempSync(join(tmpdir(), "omb-card-answerers-"));
+    home = mkdtempSync(join(tmpdir(), "hezuo-card-answerers-"));
     const data = join(home, ".hezuo");
     mkdirSync(data, { recursive: true });
     writeFileSync(join(data, "config.json"), JSON.stringify({
@@ -282,8 +282,8 @@ posixOnly("who may answer a card on a shared workspace", () => {
   it("lets a session-less local service decline but never approve under service trust", async () => {
     const bot = await makeBot("Serviced");
     await waitForExit(child, { signal: "SIGTERM" });
-    await start({ OMB_LOOPBACK_TRUST: "service" });
-    expect(log).toContain("local requests: service trust (OMB_LOOPBACK_TRUST)");
+    await start({ HEZUO_LOOPBACK_TRUST: "service" });
+    expect(log).toContain("local requests: service trust (HEZUO_LOOPBACK_TRUST)");
     const requestId = await cardFrom(bot, bot.threadId, ADA);
 
     const approve = await api("POST", `/api/threads/${bot.threadId}/respond`, { requestId, behavior: "allow" });

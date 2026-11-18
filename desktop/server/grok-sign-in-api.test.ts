@@ -4,12 +4,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { verificationServerEnvironment } from "../../scripts/control-omb.ts";
+import { verificationServerEnvironment } from "../../scripts/control-hezuo.ts";
 import { removeTempDir, waitForExit } from "./testing/cleanup.ts";
 import { freePortBlock } from "./testing/ports.ts";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
-const FAKE_GROK = join(ROOT, "server/testing/fake-grok-login-cli.ts");
+const FAKE_GROK = join(ROOT, "desktop/server/testing/fake-grok-login-cli.ts");
 // A one-off instance name keeps the product fleet's other engines out.
 const ID = "fixture-grok";
 let child: ChildProcess | undefined;
@@ -31,17 +31,17 @@ const alive = (pid: number) => { try { process.kill(pid, 0); return true; } catc
 describe.skipIf(process.platform === "win32")("Grok Build sign-in over HTTP", () => {
   beforeAll(async () => {
     chmodSync(FAKE_GROK, 0o755);
-    home = mkdtempSync(join(tmpdir(), "omb-grok-api-"));
+    home = mkdtempSync(join(tmpdir(), "hezuo-grok-api-"));
     mkdirSync(join(home, "tmp"));
     const port = await freePortBlock([0, 1]);
     base = `http://127.0.0.1:${port}`;
-    logPath = join(tmpdir(), `omb-grok-api-${port}-${process.pid}.log`);
+    logPath = join(tmpdir(), `hezuo-grok-api-${port}-${process.pid}.log`);
     writeFileSync(join(home, "config.json"), JSON.stringify({ instances: {
-      [ID]: { driver: "grokAgent", displayName: "Grok", environment: { OMB_DEVICE_AUTH_FIXTURE: "1", FAKE_GROK_MODE: "approve" }, config: { cli: FAKE_GROK } },
+      [ID]: { driver: "grokAgent", displayName: "Grok", environment: { HEZUO_DEVICE_AUTH_FIXTURE: "1", FAKE_GROK_MODE: "approve" }, config: { cli: FAKE_GROK } },
     } }));
     const log = openSync(logPath, "a", 0o600);
     try {
-      child = spawn(process.execPath, ["--experimental-strip-types", join(ROOT, "server/index.ts")], {
+      child = spawn(process.execPath, ["--experimental-strip-types", join(ROOT, "desktop/server/index.ts")], {
         cwd: ROOT, env: verificationServerEnvironment({}, home, port), stdio: ["ignore", log, log],
       });
     } finally { closeSync(log); }
@@ -91,7 +91,7 @@ describe.skipIf(process.platform === "win32")("Grok Build sign-in over HTTP", ()
     const started = await api("POST", `/api/instances/${ID}/auth/start`, {});
     expect(started.status, JSON.stringify(started.body)).toBe(200);
     const flowId = started.body.auth.flowId as string;
-    writeFileSync(join(home, ".omb-fake-grok-approved"), "approve fixture only\n");
+    writeFileSync(join(home, ".hezuo-fake-grok-approved"), "approve fixture only\n");
     await vi.waitFor(async () => {
       expect((await api("GET", `/api/instances/${ID}/auth/status?flowId=${flowId}`)).body.auth.phase).toBe("succeeded");
     }, { timeout: 10_000, interval: 200 });

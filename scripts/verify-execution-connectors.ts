@@ -5,12 +5,12 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomBytes } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
-import { launchVerificationServer } from "./control-omb.ts";
+import { launchVerificationServer } from "./control-hezuo.ts";
 import { createExecutionService } from "../desktop/server/execution-service.ts";
 import type { ExecutionTask } from "../packages/shared/execution-connectors.ts";
 
 // Fixed repository fakes only. Never accepts a URL, executable, home or credential from the caller.
-const root = await mkdtemp(join(tmpdir(), "omb-execution-smoke-"));
+const root = await mkdtemp(join(tmpdir(), "hezuo-execution-smoke-"));
 const callsFile = join(root, "bot-calls.json");
 await writeFile(callsFile, "[]");
 const fixture = await launchVerificationServer({ FAKE_CLAUDE_TOOL_CALLS_FILE: callsFile });

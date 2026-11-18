@@ -7,8 +7,6 @@ describe("control references", () => {
     const pointers: Array<[keyof typeof en, keyof typeof en]> = [
       ["cloudHome.connectHelp", "place.local"],
       ["cloudPhone.step1", "cloudSetup.myCloud"],
-      ["cloudAccount.onCloudSignIn", "cloudAccount.signInAgain"],
-      ["cloudAccount.storageFailed", "cloudAccount.signOut"],
       ["cloudAccount.codeExpired", "cloudAccount.signIn"],
       ["computer.routines.offWarning", "routines.runsOn.boat"],
     ];

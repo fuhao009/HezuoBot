@@ -56,8 +56,8 @@ const promptsOf = (threadId: string): any[] => {
   }
 };
 const liveToken = async (threadId: string): Promise<Record<string, string>> => {
-  await expect.poll(() => dumpOf(threadId)?.mcpConfig?.mcpServers?.agents?.env?.OMB_COMMS_TOKEN, { timeout: 15_000 }).toBeTruthy();
-  return { authorization: `Bearer ${dumpOf(threadId)!.mcpConfig.mcpServers.agents.env.OMB_COMMS_TOKEN}` };
+  await expect.poll(() => dumpOf(threadId)?.mcpConfig?.mcpServers?.agents?.env?.HEZUO_COMMS_TOKEN, { timeout: 15_000 }).toBeTruthy();
+  return { authorization: `Bearer ${dumpOf(threadId)!.mcpConfig.mcpServers.agents.env.HEZUO_COMMS_TOKEN}` };
 };
 /** A wake on that thread cannot start while this turn runs, so the token stays valid while the test holds the gate. */
 const heldTurn = async (bot: { id: string; threadId: string }, text: string): Promise<Record<string, string>> => {
@@ -141,7 +141,7 @@ const cleanup = async (botIds: string[]) => {
 beforeAll(async () => {
   chmodSync(FAKE_CLAUDE, 0o755);
   chmodSync(FAKE_ACP, 0o755);
-  home = mkdtempSync(join(tmpdir(), "omb-thread-aware-"));
+  home = mkdtempSync(join(tmpdir(), "hezuo-thread-aware-"));
   gates = join(home, "gates");
   const data = join(home, ".hezuo");
   mkdirSync(data, { recursive: true });
@@ -158,7 +158,7 @@ beforeAll(async () => {
     "if (at >= 0) {",
     "  try {",
     '    const servers = JSON.parse(readFileSync(process.argv[at + 1], "utf8")).mcpServers ?? {};',
-    "    for (const server of Object.values(servers)) thread ??= server?.env?.OMB_THREAD_ID ?? null;",
+    "    for (const server of Object.values(servers)) thread ??= server?.env?.HEZUO_THREAD_ID ?? null;",
     "  } catch {}",
     "}",
     "const relay = new PassThrough();",
@@ -211,9 +211,9 @@ beforeAll(async () => {
       ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}),
       HOME: home,
       USERPROFILE: home,
-      OMB_PORT: String(port),
-      OMB_WEBHOOK_PORT: String(port + 1),
-      OMB_TEST_INTERNAL_CAPABILITY_KEY: TEST_CAPABILITY_KEY,
+      HEZUO_PORT: String(port),
+      HEZUO_WEBHOOK_PORT: String(port + 1),
+      HEZUO_TEST_INTERNAL_CAPABILITY_KEY: TEST_CAPABILITY_KEY,
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -269,7 +269,7 @@ describe("start_thread on yourself", () => {
       expect(opening.text).toContain("Review the login fix.");
       await liveToken(first.body.threadId);
       const self = dumpOf(first.body.threadId)!.mcpConfig.mcpServers.agents;
-      expect(self.env.OMB_THREAD_ID).toBe(first.body.threadId);
+      expect(self.env.HEZUO_THREAD_ID).toBe(first.body.threadId);
 
       release(first.body.threadId);
       await expect.poll(async () => (await taskOf(pm.id, second.body.threadId))?.busy, { timeout: 15_000 }).toBe(true);

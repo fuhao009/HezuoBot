@@ -1,5 +1,5 @@
 import { useMemo, useState, type JSX } from "react";
-import { Bug, Copy, Cpu, Download, Gauge, ListChecks, MessagesSquare, Monitor, MoreHorizontal, Search, Share, SquarePen, UserRound } from "lucide-react";
+import { Copy, Cpu, Download, Gauge, MessagesSquare, MoreHorizontal, Search, Share, SquarePen, UserRound } from "lucide-react";
 import { currentTaskBot, openBotThread, useStore, visibleMessages, type Bot } from "@/state/store";
 import { useAdvancedMode } from "@/lib/interface-mode";
 import { useShowThreads } from "@/lib/thread-preferences";
@@ -31,7 +31,7 @@ export function useChatMoreItems(profile: Bot, phoneHeader = false): { items: Si
   const showThreads = useShowThreads();
   const findOpen = useChatFindOpen(bot.threadId);
   const [copyStatus, setCopyStatus] = useState<"copied" | "failed" | null>(null);
-  const remoteClient = window.ogb?.remoteClient?.active === true;
+  const remoteClient = window.hezuo?.remoteClient?.active === true;
   const usage = state.config?.productManaged ? null : usageSummary(bot, state.instances);
   const hasMessages = messages.length > 0;
   const transcript = () => formatTranscriptMarkdown({ title: bot.name, messages, botName: bot.name, isGroup: false });
@@ -40,7 +40,6 @@ export function useChatMoreItems(profile: Bot, phoneHeader = false): { items: Si
   const modelName = phoneHeader && selection
     ? state.instances.find((candidate) => candidate.instanceId === selection.instanceId)?.models.options.find((option) => option.id === selection.model)?.label ?? selection.model
     : "";
-  // On a phone the header drops the profile pill's click target, the model chip and the Bot's screen button; they live here.
   const phoneItems: SidebarMenuItem[] = phoneHeader ? [
     {
       key: "profile",
@@ -49,22 +48,13 @@ export function useChatMoreItems(profile: Bot, phoneHeader = false): { items: Si
       onSelect: () => dispatch({ type: "toggleSettings", open: true }),
     },
   ] : [];
-  const phoneScreen: SidebarMenuItem[] = phoneHeader ? [
-    ...(remoteClient || state.config?.productManaged ? [] : [{
+  const phoneScreen: SidebarMenuItem[] = phoneHeader && !remoteClient && !state.config?.productManaged ? [{
       key: "model",
       label: t("model.simple.model"),
       icon: <Cpu size={16} />,
       value: modelName,
       onSelect: () => openBotSettings(dispatch, "model"),
-    } satisfies SidebarMenuItem]),
-    {
-      key: "computer",
-      label: t("chat.computer"),
-      icon: <Monitor size={16} />,
-      active: state.computerOpen,
-      onSelect: () => dispatch({ type: "toggleComputer" }),
-    },
-  ] : [];
+    }] : [];
   const items: SidebarMenuItem[] = [
     ...phoneItems,
     {
@@ -124,24 +114,8 @@ export function useChatMoreItems(profile: Bot, phoneHeader = false): { items: Si
       trailing: <span title={usage.detail} data-testid="usage-chip" className={cn("tabular-nums text-[12px]", usage.tone === "danger" ? "text-danger" : usage.tone === "warning" ? "text-warning" : "text-ink-secondary")}>{usage.short}</span>,
       onSelect: () => advanced ? openBotSettings(dispatch, "usage") : dispatch({ type: "toggleAppSettings", open: true, section: "usage" }),
     } satisfies SidebarMenuItem] : []),
-    ...(remoteClient ? [] : [{
-      key: "activity",
-      label: t("activity.panel.title"),
-      icon: <ListChecks size={16} />,
-      active: state.activityOpen,
-      separatorBefore: !usage,
-      onSelect: () => dispatch({ type: "toggleActivity" }),
-    } satisfies SidebarMenuItem, {
-      key: "inspector",
-      label: t("chat.inspector"),
-      icon: <Bug size={16} />,
-      active: state.inspectorOpen,
-      // Simple mode keeps Activity and Inspector together, as the panel's menu draws them.
-      separatorBefore: advanced,
-      onSelect: () => dispatch({ type: "toggleInspector" }),
-    } satisfies SidebarMenuItem]),
   ];
-  return { items, on: findOpen || state.inspectorOpen || state.activityOpen };
+  return { items, on: findOpen };
 }
 
 function RoundChatMoreMenu({ bot, phoneHeader }: { bot: Bot; phoneHeader: boolean }) {

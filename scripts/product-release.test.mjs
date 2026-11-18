@@ -23,7 +23,7 @@ afterEach(async () => {
 
 /** A throwaway certificate for 127.0.0.1, or null where openssl is absent. */
 async function certificate(address = "127.0.0.1") {
-  const directory = await mkdtemp(path.join(tmpdir(), "omb-product-release-"));
+  const directory = await mkdtemp(path.join(tmpdir(), "hezuo-product-release-"));
   cleanups.push(() => rm(directory, { recursive: true, force: true }));
   const made = spawnSync("openssl", ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "2",
     "-keyout", path.join(directory, "key.pem"), "-out", path.join(directory, "cert.pem"),
@@ -36,7 +36,7 @@ describe("the bundled product resource", () => {
   it("verifies debug markers and refuses stale markers in normal artifacts", async () => {
     const directory = await mkdtemp(path.join(tmpdir(), "hezuo-debug-artifact-"));
     cleanups.push(() => rm(directory, { recursive: true, force: true }));
-    const metadata = Buffer.from(JSON.stringify({ ombProductManaged: true, main: "desktop/electron/main.mjs", productName: "Hezuo" }));
+    const metadata = Buffer.from(JSON.stringify({ hezuoProductManaged: true, main: "desktop/electron/main.mjs", productName: "HezuoBot" }));
     const headerJson = Buffer.from(JSON.stringify({ files: { "package.json": { size: metadata.length, offset: "0" } } }));
     const header = Buffer.alloc(8 + headerJson.length);
     header.writeUInt32LE(headerJson.length, 4);
@@ -46,13 +46,13 @@ describe("the bundled product resource", () => {
     await writeFile(path.join(directory, "app.asar"), Buffer.concat([prefix, header, metadata]));
     await writeFile(path.join(directory, "product-service.json"), JSON.stringify(productServiceDocument("https://ai.acme-ai.net")));
     const verify = (expectDebug) => verifyProductApp({ appDir: directory, resourcesDir: directory, expectDebug });
-    await expect(verify(false)).resolves.toMatchObject({ productName: "Hezuo" });
+    await expect(verify(false)).resolves.toMatchObject({ productName: "HezuoBot" });
     await expect(verify(true)).rejects.toMatchObject({ code: "ENOENT" });
     const markerPath = path.join(directory, "product-debug.json");
     await writeFile(markerPath, JSON.stringify({ enabled: false }));
     await expect(verify(true)).rejects.toThrow(/product_app_debug_marker_invalid/);
     await writeFile(markerPath, JSON.stringify({ enabled: true }));
-    await expect(verify(true)).resolves.toMatchObject({ productName: "Hezuo" });
+    await expect(verify(true)).resolves.toMatchObject({ productName: "HezuoBot" });
     await expect(verify(false)).rejects.toThrow(/product_app_debug_marker_present/);
   });
 
@@ -92,6 +92,15 @@ describe("the bundled product resource", () => {
       expect(() => operatorOrigin(`https://${host}:18487`, { allowPrivateLan: true })).toThrow(/product_origin_public_host/);
     }
     expect(() => operatorOrigin("https://127.0.0.1:18487", { allowPrivateLan: true })).toThrow(/product_origin_loopback/);
+  });
+
+  it("requires an exact project-approved hostname for a public gateway", () => {
+    const origin = "https://gateway.acme-ai.net";
+    expect(() => operatorOrigin(origin)).toThrow(/product_origin_unapproved_host/);
+    expect(() => operatorOrigin(origin, { allowedHosts: ["acme-ai.net", "*.acme-ai.net"] })).toThrow(/product_origin_unapproved_host/);
+    expect(operatorOrigin(origin, { allowedHosts: [" GATEWAY.ACME-AI.NET. "] })).toBe(origin);
+    expect(() => operatorOrigin("https://gateway.example.net", { allowedHosts: ["gateway.example.net"] })).toThrow(/product_origin_reserved_host/);
+    expect(operatorOrigin("https://gateway.example", { allowReserved: true })).toBe("https://gateway.example");
     expect(isPrivateLanHost("192.168.1.256")).toBe(false);
     expect(isPrivateLanHost("ai.acme-ai.net")).toBe(false);
   });

@@ -12,7 +12,7 @@ export function reusableConnectionUrl(page: PendingAuthorization | null | undefi
 
 /** Reserve the tab during the click, before an authorization request consumes the browser's user activation. */
 export function reserveConnectionPage() {
-  const openExternal = window.ogb?.openExternal;
+  const openExternal = window.hezuo?.openExternal;
   let page: Window | null = null;
   let navigated = false;
   let cancelled = false;

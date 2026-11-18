@@ -94,7 +94,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const DATA = mkdtempSync(join(tmpdir(), "omb-memory-"));
+const DATA = mkdtempSync(join(tmpdir(), "hezuo-memory-"));
 vi.mock("./config.ts", () => ({ DATA_DIR: DATA }));
 
 const { resolveMemoryPath, memoryOverview, readMemoryDoc, writeMemoryDoc, deleteMemoryDoc } =
@@ -413,7 +413,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
-const DATA = mkdtempSync(join(tmpdir(), "omb-journal-"));
+const DATA = mkdtempSync(join(tmpdir(), "hezuo-journal-"));
 vi.mock("./config.ts", () => ({ DATA_DIR: DATA }));
 
 const { snapshotMemory, recordMemoryChanges, readMemoryJournal, revertMemoryChange } =

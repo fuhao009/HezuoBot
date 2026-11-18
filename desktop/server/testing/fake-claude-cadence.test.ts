@@ -15,7 +15,7 @@ const deltaText = (frame: { type: unknown; event?: unknown }): string => {
 };
 
 it("completes a cadence-replayed turn with a result frame and a clean exit", async () => {
-  const home = mkdtempSync(join(tmpdir(), "omb-claude-cadence-"));
+  const home = mkdtempSync(join(tmpdir(), "hezuo-claude-cadence-"));
   const markers = join(home, "marker-replies.json");
   const reply = "one two three four five six seven eight";
   writeFileSync(markers, JSON.stringify({ "omb cadence probe": reply }));

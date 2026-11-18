@@ -133,7 +133,7 @@ describe("an OpenAI-compatible provider that refuses large requests", () => {
     });
     await instance.refreshModels?.();
     const recorder = recordEvents(instance.adapter);
-    const directory = mkdtempSync(join(tmpdir(), "omb-size-limit-"));
+    const directory = mkdtempSync(join(tmpdir(), "hezuo-size-limit-"));
     cleanups.push(async () => {
       recorder.stop();
       await instance.dispose();

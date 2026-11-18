@@ -26,7 +26,7 @@ describe("service units", () => {
     const unit = systemdUnit(spec);
     expect(unit).toContain("Description=Hezuo (agentada)");
     expect(unit).toContain("User=hezuo");
-    expect(unit).toContain("Environment=OMB_DATA_DIR=/home/hezuo/.hezuo");
+    expect(unit).toContain("Environment=HEZUO_DATA_DIR=/home/hezuo/.hezuo");
     expect(unit).toContain("ExecStart=/usr/bin/node /usr/lib/node_modules/hezuo/cli.js serve --port 8799 --data-dir /home/hezuo/.hezuo --domain hezuo.example.com --no-pair");
     expect(unit).toContain("Restart=always");
     expect(unit).toContain("AmbientCapabilities=CAP_NET_BIND_SERVICE");

@@ -32,6 +32,6 @@ export function holdsHezuoTools<T extends NonNullable<RoleBot>>(bot: T | null | 
 }
 
 /** The role switches a bot's agents tools are listed under: the Chief-only tools, and Hezuo's notification pair. */
-export function roleToolEnv(bot: RoleBot): { OMB_CHIEF_OF_STAFF: "1" | "0"; OMB_HEZUO: "1" | "0" } {
-  return { OMB_CHIEF_OF_STAFF: chiefLevel(bot) ? "1" : "0", OMB_HEZUO: holdsHezuoTools(bot) ? "1" : "0" };
+export function roleToolEnv(bot: RoleBot): { HEZUO_CHIEF_OF_STAFF: "1" | "0"; HEZUO_HEZUO: "1" | "0" } {
+  return { HEZUO_CHIEF_OF_STAFF: chiefLevel(bot) ? "1" : "0", HEZUO_HEZUO: holdsHezuoTools(bot) ? "1" : "0" };
 }

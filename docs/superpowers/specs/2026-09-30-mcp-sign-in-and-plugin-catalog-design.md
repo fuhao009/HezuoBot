@@ -30,9 +30,6 @@ people who don't use Composio have no one-click way to connect them.
 
 ## Non-goals
 
-- Signing in from the iOS/Android apps. Phones show state and use connected
-  plugins; they say "Sign in on your computer". (A hosted return page + deep
-  link can add this later without changing the stored data.)
 - Signing in when the desktop is attached to a remote workspace (Box/VPS). The
   loopback callback only works where the server runs; the UI says so.
 - Local (stdio) registry packages. Catalog and search show URL servers only.
@@ -88,13 +85,6 @@ probe returns `{ ok: false, auth: "required" }` instead of the misleading
   this workspace."
 
 ### Token storage
-
-A new `mcp-oauth.json` in the data directory, written atomically with mode
-`0600` like `config.json`, keyed by server name and bound to its URL:
-`{ url, clientId, accessToken, refreshToken?, expiresAt?, scope?, authServer }`.
-Tokens never leave the server: not in `GET /api/mcp/servers`, not in logs
-(add them to redaction), not to phones. The list API gains
-`auth: "none" | "signed-in" | "needs-sign-in"`.
 
 Changing a server's URL, removing it, or **Sign out** deletes its tokens
 (Sign out also calls the revocation endpoint when advertised, best-effort).
@@ -160,11 +150,6 @@ Cards read state from the MCP server list (matched by URL), so a server added
 by hand on the MCP servers page also shows as connected. Per-bot access uses
 the existing per-bot MCP selection — nothing new.
 
-### Phones
-
-Phone apps list connected plugins read-only and show "Sign in on your
-computer" for Needs sign-in. Small label change on iOS and Android.
-
 ## Error handling summary
 
 | Situation | Result |
@@ -190,7 +175,7 @@ computer" for Needs sign-in. Small label change on iOS and Android.
   refresh → still works, revoke → Needs sign-in.
 - **Probe:** a 401 OAuth server returns `auth: "required"` quickly, not a
   timeout.
-- **Manual (OMB2 side-by-side build):** Higgsfield from the catalog end to end
+- **Manual (Hezuo side-by-side build):** Higgsfield from the catalog end to end
   on macOS, then a Claude bot and a Codex bot generating an image; Notion as a
   second provider; Windows smoke on a Windows build.
 
@@ -200,6 +185,5 @@ computer" for Needs sign-in. Small label change on iOS and Android.
 2. A: sign-in flow, token store, refresh, `engineMcpServers` injection, panel UI.
 3. B: catalog file + Plugins tab + Connect.
 4. B: registry search.
-5. Phone labels.
 
 Each step is shippable on its own; 1–2 can be one PR, 3–4 a second, 5 a third.

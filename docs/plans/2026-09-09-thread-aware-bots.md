@@ -99,12 +99,6 @@ ones whose reply it has read.
 
 ### 4. Ledger: threads carry their opener
 
-`TaskRecord` gains `openedBy?: { botId, name, delegationId?, at }`. Persisted
-with the task, exported in the wire shape, shown in the sidebar row and on
-iOS as a small "opened by Scout" label. This is what makes `list_threads`
-scoping possible and what the person needs in order to trust a thread they
-did not start. Backups copy it like `peerPost` and `peerAsk`.
-
 ### 5. The prompt tells a bot what a thread is
 
 One paragraph, mounted with the agents tools:
@@ -128,19 +122,8 @@ opened in the sidebar behaves as any thread they read.
 
 ### 7. Threads are linkable from chat
 
-When a bot writes a thread's title as `#Title` in a reply, the transcript
-renders it as a link that opens that thread: select the bot, switch to the
-thread, never redirect running work. Resolution mirrors @mentions: word
-start, longest known title first, case-insensitive, only titles the person
-can actually see, never `#123`-style numbers or markdown headings. The chip
-a bot leaves when it opens a thread carries a structured `threadRef` and is
-the same clickable pill the bot⇄bot exchange chips already are, visible even
-with Tool calls hidden. Phones decode both fields, show the opener label, and
-tap through to the thread by the switch route they already use.
-
 ## Sequence
 
-1. `openedBy` on `TaskRecord`, wire, sidebar and iOS label, backup round trip.
 2. `start_thread` on self, then on a peer through the delegation path; the
    ledger, gates and cap; proxy tests plus one end-to-end with the fake CLI
    opening three threads on a peer set to two slots and asserting one queues.
@@ -149,7 +132,6 @@ tap through to the thread by the switch route they already use.
 4. Prompt paragraph; a test that the words "start_thread" reach both the 1:1
    and the room system prompt.
 5. `close_thread`.
-6. `#Title` links and the `threadRef` chip on desktop and mobile.
 
 ## Risks and the answers
 

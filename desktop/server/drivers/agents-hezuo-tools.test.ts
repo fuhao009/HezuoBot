@@ -3,14 +3,14 @@ import { describe, expect, it } from "vitest";
 import { availableTools, catalogProfileFromEnv, fullInputSchema } from "./agents-catalog.ts";
 import { HEZUO_TOOL_DEFINITIONS } from "./agents-hezuo-tools.ts";
 
-const listed = (env: Record<string, string>) => availableTools(catalogProfileFromEnv({ OMB_BOT_ID: "hezuo", OMB_CHIEF_OF_STAFF: "1", ...env }));
+const listed = (env: Record<string, string>) => availableTools(catalogProfileFromEnv({ HEZUO_BOT_ID: "hezuo", HEZUO_CHIEF_OF_STAFF: "1", ...env }));
 
 describe("Hezuo's two notification tools on the wire", () => {
-  const hezuo = listed({ OMB_HEZUO: "1" }).slice(-2) as Array<{ name: string; inputSchema: Record<string, any> }>;
+  const hezuo = listed({ HEZUO_HEZUO: "1" }).slice(-2) as Array<{ name: string; inputSchema: Record<string, any> }>;
 
-  it("are listed last, in this order, only with OMB_HEZUO", () => {
+  it("are listed last, in this order, only with HEZUO_HEZUO", () => {
     expect(hezuo.map((tool) => tool.name)).toEqual(["list_unread_notifications", "mark_notifications_read"]);
-    for (const env of [{}, { OMB_HEZUO: "0" }, { OMB_HEZUO: "true" }] as Array<Record<string, string>>) {
+    for (const env of [{}, { HEZUO_HEZUO: "0" }, { HEZUO_HEZUO: "true" }] as Array<Record<string, string>>) {
       expect(listed(env).map((tool) => tool.name)).not.toEqual(expect.arrayContaining(["mark_notifications_read"]));
     }
   });

@@ -6,7 +6,7 @@ import { createProxyHandler, proxyHeadersTimeoutMs } from "../src/proxy.ts";
 import type { CompanionEndpoint } from "../src/endpoints.ts";
 import { scrub } from "../src/wire.ts";
 
-const TOKEN = "omb_test_token";
+const TOKEN = "hezuo_test_token";
 
 /** Nested past any plausible stack, so `scrub`'s recursion gives out while
  * JSON.parse does not. The payload is what the scrubber is meant to remove. */
@@ -100,7 +100,7 @@ describe("preparing a harness response for a device", () => {
       for (const path of ["computer/join", "computer/screenshot", "local-computer/screenshot", "local-computer/join"]) {
         const { status, text } = await device(`/api/bots/b1/${path}`, "POST");
         expect(status).toBe(403);
-        expect(text).toContain("enable it in Hezuo");
+        expect(text).toContain("enable it in HezuoBot");
         expect(text).toContain("Settings → Remote access");
       }
     } finally {

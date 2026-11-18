@@ -67,7 +67,7 @@ export function SettingsPage({ bot, derived, onOpen, editingInstructions = false
   // As the call button: where this device cannot listen in turns, a call is always Live.
   const turnsHere = !ready || capabilities.dictation.available;
   const callMode = effectiveCallMode(storedCallMode, { turnsHere, canLive: true });
-  const turnsHelp = turnsHere ? null : callCapabilityHelp(capabilities, Boolean(window.ogb?.speechStart));
+  const turnsHelp = turnsHere ? null : callCapabilityHelp(capabilities, Boolean(window.hezuo?.speechStart));
   const callOptions: SegmentOption<CallMode>[] = CALL_MODES.map((entry) => ({
     value: entry.id,
     label: t(entry.label),

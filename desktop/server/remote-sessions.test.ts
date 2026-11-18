@@ -117,7 +117,7 @@ async function pairingCode(scopes?: string[]): Promise<{ code: string; credentia
 }
 
 beforeAll(async () => {
-  home = mkdtempSync(join(tmpdir(), "omb-remote-test-"));
+  home = mkdtempSync(join(tmpdir(), "hezuo-remote-test-"));
   const staticDir = join(home, "static");
   mkdirSync(join(home, ".hezuo"), { recursive: true });
   mkdirSync(join(staticDir, "assets"), { recursive: true });
@@ -136,15 +136,15 @@ beforeAll(async () => {
       ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}),
       HOME: home,
       USERPROFILE: home,
-      OMB_PORT: String(PORT),
-      OMB_WEBHOOK_PORT: String(WEBHOOK_PORT),
-      OMB_STATIC_DIR: staticDir,
-      OMB_PUBLIC_URL: `${PUBLIC_URL}/`,
-      OMB_APP_VERSION: "9.9.9-test",
-      OMB_ENVIRONMENT_LABEL: "cab mini",
-      OMB_BROWSER_CONNECTION: join(home, "browser-test-connection.json"),
+      HEZUO_PORT: String(PORT),
+      HEZUO_WEBHOOK_PORT: String(WEBHOOK_PORT),
+      HEZUO_STATIC_DIR: staticDir,
+      HEZUO_PUBLIC_URL: `${PUBLIC_URL}/`,
+      HEZUO_APP_VERSION: "9.9.9-test",
+      HEZUO_ENVIRONMENT_LABEL: "cab mini",
+      HEZUO_BROWSER_CONNECTION: join(home, "browser-test-connection.json"),
       // Slow heartbeat: the revocation test must prove the revoke itself ends the stream.
-      OMB_SSE_HEARTBEAT_MS: "4000",
+      HEZUO_SSE_HEARTBEAT_MS: "4000",
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -187,10 +187,7 @@ describe("before pairing", () => {
     expect(descriptor.body.capabilities).toEqual({
       remoteSessions: true,
       selfUpdate: "operator",
-      emailSignIn: false,
       jobs: true,
-      // A server nobody else signs in to can be its owner's bots' home: it takes their move once they pair.
-      move: 1,
     });
     const refused = await call("/api/bots", { headers: remote("10.0.0.1") });
     expect(refused.status).toBe(403);
@@ -275,7 +272,7 @@ describe("pairing", () => {
       body: JSON.stringify({ code: opened.code.toLowerCase() }),
     });
     expect(paired.status).toBe(200);
-    expect(paired.body.token).toMatch(/^omb_sess_/);
+    expect(paired.body.token).toMatch(/^hezuo_sess_/);
     expect(paired.body.session.label).toBe("Safari on Mac");
     expect(paired.body.environment.label).toBe("cab mini");
     const again = await call("/api/auth/pair", { method: "POST", headers: remote("10.0.0.3"), body: JSON.stringify({ code: opened.code }) });
@@ -287,7 +284,7 @@ describe("pairing", () => {
     expect(me.body).toMatchObject({ kind: "session", via: "bearer", label: "Safari on Mac", scopes: ["admin", "client"] });
 
     const ticket = await call("/api/auth/stream-ticket", { method: "POST", headers: bearer });
-    expect(ticket.body.ticket).toMatch(/^omb_tick_/);
+    expect(ticket.body.ticket).toMatch(/^hezuo_tick_/);
     const stream = await openSse(`${BASE}/api/events?ticket=${ticket.body.ticket}`, { host: REMOTE_HOST });
     try {
       const hello = await stream.until((f) => f.kind === "hello", 5_000);
@@ -319,7 +316,7 @@ describe("pairing", () => {
     expect(res.status).toBe(200);
     expect(res.body.token).toBeUndefined();
     const setCookie = header(res.headers, "set-cookie");
-    expect(setCookie).toMatch(new RegExp(`^omb_session_${PORT}_[a-f0-9]{12}=omb_sess_`));
+    expect(setCookie).toMatch(new RegExp(`^hezuo_session_${PORT}_[a-f0-9]{12}=hezuo_sess_`));
     expect(setCookie).toContain("HttpOnly");
     expect(setCookie).toContain("SameSite=Lax");
     expect(setCookie).toContain("Secure");
@@ -331,7 +328,7 @@ describe("pairing", () => {
     expect(refreshed.split(";")[0]).toBe(cookie);
     expect(refreshed).toMatch(/Max-Age=\d+/);
     expect(refreshed).toContain("HttpOnly");
-    const stranger = await call("/api/bots", { headers: remote("10.0.0.4", { cookie: `${cookie.split("=")[0]}=omb_sess_nope`, origin: `http://${REMOTE_HOST}` }) });
+    const stranger = await call("/api/bots", { headers: remote("10.0.0.4", { cookie: `${cookie.split("=")[0]}=hezuo_sess_nope`, origin: `http://${REMOTE_HOST}` }) });
     expect(stranger.status).toBe(401);
     expect(header(stranger.headers, "set-cookie")).toBe("");
     const noOrigin = await call("/api/auth/session", { headers: remote("10.0.0.4", { cookie }) });
@@ -347,7 +344,7 @@ describe("pairing", () => {
 
   it("pairs a native companion app on its own route, with the body shape it sends", async () => {
     const opened = await pairingCode(["client"]);
-    expect(opened.credential).toMatch(/^omb_pair_[A-Za-z0-9_-]{43}$/);
+    expect(opened.credential).toMatch(/^hezuo_pair_[A-Za-z0-9_-]{43}$/);
 
     const paired = await call("/api/pair", {
       method: "POST",
@@ -357,7 +354,7 @@ describe("pairing", () => {
     expect(paired.status).toBe(200);
     // Exactly the fields android/core's PairResponseSerializer requires.
     expect(typeof paired.body.token).toBe("string");
-    expect(paired.body.token.startsWith("omb_sess_")).toBe(true);
+    expect(paired.body.token.startsWith("hezuo_sess_")).toBe(true);
     expect(paired.body.serverName).toBe(opened.serverName);
     expect(paired.body.device.name).toBe("Pixel 9");
     expect(typeof paired.body.device.id).toBe("string");
@@ -387,8 +384,7 @@ describe("pairing", () => {
     const opened = await pairingCode(["client"]);
     expect(opened.inviteUrl).not.toBeNull();
     const invite = new URL(opened.inviteUrl!);
-    // Android's PairingInvite.parse accepts only this exact scheme and host (android/core Connection.kt).
-    expect(invite.protocol).toBe("hezuo:");
+    expect(invite.protocol).toBe("hezuobot:");
     expect(invite.host).toBe("pair");
     expect(invite.searchParams.get("address")).toBe(PUBLIC_URL);
     expect(invite.searchParams.get("token")).toBe(opened.credential);

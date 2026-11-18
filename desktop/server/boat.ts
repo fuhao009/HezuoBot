@@ -16,7 +16,6 @@ import {
   type BoatDeletionOperation,
 } from "./boat-deletion.ts";
 import {
-  adoptResolvedBoat,
   beginBoatCreate,
   boatCreateRecoverySnapshot,
   discardBoatCreate,
@@ -68,10 +67,9 @@ const BOAT_DELETE_OPERATION_POLL_DELAYS_MS = [0, 100, 250, 500, 1_000, 2_000] as
 const BOAT_INVENTORY_PAGE_SIZE = 200;
 // Bounded: a broken or adversarial cursor must not hold Settings open.
 const MAX_BOAT_INVENTORY_PAGES = 10;
-const LEGACY_MANAGED_BOAT_NAME = /^ogb-[a-z0-9]{1,8}-[a-f0-9]{6}$/;
-const SCOPED_MANAGED_BOAT_NAME = /^ogb-[a-f0-9]{12}-[a-z0-9]{1,8}-[a-f0-9]{6}$/;
+const SCOPED_MANAGED_BOAT_NAME = /^hezuo-[a-f0-9]{12}-[a-z0-9]{1,8}-[a-f0-9]{6}$/;
 const BOAT_ID = /^bx_[23456789abcdefghjkmnpqrstuvwxyz]{8}$/;
-/** Sandbox.state in v1, plus Hezuo's own `removing` for a sandbox whose deletion is under way. */
+/** Sandbox.state in v1, plus HezuoBot's own `removing` for a sandbox whose deletion is under way. */
 const BOAT_STATES = new Set([
   "init", "provisioning", "provisioned", "cloning", "ready", "idle", "running", "archiving", "archived", "error", "cancelled", "removing",
 ]);
@@ -85,7 +83,7 @@ function scopedBoatPrefix(): string {
     .update(loadEnvironmentId(DATA_DIR))
     .digest("hex")
     .slice(0, 12);
-  scopedBoatPrefixCache = `ogb-${scope}-`;
+  scopedBoatPrefixCache = `hezuo-${scope}-`;
   return scopedBoatPrefixCache;
 }
 
@@ -335,18 +333,13 @@ function boatBotNameParts(botId: string): { prefix: string; hash: string } {
   return { prefix, hash };
 }
 
-function legacyBoatNameFor(botId: string): string {
-  const { prefix, hash } = boatBotNameParts(botId);
-  return `ogb-${prefix}-${hash}`;
-}
-
 export async function boatNameFor(botId: string) {
   const { prefix, hash } = boatBotNameParts(botId);
   return `${scopedBoatPrefix()}${prefix}-${hash}`;
 }
 
 export async function boatNameMatchesBot(botId: string, name: string): Promise<boolean> {
-  return name === await boatNameFor(botId) || name === legacyBoatNameFor(botId);
+  return name === await boatNameFor(botId);
 }
 
 export async function runCommand(cfg: AppConfig, boxId: string, command: string, { timeoutMs = 120_000, signal }: { timeoutMs?: number; signal?: AbortSignal } = {}) {
@@ -477,7 +470,7 @@ async function listBoatPages(
 export async function listManagedBoats(
   cfg: AppConfig,
   owners: ManagedBoatOwner[],
-  options: { adoptLegacy?: boolean } = {},
+  options: { reconcileRecords?: boolean } = {},
 ): Promise<ManagedBoatInventory> {
   cfg = snapshotBoatConfig(cfg);
   if (!boatConfigured(cfg)) {
@@ -489,7 +482,6 @@ export async function listManagedBoats(
 
   const namedOwners = await Promise.all(owners.map(async (owner) => ({
     currentName: await boatNameFor(owner.botId),
-    legacyName: legacyBoatNameFor(owner.botId),
     owner,
   })));
   const invalidInventory = (problem: string): ManagedBoatInventory => ({
@@ -500,13 +492,13 @@ export async function listManagedBoats(
   });
 
   let candidates = [...listed.boats];
-  if (options.adoptLegacy !== false) {
+  if (options.reconcileRecords !== false) {
     const namedOwnerByBotId = new Map(namedOwners.map((entry) => [entry.owner.botId, entry] as const));
     let recoveries: ReturnType<typeof boatCreateRecoverySnapshot>;
     try {
       recoveries = boatCreateRecoverySnapshot();
     } catch {
-      return invalidInventory("Hezuo could not safely read its cloud computer recovery records");
+      return invalidInventory("HezuoBot could not safely read its cloud computer recovery records");
     }
     for (const recovery of recoveries) {
       if (!recovery.resolved || !recovery.boxId) continue;
@@ -515,12 +507,12 @@ export async function listManagedBoats(
 
       const matchingRows = candidates.filter((candidate) => candidate?.id === recovery.boxId);
       if (matchingRows.length > 1) {
-        return invalidInventory("boat.dev returned a conflicting id for an Hezuo-managed cloud computer — refresh or repair it in boat.dev");
+        return invalidInventory("boat.dev returned a conflicting id for a HezuoBot-managed cloud computer — refresh or repair it in boat.dev");
       }
       if (matchingRows.length === 1) {
         const listedName = typeof matchingRows[0]?.name === "string" ? matchingRows[0].name : "";
-        if (listedName !== namedOwner.currentName && listedName !== namedOwner.legacyName) {
-          return invalidInventory("A remembered cloud computer no longer has its Hezuo owner name — repair it in boat.dev before continuing");
+        if (listedName !== namedOwner.currentName) {
+          return invalidInventory("A remembered cloud computer no longer has its HezuoBot owner name — repair it in boat.dev before continuing");
         }
         continue;
       }
@@ -534,11 +526,8 @@ export async function listManagedBoats(
         retireDeletedBoatCreate(recovery.boxId);
         continue;
       }
-      if (
-        inspected.identity.name !== namedOwner.currentName
-        && inspected.identity.name !== namedOwner.legacyName
-      ) {
-        return invalidInventory("A remembered cloud computer no longer has its Hezuo owner name — repair it in boat.dev before continuing");
+      if (inspected.identity.name !== namedOwner.currentName) {
+        return invalidInventory("A remembered cloud computer no longer has its HezuoBot owner name — repair it in boat.dev before continuing");
       }
       const directCandidate = {
         id: inspected.identity.boxId,
@@ -552,7 +541,7 @@ export async function listManagedBoats(
     try {
       deletions = boatDeletionSnapshot();
     } catch {
-      return invalidInventory("Hezuo could not safely read its cloud computer deletion records");
+      return invalidInventory("HezuoBot could not safely read its cloud computer deletion records");
     }
     for (const deletion of deletions) {
       let state: BoatDeletionReconciliation;
@@ -599,7 +588,6 @@ export async function listManagedBoats(
     }
   }
   const ownerByCurrentName = new Map(namedOwners.map(({ currentName, owner }) => [currentName, owner] as const));
-  const ownerByLegacyName = new Map(namedOwners.map(({ legacyName, owner }) => [legacyName, owner] as const));
   const boatIdCounts = new Map<string, number>();
   for (const candidate of candidates) {
     if (!candidate || typeof candidate !== "object") continue;
@@ -610,15 +598,15 @@ export async function listManagedBoats(
   for (const candidate of candidates) {
     if (!candidate || typeof candidate !== "object") continue;
     const name = typeof candidate.name === "string" ? candidate.name : "";
-    const owner = ownerByCurrentName.get(name) ?? ownerByLegacyName.get(name) ?? null;
+    const owner = ownerByCurrentName.get(name) ?? null;
     if (!owner) continue;
     const boxId = typeof candidate.id === "string" ? candidate.id : "";
     if (!BOAT_ID.test(boxId)) {
-      return invalidInventory("boat.dev returned an invalid id for an Hezuo-managed cloud computer — refresh or repair it in boat.dev");
+      return invalidInventory("boat.dev returned an invalid id for a HezuoBot-managed cloud computer — refresh or repair it in boat.dev");
     }
     const existing = ownedBoatByBot.get(owner.botId);
     if (existing && existing !== boxId) {
-      return invalidInventory("boat.dev returned conflicting cloud computers for one Hezuo bot — repair them in boat.dev before continuing");
+      return invalidInventory("boat.dev returned conflicting cloud computers for one HezuoBot bot — repair them in boat.dev before continuing");
     }
     ownedBoatByBot.set(owner.botId, boxId);
   }
@@ -630,30 +618,18 @@ export async function listManagedBoats(
     const boxId = typeof candidate.id === "string" ? candidate.id : "";
     const name = typeof candidate.name === "string" ? candidate.name : "";
     let owner: ManagedBoatOwner | null = null;
-    let legacyOwner = false;
     if (SCOPED_MANAGED_BOAT_NAME.test(name)) {
       if (!name.startsWith(scopedPrefix)) continue;
       owner = ownerByCurrentName.get(name) ?? null;
-    } else if (LEGACY_MANAGED_BOAT_NAME.test(name)) {
-      owner = ownerByLegacyName.get(name) ?? null;
-      if (!owner) continue;
-      legacyOwner = true;
     } else {
       continue;
     }
     // Throw, never skip: deletion must not mistake provider corruption for absence.
     if (!BOAT_ID.test(boxId)) {
-      return invalidInventory("boat.dev returned an invalid id for an Hezuo-managed cloud computer — refresh or repair it in boat.dev");
+      return invalidInventory("boat.dev returned an invalid id for a HezuoBot-managed cloud computer — refresh or repair it in boat.dev");
     }
     if ((boatIdCounts.get(boxId) ?? 0) !== 1 || seenBoatIds.has(boxId)) {
-      return invalidInventory("boat.dev returned a conflicting id for an Hezuo-managed cloud computer — refresh or repair it in boat.dev");
-    }
-    if (legacyOwner && owner && options.adoptLegacy !== false) {
-      try {
-        adoptResolvedBoat(owner.botId, boxId);
-      } catch {
-        return invalidInventory("Hezuo could not safely remember this legacy cloud computer's owner — repair it in boat.dev before continuing");
-      }
+      return invalidInventory("boat.dev returned a conflicting id for a HezuoBot-managed cloud computer — refresh or repair it in boat.dev");
     }
     seenBoatIds.add(boxId);
     instances.push({
@@ -740,7 +716,7 @@ async function revalidateManagedBoat(
   if (!inventory.available) throw inventoryFailure(inventory);
   const instance = inventory.instances.find((candidate) => candidate.boxId === boxId);
   if (!instance) {
-    throw Object.assign(new Error("that Hezuo-managed cloud computer no longer exists"), { status: 404 });
+    throw Object.assign(new Error("that HezuoBot-managed cloud computer no longer exists"), { status: 404 });
   }
   return instance;
 }
@@ -837,6 +813,7 @@ export async function deleteManagedBoat(
 export async function findBoat(cfg: AppConfig, botId: string) {
   cfg = snapshotBoatConfig(cfg);
   assertBotBoatNotDeleting(botId);
+  const name = await boatNameFor(botId);
   const cachedId = boatIdCache.get(botId);
   if (cachedId) {
     let direct: Awaited<ReturnType<typeof boatJson>> | null = null;
@@ -845,31 +822,26 @@ export async function findBoat(cfg: AppConfig, botId: string) {
     } catch {
     }
     const directBoat = direct?.body?.sandbox;
-    if (direct?.ok && directBoat?.id === cachedId && !TERMINAL.has(directBoat.state)) return directBoat;
+    if (direct?.ok && directBoat?.id === cachedId && directBoat.name === name && !TERMINAL.has(directBoat.state)) return directBoat;
     if (direct?.ok && directBoat?.id !== cachedId) {
       throw Object.assign(new Error("boat.dev returned an invalid cloud computer identity"), { status: 503 });
     }
     boatIdCache.delete(botId);
   }
-  const name = await boatNameFor(botId);
-  const legacyName = legacyBoatNameFor(botId);
   const listed = await listBoatPages(cfg);
   if (!listed.ok) {
     throw Object.assign(new Error(listed.problem), { status: 503, transient: listed.unreachable === true });
   }
-  const expected = listed.boats.filter((candidate: any) => candidate?.name === name || candidate?.name === legacyName);
+  const expected = listed.boats.filter((candidate) => candidate?.name === name);
   if (expected.some((candidate: any) => !BOAT_ID.test(candidate?.id))) {
     throw Object.assign(new Error("boat.dev returned an invalid cloud computer identity"), { status: 503 });
   }
-  const found = expected.find((candidate: any) => candidate.name === name && !TERMINAL.has(candidate.state))
-    ?? expected.find((candidate: any) => candidate.name === legacyName && !TERMINAL.has(candidate.state))
-    ?? null;
+  const found = expected.find((candidate) => !TERMINAL.has(candidate.state)) ?? null;
   if (found) {
     const duplicateId = listed.boats.filter((candidate: any) => candidate?.id === found.id).length !== 1;
     if (duplicateId) {
       throw Object.assign(new Error("boat.dev returned a conflicting cloud computer identity"), { status: 503 });
     }
-    if (found.name === legacyName) adoptResolvedBoat(botId, found.id);
     boatIdCache.set(botId, found.id);
   }
   return found;
@@ -924,7 +896,7 @@ export async function verifyToken(token: string): Promise<{ ok: true } | { ok: f
 }
 
 const INCLUDED_BOAT_UNAVAILABLE = "The cloud computers included with your Cloud plan aren't available right now. Try again later.";
-const boatServiceName = (included: boolean) => included ? "Hezuo Cloud's computer service" : "boat.dev";
+const boatServiceName = (included: boolean) => included ? "HezuoBot's computer service" : "boat.dev";
 
 export function boatErrorMessage(status: number, what: string, body?: any, included = false): string {
   const theirs = typeof body?.message === "string" ? body.message.trim() : "";
@@ -1187,7 +1159,7 @@ export async function execOnBoat(cfg: AppConfig, botId: string, command: string)
 
 // Base64 over command stdout is not reliable for full-size frames (probed 2026-08-12: corrupted length), so frames come over HTTP.
 // X11 captures leave the pointer out by default, hence scrot --pointer and ffmpeg -draw_mouse.
-const PANEL_PATH = "/tmp/ogb-panel.jpg";
+const PANEL_PATH = "/tmp/hezuo-panel.jpg";
 export const PANEL_FRAME_WIDTH = 1920;
 export const PANEL_FRAME_QUALITY = 85;
 // ffmpeg's -q:v runs 2 (best) to 31; 3 lands near JPEG quality 85.

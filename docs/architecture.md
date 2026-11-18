@@ -5,9 +5,6 @@
 ## 整体关系与数据边界
 
 ```text
-手机 App（mobile/android、mobile/ios）
-  │ 账号登录、安装列表、手机中继
-  ▼
 网关（gateway/） ── 模型请求 ──▶ 运营者配置的上游 API
   ▲ HTTPS；本机部署地址 https://127.0.0.1:18487
   │ 账号、积分、模型凭据；桌面建立中继连接
@@ -19,10 +16,10 @@
   bot、对话、群、部门、工作区与本地工具执行
 ```
 
-- 桌面本地服务和网关是两个独立服务，**不共享数据库或数据目录**。网关保存账号、会话、安装归属、AI 权限、积分账本和请求结算；它不是 bot 和对话的存储服务。手机通过中继操作所属桌面上的数据，不会把桌面数据库迁入网关。
+- 桌面本地服务和网关是两个独立服务，**不共享数据库或数据目录**。网关保存账号、会话、安装归属、AI 权限、积分账本和请求结算；它不是 bot 和对话的存储服务。远程 companion 客户端通过中继操作所属桌面上的数据，不会把桌面数据库迁入网关。
 - `8799` 是桌面首选端口；占用时还会尝试 `18799`、`28799`（`desktop/electron/desktop-ports.mjs`）。`18487` 是当前本机部署选择的网关端口，并非 CLI 默认值；本地网关默认端口是 `8787`。
-- 手机上的 `127.0.0.1` 指手机本身，不是电脑。跨设备连接必须使用手机可达、证书可信且网关实际绑定的 HTTPS 地址；仅监听电脑回环地址的部署只适用于本机客户端。
-- 本机网关的数据目录约定为 `~/Library/ApplicationSupport/HezuoGateway/`（注意 `ApplicationSupport` 没有空格）。CLI 未指定数据目录时默认用仓库的 `.omb-scratch/local-gateway/`。两者不可混为一谈，移动源码也不应移动数据。
+- 远程设备上的 `127.0.0.1` 指设备本身，不是桌面电脑。跨设备连接必须使用客户端可达、证书可信且网关实际绑定的 HTTPS 地址；仅监听电脑回环地址的部署只适用于本机客户端。
+- 本机网关的数据目录约定为 `~/Library/ApplicationSupport/HezuoGateway/`（注意 `ApplicationSupport` 没有空格）。CLI 未指定数据目录时默认用仓库的 `.hezuo-scratch/local-gateway/`。两者不可混为一谈，移动源码也不应移动数据。
 
 ### 源码职责
 
@@ -31,9 +28,8 @@
 | `desktop/src/`、`desktop/public/`、`desktop/*.html` | 桌面/网页 UI 与静态资源 |
 | `desktop/server/` | bot、对话、部门、工具与本地 API |
 | `desktop/electron/`、`desktop/companion/` | 桌面宿主、系统能力、远程连接与 companion 服务 |
-| `mobile/android/`、`mobile/ios/` | Android 与 iOS 原生客户端 |
 | `gateway/control-plane/` | Cloudflare Worker：认证、安装、模型代理、账本与运营者接口 |
-| `gateway/local/` | 同一 Worker 的本地 Miniflare/TLS 宿主及手机中继 |
+| `gateway/local/` | 同一 Worker 的本地 Miniflare/TLS 宿主及 companion 中继 |
 | `gateway/composio-broker/` | 独立的托管连接服务 |
 | `gateway/scripts/` | 网关部署与账号 AI 管理工具 |
 | `packages/shared/` | 桌面与控制平面等使用的共享类型、协议和纯逻辑 |
@@ -62,7 +58,7 @@
 | `GET`、`POST`、`DELETE` | `/v1/installations/self/endpoint` | 安装凭据；读取、申请、清理托管端点（需要对应部署能力） |
 | `POST` | `/v1/installations/self/push/register`、`unregister`、`send` | 安装凭据；设备推送注册、注销和发送 |
 | WebSocket upgrade | `/v1/companion/relay` | 本地网关的桌面隧道入口；验证安装凭据 |
-| HTTP / WebSocket | `/v1/companion/:installationId/*` | 本地网关手机侧中继；验证账号会话及安装归属，再转给在线桌面 |
+| HTTP / WebSocket | `/v1/companion/:installationId/*` | 本地网关远程客户端中继；验证账号会话及安装归属，再转给在线桌面 |
 | `GET`、`POST` | `/v1/operator/ai/account` | 仅运营者账号：按邮箱查询、开启或关闭账号 AI |
 | `POST` | `/v1/operator/ai/balance` | 仅运营者账号：增加积分，写审计记录 |
 | `GET`、`POST` | `/v1/operator/ai/requests`、`/v1/operator/ai/requests/:id/settle` | 仅运营者账号：查请求、结算待复核预扣 |
@@ -90,9 +86,8 @@
 | 登录方式 | `emailVerification` 为 `required` / `off`；邮件还需 `emailFrom` 和 `<数据目录>/secrets/smtp-url` | `AUTH_EMAIL_VERIFICATION`、`EMAIL_FROM`、`EMAIL` binding；`off` 不等于禁用密码登录 |
 | TLS 证书与私钥 | `<数据目录>/tls/`；或 `--cert` / `--key`（配置中的 `certFile` / `keyFile`） | 本地 TLS 宿主；Worker 公网 TLS 由部署域名提供 |
 | 监听地址与端口 | `host`、`port`、`publicHost`；非回环绑定必须明确公开主机名 | 决定客户端实际使用的 HTTPS origin |
-| 桌面固定网关地址及信任证书 | 打包时 `OMB_PRODUCT_SERVICE_URL` 和 `--gateway-ca`；本机 origin 另需 `--local-origin` | 写入包内 `product-service.json`；不是让 renderer 任意选择上游 |
-| 手机端网关地址 | 登录页手动输入手机可达的网关地址 | Android `mobile/android/app/src/main/kotlin/com/openmausbot/companion/ui/AccountLoginScreen.kt`；iOS `mobile/ios/App/AccountLoginView.swift` |
-| 云端部署 | `gateway/control-plane/wrangler.jsonc` 的 vars、D1、bindings 与 secrets | 部署工具 `gateway/scripts/deploy-product-service.mjs`，不是根目录 `scripts/` |
+| 桌面固定网关地址及信任证书 | 打包时 `HEZUO_PRODUCT_SERVICE_URL` 和 `--gateway-ca`；本机 origin 另需 `--local-origin` | 写入包内 `product-service.json`；不是让 renderer 任意选择上游 |
+| 云端部署 | `gateway/control-plane/wrangler.jsonc` 的 vars、D1、bindings 与 secrets | 部署工具 `gateway/scripts/deploy-hezuobot-service.mjs`，不是根目录 `scripts/` |
 
 单价使用每百万 token 的微积分，1 积分 = 1,000,000 微积分。模型目录必须由运营者明确启用和定价；修改公开模型不等于实现按复杂度自动切换上游模型。未迁移渠道目录的部署，`init` 的外部模型文件、默认模型和费率参数可能重新生成 `models`，修改这些启动配置后需重启。网页渠道配置立即用于新请求，已预占请求保留原计价快照。
 
@@ -100,13 +95,13 @@
 
 ### 本地网关
 
-入口 `gateway/local/local-gateway.mjs` 将 `gateway/control-plane/src/index.ts` 打包交给 Miniflare，使用同一份 Worker 和 `gateway/control-plane/migrations/`，持久化 D1 状态在 `<数据目录>/state/`。外层提供 HTTPS、自签名证书、SMTP 适配及桌面/手机中继。macOS 可通过 `service install` 安装 launchd 登录服务。详细命令、证书信任和私有文件要求见 [本地网关](local-gateway.md)。
+入口 `gateway/local/local-gateway.mjs` 将 `gateway/control-plane/src/index.ts` 打包交给 Miniflare，使用同一份 Worker 和 `gateway/control-plane/migrations/`，持久化 D1 状态在 `<数据目录>/state/`。外层提供 HTTPS、自签名证书、SMTP 适配及桌面 companion 中继。macOS 可通过 `service install` 安装 launchd 登录服务。详细命令、证书信任和私有文件要求见 [本地网关](local-gateway.md)。
 
 源码搬迁不会自动更新已安装 LaunchAgent 的绝对路径。指向旧入口的服务在下一次启动可能失败；应先在隔离数据目录验证新入口，再由维护者安排重新安装服务。**不要为了阅读或修改文档重启真实服务，也不要改动已有用户数据库。**
 
 ### Cloudflare Worker
 
-`gateway/control-plane/` 用 Wrangler 部署，同样执行认证、安装、模型代理与积分账本逻辑，使用云端 D1、vars 和 secrets。可用 `gateway/scripts/deploy-product-service.mjs` 完成运营者自己的部署，见 [产品发布](product-release.md)。
+`gateway/control-plane/` 用 Wrangler 部署，同样执行认证、安装、模型代理与积分账本逻辑，使用云端 D1、vars 和 secrets。可用 `gateway/scripts/deploy-hezuobot-service.mjs` 完成运营者自己的部署，见 [产品发布](product-release.md)。
 
 同一份 Worker 不代表外层能力相同：`/v1/companion/relay` 和 `/v1/companion/:installationId/*` 实现位于本地 Node 宿主，不在 Worker 路由里。云端远程连接使用控制平面的托管端点和 Cloudflare Tunnel，不能把只有 Worker 的域名当作本地 Node 中继入口。数据库也不会在两种部署间自动同步。
 

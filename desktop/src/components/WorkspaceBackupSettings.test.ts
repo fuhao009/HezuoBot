@@ -45,7 +45,7 @@ async function ready() { fixture.api.mockResolvedValueOnce({ busy: false }); ren
 describe("Settings full backups", () => {
   it("shows a native file input, password fields and validated summary with warnings", () => {
     const html = render().html;
-    expect(html).toContain('type="file" accept=".ombbackup"');
+    expect(html).toContain('type="file" accept=".hezuobackup"');
     expect(html.match(/type="password"/g)).toHaveLength(3);
     expect(html).toContain("the disks of remote desktops");
     expect(html).toContain("Saved account credentials and connections are not included");
@@ -58,20 +58,20 @@ describe("Settings full backups", () => {
 
   it("exports encrypted state by POST and downloads without putting the password in a URL or storage", async () => {
     await ready();
-    storage.set("omb-drafts", "private draft"); storage.set("auth-token", "not exported"); storage.set("omb-webhook-credentials", "not exported either");
+    storage.set("hezuo-drafts", "private draft"); storage.set("auth-token", "not exported"); storage.set("hezuo-webhook-credentials", "not exported either");
     let view = render();
     const passwords = view.nodes.filter((node) => node.type === "input" && node.props.type === "password");
     change(passwords[0], "correct horse battery"); change(passwords[1], "correct horse battery");
     view = render();
     const link = { href: "", download: "", click: vi.fn(), remove: vi.fn() };
     vi.stubGlobal("document", { createElement: () => link, body: { append: vi.fn() } });
-    fixture.api.mockResolvedValueOnce({ id: "download-id", filename: "fixture.ombbackup" });
+    fixture.api.mockResolvedValueOnce({ id: "download-id", filename: "fixture.hezuobackup" });
     const form = view.nodes.find((node) => node.type === "form")!;
     submit(form); submit(form); await flush();
     expect(fixture.api).toHaveBeenCalledTimes(2); // one status, one export
     const [path, init] = fixture.api.mock.calls[1];
     expect(path).toBe("/api/workspace-backup/export");
-    expect(JSON.parse(init.body)).toEqual({ password: "correct horse battery", clientState: { "omb-drafts": "private draft" } });
+    expect(JSON.parse(init.body)).toEqual({ password: "correct horse battery", clientState: { "hezuo-drafts": "private draft" } });
     expect(link.href).toBe("/api/workspace-backup/download/download-id");
     expect(link.click).toHaveBeenCalledOnce();
     expect([...storage.values()]).not.toContain("correct horse battery");
@@ -80,7 +80,7 @@ describe("Settings full backups", () => {
 
   it("uploads a raw file, validates it, and requires exact REPLACE with the staged ID", async () => {
     await ready();
-    const file = new File(["encrypted fixture"], "fixture.ombbackup");
+    const file = new File(["encrypted fixture"], "fixture.hezuobackup");
     render().nodes.find((node) => node.props.type === "file")!.props.onChange!({ target: { files: [file] } });
     let view = render();
     change(view.nodes.filter((node) => node.props.type === "password")[2], "correct horse battery");
@@ -97,12 +97,12 @@ describe("Settings full backups", () => {
     fixture.api.mockResolvedValueOnce({ restartRequired: true, restoreId: "stage-id" });
     replace().props.onClick!(); await flush();
     expect(JSON.parse(fixture.api.mock.calls[3][1].body)).toEqual({ id: "stage-id", confirmation: "REPLACE" });
-    expect(storage.get("omb-pending-workspace-restore")).toBe("stage-id");
+    expect(storage.get("hezuo-pending-workspace-restore")).toBe("stage-id");
   });
 
   it("does not offer a replacement after failed password validation", async () => {
     await ready();
-    render().nodes.find((node) => node.props.type === "file")!.props.onChange!({ target: { files: [new File(["archive"], "file.ombbackup")] } });
+    render().nodes.find((node) => node.props.type === "file")!.props.onChange!({ target: { files: [new File(["archive"], "file.hezuobackup")] } });
     change(render().nodes.filter((node) => node.props.type === "password")[2], "wrong password");
     fixture.api.mockResolvedValueOnce({ id: "upload" }).mockRejectedValueOnce(new Error("Wrong password"));
     submit(render().nodes.filter((node) => node.type === "form")[1]); await flush();
@@ -112,7 +112,7 @@ describe("Settings full backups", () => {
 
   it("reuploads the selected file if its upload or validated stage expires", async () => {
     await ready();
-    const file = new File(["archive"], "file.ombbackup");
+    const file = new File(["archive"], "file.hezuobackup");
     render().nodes.find((node) => node.props.type === "file")!.props.onChange!({ target: { files: [file] } });
     const validate = async () => { change(render().nodes.filter((node) => node.props.type === "password")[2], "correct horse battery"); submit(render().nodes.filter((node) => node.type === "form")[1]); await flush(); };
     const expired = Object.assign(new Error("Backup expired; upload again"), { status: 404 });
@@ -131,23 +131,23 @@ describe("Settings full backups", () => {
   });
 
   it("does not restore client state before restart, then replaces only the initiating browser's allowlist", async () => {
-    storage.set("omb-pending-workspace-restore", "stage-id"); storage.set("omb-drafts", "old"); storage.set("auth-token", "keep");
+    storage.set("hezuo-pending-workspace-restore", "stage-id"); storage.set("hezuo-drafts", "old"); storage.set("auth-token", "keep");
     fixture.api.mockResolvedValueOnce({ busy: true, pendingRestore: true });
     expect(render(true).html).not.toContain("Continue without restoring drafts");
     fixture.effects[0](); await flush();
     expect(render(true).html).not.toContain("Continue without restoring drafts");
-    expect(fixture.api).toHaveBeenCalledOnce(); expect(storage.get("omb-drafts")).toBe("old");
+    expect(fixture.api).toHaveBeenCalledOnce(); expect(storage.get("hezuo-drafts")).toBe("old");
     fixture.values = [];
-    fixture.api.mockResolvedValueOnce({ busy: false, lastRestoreId: "stage-id" }).mockResolvedValueOnce({ clientState: { "omb-drafts": "restored" } });
+    fixture.api.mockResolvedValueOnce({ busy: false, lastRestoreId: "stage-id" }).mockResolvedValueOnce({ clientState: { "hezuo-drafts": "restored" } });
     render(true); fixture.effects[0](); await flush();
-    expect(storage.get("omb-drafts")).toBe("restored"); expect(storage.get("auth-token")).toBe("keep");
-    expect(storage.has("omb-pending-workspace-restore")).toBe(false); expect(window.location.reload).toHaveBeenCalledOnce();
+    expect(storage.get("hezuo-drafts")).toBe("restored"); expect(storage.get("auth-token")).toBe("keep");
+    expect(storage.has("hezuo-pending-workspace-restore")).toBe(false); expect(window.location.reload).toHaveBeenCalledOnce();
   });
 
   it("offers a real desktop restart without clearing the restore marker or drafts, once only", async () => {
     const relaunch = vi.fn().mockResolvedValue(true);
-    vi.stubGlobal("window", { ...window, ogb: { relaunch } });
-    storage.set("omb-pending-workspace-restore", "stage-id"); storage.set("omb-drafts", "keep");
+    vi.stubGlobal("window", { ...window, hezuo: { relaunch } });
+    storage.set("hezuo-pending-workspace-restore", "stage-id"); storage.set("hezuo-drafts", "keep");
     fixture.api.mockResolvedValueOnce({ busy: true, pendingRestore: true });
     render(true); fixture.effects[0](); await flush();
     expect(render(true).html).toContain("Restart and restore");
@@ -157,25 +157,25 @@ describe("Settings full backups", () => {
     restart.props.onClick!(); restart.props.onClick!(); await flush();
     expect(relaunch).toHaveBeenCalledOnce();
     expect(render("restart").nodes.find(node => node.type === "button")!.props.disabled).toBe(true);
-    expect(storage.get("omb-pending-workspace-restore")).toBe("stage-id");
-    expect(storage.get("omb-drafts")).toBe("keep");
+    expect(storage.get("hezuo-pending-workspace-restore")).toBe("stage-id");
+    expect(storage.get("hezuo-drafts")).toBe("keep");
     expect(window.location.reload).not.toHaveBeenCalled();
   });
 
   it.each([false, new Error("Fixture restart unavailable")])("keeps recovery intact and offers a retry when native restart fails (%s)", async result => {
     const relaunch = result === false ? vi.fn().mockResolvedValue(false) : vi.fn().mockRejectedValue(result);
-    vi.stubGlobal("window", { ...window, ogb: { relaunch } });
-    storage.set("omb-pending-workspace-restore", "stage-id");
+    vi.stubGlobal("window", { ...window, hezuo: { relaunch } });
+    storage.set("hezuo-pending-workspace-restore", "stage-id");
     render("restart").nodes.find(node => node.type === "button")!.props.onClick!(); await flush();
     const view = render("restart");
     expect(view.html).toContain('role="alert"');
     expect(view.nodes.find(node => node.type === "button")!.props.disabled).toBe(false);
-    expect(storage.get("omb-pending-workspace-restore")).toBe("stage-id");
+    expect(storage.get("hezuo-pending-workspace-restore")).toBe("stage-id");
     expect(window.location.reload).not.toHaveBeenCalled();
   });
 
   it.each([undefined, { relaunch: vi.fn(), remoteClient: { active: true } }])("never restarts the local app for a browser or remote workspace", bridge => {
-    window.ogb = bridge as Window["ogb"];
+    window.hezuo = bridge as Window["hezuo"];
     const view = render("restart");
     expect(view.html).toContain("restart the server process");
     expect(view.html).not.toContain("Restart and restore");
@@ -183,7 +183,7 @@ describe("Settings full backups", () => {
   });
 
   it("retains the server-status retry for browser recovery", async () => {
-    storage.set("omb-pending-workspace-restore", "stage-id");
+    storage.set("hezuo-pending-workspace-restore", "stage-id");
     fixture.api.mockResolvedValueOnce({ busy: true, pendingRestore: true });
     render(true); fixture.effects[0](); await flush();
     expect(render(true).html).toContain(">Retry<");
@@ -191,30 +191,30 @@ describe("Settings full backups", () => {
   });
 
   it("never imports a different restore's browser state", async () => {
-    storage.set("omb-pending-workspace-restore", "my-stage"); storage.set("omb-drafts", "keep");
+    storage.set("hezuo-pending-workspace-restore", "my-stage"); storage.set("hezuo-drafts", "keep");
     fixture.api.mockResolvedValueOnce({ busy: false, lastRestoreId: "another-stage" });
     render(true); fixture.effects[0](); await flush();
     expect(fixture.api).toHaveBeenCalledOnce();
     expect(render(true).html).toContain("Normal app");
-    expect(storage.get("omb-drafts")).toBe("keep");
-    expect(storage.has("omb-pending-workspace-restore")).toBe(false);
+    expect(storage.get("hezuo-drafts")).toBe("keep");
+    expect(storage.has("hezuo-pending-workspace-restore")).toBe(false);
     expect(window.location.reload).not.toHaveBeenCalled();
   });
 
   it("keeps the normal app gated and its old drafts intact on recovery failure", async () => {
-    storage.set("omb-pending-workspace-restore", "stage-id"); storage.set("omb-drafts", "keep");
+    storage.set("hezuo-pending-workspace-restore", "stage-id"); storage.set("hezuo-drafts", "keep");
     fixture.api.mockResolvedValueOnce({ busy: false, lastRestoreId: "stage-id" }).mockRejectedValueOnce(new Error("Fixture unavailable"));
     render(true); fixture.effects[0](); await flush();
     const html = render(true).html;
     expect(html).toContain("Fixture unavailable"); expect(html).toContain("Retry"); expect(html).not.toContain("Normal app");
-    expect(storage.get("omb-drafts")).toBe("keep"); expect(storage.get("omb-pending-workspace-restore")).toBe("stage-id");
+    expect(storage.get("hezuo-drafts")).toBe("keep"); expect(storage.get("hezuo-pending-workspace-restore")).toBe("stage-id");
     expect(window.location.reload).not.toHaveBeenCalled();
   });
 
   it.each([401, 403])("explicitly returns to normal bootstrap after a %s without changing browser state", async (status) => {
-    storage.set("omb-pending-workspace-restore", "stage-id");
-    storage.set("omb-drafts", "keep drafts"); storage.set("omb-draft-attachments", "keep attachments");
-    storage.set("omb-skin", "keep preferences"); storage.set("auth-token", "keep session");
+    storage.set("hezuo-pending-workspace-restore", "stage-id");
+    storage.set("hezuo-drafts", "keep drafts"); storage.set("hezuo-draft-attachments", "keep attachments");
+    storage.set("hezuo-skin", "keep preferences"); storage.set("auth-token", "keep session");
     const before = new Map(storage);
     if (status === 403) fixture.api.mockResolvedValueOnce({ busy: false, lastRestoreId: "stage-id" });
     fixture.api.mockRejectedValueOnce(Object.assign(new Error("Sign-in required"), { status }));
@@ -224,7 +224,7 @@ describe("Settings full backups", () => {
     expect(view.html).not.toContain("Normal app");
     expect(storage).toEqual(before); expect(window.location.reload).not.toHaveBeenCalled();
     view.nodes.find((node) => node.type === "button" && node.props.children === "Continue without restoring drafts")!.props.onClick!();
-    before.delete("omb-pending-workspace-restore");
+    before.delete("hezuo-pending-workspace-restore");
     expect(storage).toEqual(before);
     expect(window.location.reload).toHaveBeenCalledOnce();
     expect(render(true).html).not.toContain("Normal app"); // bootstrap, not a direct authentication bypass
@@ -232,13 +232,13 @@ describe("Settings full backups", () => {
   });
 
   it("keeps recovery gated if its marker cannot be cleared", async () => {
-    storage.set("omb-pending-workspace-restore", "stage-id"); storage.set("omb-drafts", "keep");
+    storage.set("hezuo-pending-workspace-restore", "stage-id"); storage.set("hezuo-drafts", "keep");
     fixture.api.mockRejectedValueOnce(new Error("Sign-in required"));
     render(true); fixture.effects[0](); await flush();
     vi.spyOn(localStorage, "removeItem").mockImplementation(() => { throw new Error("Storage unavailable"); });
     render(true).nodes.find((node) => node.type === "button" && node.props.children === "Continue without restoring drafts")!.props.onClick!();
     expect(render(true).html).toContain("Storage unavailable"); expect(render(true).html).not.toContain("Normal app");
-    expect(storage.get("omb-drafts")).toBe("keep"); expect(storage.get("omb-pending-workspace-restore")).toBe("stage-id");
+    expect(storage.get("hezuo-drafts")).toBe("keep"); expect(storage.get("hezuo-pending-workspace-restore")).toBe("stage-id");
     expect(window.location.reload).not.toHaveBeenCalled();
   });
 });

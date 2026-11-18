@@ -7,7 +7,7 @@ import { createInterface } from "node:readline";
 import { pathToFileURL } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { launchVerificationServer, type VerificationServer } from "../../scripts/control-omb.ts";
+import { launchVerificationServer, type VerificationServer } from "../../scripts/control-hezuo.ts";
 import { removeTempDir } from "./testing/cleanup.ts";
 import { openSse } from "./testing/sse.ts";
 
@@ -68,7 +68,7 @@ describe("per-bot thread capacity through an isolated HTTP fixture", () => {
   };
   const capabilityStatus = async (launched: any) => {
     const response = await fetch(`${fixture.info.url}/api/internal/agents`, {
-      headers: { authorization: `Bearer ${launched.mcpConfig.mcpServers.agents.env.OMB_COMMS_TOKEN}` },
+      headers: { authorization: `Bearer ${launched.mcpConfig.mcpServers.agents.env.HEZUO_COMMS_TOKEN}` },
     });
     await response.arrayBuffer();
     evidence.push({ authority: "existing provider capability", path: "/api/internal/agents", status: response.status, pid: launched.pid });
@@ -76,7 +76,7 @@ describe("per-bot thread capacity through an isolated HTTP fixture", () => {
   };
   const permission = async (threadId: string, requestId: string) => {
     const launched = await dump(threadId);
-    const socket = connect(launched.mcpConfig.mcpServers.ogb.args.at(-1));
+    const socket = connect(launched.mcpConfig.mcpServers.hezuo.args.at(-1));
     sockets.push(socket);
     await new Promise<void>((resolve, reject) => {
       socket.once("connect", resolve);
@@ -97,8 +97,8 @@ describe("per-bot thread capacity through an isolated HTTP fixture", () => {
       'import { basename, join } from "node:path";',
       'const thread = basename(process.cwd());',
       'process.env.FAKE_CLAUDE_MODE = "slow";',
-      'process.env.OMB_FIXTURE_CWD = process.cwd();',
-      'process.env.OMB_FIXTURE_LAUNCHED_AT = String(Date.now());',
+      'process.env.HEZUO_FIXTURE_CWD = process.cwd();',
+      'process.env.HEZUO_FIXTURE_LAUNCHED_AT = String(Date.now());',
       `process.env.FAKE_CLAUDE_SLOW_FINISH_GATE = join(${JSON.stringify(fixture.info.dataDir)}, thread + ".gate");`,
       `process.env.FAKE_CLAUDE_DUMP = join(${JSON.stringify(fixture.info.dataDir)}, thread + ".json");`,
       `await import(${JSON.stringify(pathToFileURL(join(process.cwd(), "desktop/server/testing/fake-claude-cli.ts")).href)});`,
@@ -142,12 +142,12 @@ describe("per-bot thread capacity through an isolated HTTP fixture", () => {
     expect(rest.every((result) => result.status === 202 && !result.body.queued)).toBe(true);
     const launched = await Promise.all(threads.slice(0, 10).map(dump));
     expect(new Set(launched.map((entry) => entry.pid)).size).toBe(10);
-    expect(new Set(launched.map((entry) => entry.env.OMB_FIXTURE_CWD)).size).toBe(10);
+    expect(new Set(launched.map((entry) => entry.env.HEZUO_FIXTURE_CWD)).size).toBe(10);
     expect(launched.every((entry) => entry.argv[entry.argv.indexOf("--model") + 1] === model)).toBe(true);
     expect(await busyThreads(botId)).toHaveLength(10);
     for (const process of initialProcesses) expect(await capabilityStatus(process)).toBe(200);
     expect(JSON.parse(readFileSync(join(fixture.info.dataDir, "config.json"), "utf8")).threads).toEqual({ maxConcurrentPerBot: 10 });
-    evidence.push({ simultaneousProviderProcesses: launched.map((entry) => ({ pid: entry.pid, cwd: entry.env.OMB_FIXTURE_CWD })), model });
+    evidence.push({ simultaneousProviderProcesses: launched.map((entry) => ({ pid: entry.pid, cwd: entry.env.HEZUO_FIXTURE_CWD })), model });
 
     const overflow = await send(botId, threads[10], "ELEVENTH_WAITING", "capacity_eleventh_retry");
     expect(overflow.status).toBe(202);
@@ -257,7 +257,7 @@ describe("per-bot thread capacity through an isolated HTTP fixture", () => {
 
   it("starts a routine in the bot's project folder while another thread works there", async () => {
     await limit(2);
-    const project = mkdtempSync(join(tmpdir(), "omb-collide-"));
+    const project = mkdtempSync(join(tmpdir(), "hezuo-collide-"));
     projectDirs.push(project);
     // Both threads pin to one folder, so the fake CLI's cwd-keyed gate/dump collapses to one key: one gate write finishes both.
     const key = basename(project);
@@ -470,7 +470,7 @@ describe("per-bot thread capacity through an isolated HTTP fixture", () => {
       await expect.poll(async () => (await runState(run.id))?.status, { timeout: 15_000 }).toBe("running");
       const started = await runState(run.id);
       const launched = await dump(started.threadId);
-      return { runId: run.id as string, threadId: started.threadId as string, token: launched.mcpConfig.mcpServers.agents.env.OMB_COMMS_TOKEN as string };
+      return { runId: run.id as string, threadId: started.threadId as string, token: launched.mcpConfig.mcpServers.agents.env.HEZUO_COMMS_TOKEN as string };
     };
     const delegate = async (turn: { threadId: string; token: string }) => {
       const response = await fetch(`${fixture.info.url}/api/internal/coordinate-bots`, {
@@ -637,8 +637,8 @@ describe("per-bot thread capacity through an isolated HTTP fixture", () => {
     finish(third);
     const launchedFourth = await dump(fourth);
     await expect.poll(() => busyThreads(botId)).toEqual([fourth]);
-    expect(Number(launchedSecond.env.OMB_FIXTURE_LAUNCHED_AT)).toBeLessThan(Number(launchedThird.env.OMB_FIXTURE_LAUNCHED_AT));
-    expect(Number(launchedThird.env.OMB_FIXTURE_LAUNCHED_AT)).toBeLessThan(Number(launchedFourth.env.OMB_FIXTURE_LAUNCHED_AT));
+    expect(Number(launchedSecond.env.HEZUO_FIXTURE_LAUNCHED_AT)).toBeLessThan(Number(launchedThird.env.HEZUO_FIXTURE_LAUNCHED_AT));
+    expect(Number(launchedThird.env.HEZUO_FIXTURE_LAUNCHED_AT)).toBeLessThan(Number(launchedFourth.env.HEZUO_FIXTURE_LAUNCHED_AT));
     finish(fourth);
     await expect.poll(() => busyThreads(botId)).toEqual([]);
     for (const [index, threadId] of [second, third, fourth].entries()) {

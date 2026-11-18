@@ -14,7 +14,7 @@ import { pollServerIdentity } from "../desktop/electron/server-boot-probe.mjs";
 import { acquireDataDirLease } from "../desktop/electron/data-dir-lease.mjs";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
-const flag = "--omb-server-recovery-fixture";
+const flag = "--hezuo-server-recovery-fixture";
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function until(check, label) {
   const deadline = Date.now() + 30_000;
@@ -109,8 +109,8 @@ if (process.versions.electron && process.argv.includes(flag)) {
           PATH: dirname(runtime), HOME: home, USERPROFILE: home,
           XDG_CONFIG_HOME: home, XDG_CACHE_HOME: home, XDG_DATA_HOME: home,
           APPDATA: home, LOCALAPPDATA: home, TMPDIR: home, TEMP: home, TMP: home,
-          OMB_DATA_DIR: dataDir, OMB_PORT: String(port), OMB_WEBHOOK_PORT: String(webhookPort),
-          OMB_STATIC_DIR: join(output, "ui"), OMB_DESKTOP_PARENT: "1",
+          HEZUO_DATA_DIR: dataDir, HEZUO_PORT: String(port), HEZUO_WEBHOOK_PORT: String(webhookPort),
+          HEZUO_STATIC_DIR: join(output, "ui"), HEZUO_DESKTOP_PARENT: "1",
           ...lease.utilityServerLeaseEnvironment(),
           FAKE_CLAUDE_MODE: "hang", FAKE_CLAUDE_PROMPTS: join(home, "prompts.jsonl"),
           FAKE_CLAUDE_DUMP: join(home, "fake.json"),
@@ -221,7 +221,7 @@ if (process.versions.electron && process.argv.includes(flag)) {
 } else {
   assert.notEqual(process.platform, "win32", "This crash fixture uses POSIX SIGSTOP/SIGKILL");
   // macOS's default temp path leaves no room for the server's Unix sockets.
-  const output = mkdtempSync(join(process.platform === "darwin" ? "/tmp" : tmpdir(), "omb-server-recovery-"));
+  const output = mkdtempSync(join(process.platform === "darwin" ? "/tmp" : tmpdir(), "hezuo-server-recovery-"));
   const electron = createRequire(import.meta.url)("electron");
   cpSync(join(root, "dist-server"), join(output, "server"), { recursive: true });
   mkdirSync(join(output, "ui"));

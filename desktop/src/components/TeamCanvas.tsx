@@ -161,7 +161,7 @@ export function TeamCanvas({ sections, canManage, onMove, onInstructions, onMemo
     let active = true;
     void api("/.well-known/hezuo/environment", { signal: AbortSignal.timeout(5_000) }).then((environment) => {
       if (!active || typeof environment.environmentId !== "string") return;
-      storageKey.current = `omb-team-canvas:${environment.environmentId}`;
+      storageKey.current = `hezuo-team-canvas:${environment.environmentId}`;
       try {
         const saved = parsePositions(localStorage.getItem(storageKey.current));
         setPositions((previous) => ({ ...saved, ...previous }));

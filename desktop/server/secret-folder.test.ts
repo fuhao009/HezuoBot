@@ -6,9 +6,8 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { skipped } from "../electron/cloud-sync-rules.mjs";
+import { skipped } from "../electron/file-transfer-rules.mjs";
 import { uploadableFiles } from "./browser-upload.ts";
-import { listBotFiles } from "./cloud-send-files.ts";
 import { listMessageFolder, openMessageFile } from "./message-file.ts";
 import { botFileSource, readPageBundle } from "./pages/bundle.ts";
 import { SECRET_FILE_REFUSAL, SECRET_FOLDER } from "./secret-folder.ts";
@@ -20,7 +19,7 @@ let workspace = "";
 let secret = "";
 
 beforeEach(() => {
-  data = mkdtempSync(join(tmpdir(), "omb-secret-folder-"));
+  data = mkdtempSync(join(tmpdir(), "hezuo-secret-folder-"));
   workspace = join(data, "workspaces", "atlas");
   mkdirSync(join(workspace, SECRET_FOLDER, "thread-1"), { recursive: true });
   secret = join(workspace, SECRET_FOLDER, "thread-1", "card-1");
@@ -31,16 +30,13 @@ beforeEach(() => {
 afterEach(() => rmSync(data, { recursive: true, force: true }));
 
 describe("a bot's private secret files", () => {
-  it("never go into a workspace backup, a move to a Cloud or into a team, or Cloud Files", async () => {
+  it("never go into a workspace backup or Cloud Files", async () => {
     for (const path of [`workspaces/atlas/${SECRET_FOLDER}`, `workspaces/atlas/${SECRET_FOLDER}/thread-1/card-1`,
       `workspaces/atlas--member-ab12/${SECRET_FOLDER}/t/c`, `vm-home/${SECRET_FOLDER}/t/c`, `vm-homes/0123456789abcdef/${SECRET_FOLDER}/t/c`]) {
       expect(excludedWorkspaceAuthPath(path), path).toBe(true);
       expect(omittedFromWorkspaceBackup(path), path).toBe(true);
     }
     expect(excludedWorkspaceAuthPath("workspaces/atlas/notes.txt")).toBe(false);
-    const moved = (await listBotFiles(data, ["atlas"])).map((file) => file.path);
-    expect(moved).toContain("workspaces/atlas/notes.txt");
-    expect(moved.some((path) => path.includes(SECRET_FOLDER))).toBe(false);
     expect(skipped(SECRET_FOLDER, true)).toBe(true);
   });
 

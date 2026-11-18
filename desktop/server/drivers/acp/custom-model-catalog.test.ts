@@ -15,7 +15,7 @@ const scratch: string[] = [];
 afterEach(async () => { stop.refuses = false; await Promise.all(scratch.splice(0).map((path) => rm(path, { recursive: true, force: true }))); });
 
 async function fake(mode = "normal") {
-  const cwd = await mkdtemp(join(tmpdir(), "omb-catalog-test-"));
+  const cwd = await mkdtemp(join(tmpdir(), "hezuo-catalog-test-"));
   scratch.push(cwd);
   const cli = join(cwd, "fake.mjs");
   const dump = join(cwd, "requests.jsonl");
@@ -123,7 +123,7 @@ describe("custom ACP catalog discovery (isolated fake CLI)", () => {
     expect(forgetSession).toHaveBeenCalledOnce();
     const [session] = forgetSession.mock.calls[0] as unknown as [{ sessionId: string; cwd: string; env: unknown }];
     expect(session.sessionId).toBe("fake-session");
-    expect(basename(session.cwd)).toMatch(/^omb-acp-models-/);
+    expect(basename(session.cwd)).toMatch(/^hezuo-acp-models-/);
     // macOS reports the agent's cwd through /private; the folder name is the same either way.
     expect(basename(session.cwd)).toBe(basename((await fixture.requests())[0].cwd));
     expect(session.env).toBe(fixture.env);

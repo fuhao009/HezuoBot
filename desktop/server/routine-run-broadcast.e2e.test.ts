@@ -74,7 +74,7 @@ function openStream() {
 posixOnly("a routine run's task on the event stream", () => {
   beforeAll(async () => {
     chmodSync(FAKE_CLI, 0o755);
-    home = mkdtempSync(join(tmpdir(), "omb-routine-broadcast-"));
+    home = mkdtempSync(join(tmpdir(), "hezuo-routine-broadcast-"));
     const data = join(home, ".hezuo");
     mkdirSync(data, { recursive: true });
     writeFileSync(join(data, "config.json"), JSON.stringify({
@@ -89,7 +89,7 @@ posixOnly("a routine run's task on the event stream", () => {
       cwd: join(SERVER_DIR, "..", ".."),
       env: {
         ...(process.env.PATH ? { PATH: process.env.PATH } : {}),
-        HOME: home, OMB_PORT: String(PORT), OMB_WEBHOOK_PORT: String(PORT + 1),
+        HOME: home, HEZUO_PORT: String(PORT), HEZUO_WEBHOOK_PORT: String(PORT + 1),
       },
       stdio: ["ignore", "pipe", "pipe"],
     });

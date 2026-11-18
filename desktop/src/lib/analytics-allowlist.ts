@@ -84,5 +84,4 @@ export const CONNECTORS_MODE = ["managed", "self_hosted", "unavailable"] as cons
 export const LOCAL_VM_MODE = ["shared", "per_bot", "pool"] as const;
 export const TRIAL_CREDIT = ["active", "used_up", "ended", "none"] as const;
 export const CLOUD_PLAN = ["starter", "personal", "pro", "max", "other", "none", "unknown"] as const;
-export const EDITION = ["oss", "enterprise"] as const;
 export const PLATFORM = ["desktop", "browser"] as const;

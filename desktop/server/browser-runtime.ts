@@ -81,7 +81,7 @@ export function ownsBrowserViewport(env: NodeJS.ProcessEnv): boolean {
 
 export class TransportError extends Error {}
 
-/** One timed browser action (ms), logged with OMB_BROWSER_TIMING=1; `inFlight` is this session's work already running. */
+/** One timed browser action (ms), logged with HEZUO_BROWSER_TIMING=1; `inFlight` is this session's work already running. */
 export interface BrowserTiming {
   session: string;
   tool: string;

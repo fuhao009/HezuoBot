@@ -90,7 +90,7 @@ describe("run", () => {
   });
 
   it("refuses an export folder that already has files before sending anything (exit 2), unless --force", async () => {
-    const used = mkdtempSync(join(tmpdir(), "omb-run-export-"));
+    const used = mkdtempSync(join(tmpdir(), "hezuo-run-export-"));
     try {
       writeFileSync(join(used, "earlier.txt"), "from an earlier run");
       const h = harness([waited("settled", "completed", job("completed", "v1"))]);

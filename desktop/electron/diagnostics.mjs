@@ -7,42 +7,42 @@ export const CREDENTIAL_ENV_NAMES = [
   "XAI_API_KEY",
   "MISTRAL_API_KEY",
   "CEREBRAS_API_KEY",
-  "OMB_GROQ_API_KEY",
-  "OMB_GREENFERENCE_API_KEY",
-  "OMB_META_API_KEY",
-  "OMB_DEEPSEEK_API_KEY",
-  "OMB_ANTHROPIC_API_KEY",
-  "OMB_ANTHROPIC_API_URL",
-  "OMB_HOSTED_MODEL_TOKEN",
-  "OMB_HOSTED_MODELS",
+  "HEZUO_GROQ_API_KEY",
+  "HEZUO_GREENFERENCE_API_KEY",
+  "HEZUO_META_API_KEY",
+  "HEZUO_DEEPSEEK_API_KEY",
+  "HEZUO_ANTHROPIC_API_KEY",
+  "HEZUO_ANTHROPIC_API_URL",
+  "HEZUO_HOSTED_MODEL_TOKEN",
+  "HEZUO_HOSTED_MODELS",
   "OPENAI_COMPAT_API_KEY",
   "OPENAI_COMPAT_URL",
-  "OMB_OPENAI_API_KEY",
-  "OMB_OPENROUTER_API_KEY",
+  "HEZUO_OPENAI_API_KEY",
+  "HEZUO_OPENROUTER_API_KEY",
   "BOX_TOKEN",
   "OPENCODE_API_KEY",
-  "OMB_TTS_KEY",
-  "OMB_FISH_AUDIO_API_KEY",
-  "OMB_JEV_API_KEY",
-  "OMB_OPENROUTER_DECIDER_KEY",
-  "OMB_WORKERS_AI_TOKEN",
-  "OMB_OPENAI_IMAGE_KEY",
-  "OMB_CUSTOM_IMAGE_KEY",
-  "OMB_OPENAI_LIVE_KEY",
-  "OMB_TREG_KEY",
-  "OMB_POSTIZ_API_KEY",
+  "HEZUO_TTS_KEY",
+  "HEZUO_FISH_AUDIO_API_KEY",
+  "HEZUO_JEV_API_KEY",
+  "HEZUO_OPENROUTER_DECIDER_KEY",
+  "HEZUO_WORKERS_AI_TOKEN",
+  "HEZUO_OPENAI_IMAGE_KEY",
+  "HEZUO_CUSTOM_IMAGE_KEY",
+  "HEZUO_OPENAI_LIVE_KEY",
+  "HEZUO_TREG_KEY",
+  "HEZUO_POSTIZ_API_KEY",
   "COMPOSIO_API_KEY",
-  "OMB_COMPOSIO_BROKER_TOKEN",
-  "OMB_CLOUD_BOAT_TOKEN",
-  "OMB_CLOUD_VOICE_TOKEN",
-  "OMB_CLOUD_DECIDER_TOKEN",
-  "OMB_CLOUD_AI_TOKEN",
-  "OMB_CLOUD_X_TOKEN",
-  "OMB_CLOUD_CONNECTED_APPS_GRANT",
+  "HEZUO_COMPOSIO_BROKER_TOKEN",
+  "HEZUO_CLOUD_BOAT_TOKEN",
+  "HEZUO_CLOUD_VOICE_TOKEN",
+  "HEZUO_CLOUD_DECIDER_TOKEN",
+  "HEZUO_CLOUD_AI_TOKEN",
+  "HEZUO_CLOUD_X_TOKEN",
+  "HEZUO_CLOUD_CONNECTED_APPS_GRANT",
   // Private even though they are not traditional API credentials.
-  "OMB_BROWSER_CONNECTION",
-  "OMB_USER_DATA",
-  "OMB_BOAT_API",
+  "HEZUO_BROWSER_CONNECTION",
+  "HEZUO_USER_DATA",
+  "HEZUO_BOAT_API",
 ];
 
 // Kept in parity with server/redact.ts: unmistakable token formats are masked wherever they appear, keyed or not.
@@ -75,7 +75,6 @@ const VALUE_PART = String.raw`("[^"]*"|'[^']*'|[^\s"',;)\]}]+)`;
 
 export function redactSecretsInLine(line) {
   let out = String(line ?? "");
-  // Updater errors include signed redirect URLs: keep host and path, never userinfo, query or fragment.
   out = out.replace(/\bhttps?:\/\/[^\s"'<>]+/gi, (url) => {
     const query = url.search(/[?#]/);
     const address = query < 0 ? url : url.slice(0, query);
@@ -270,12 +269,11 @@ export function buildDiagnosticsReport({
   appInfo = {},
   configSummary = {},
   desktopLogTail,
-  updaterLogTail,
   logTail,
   now = new Date().toISOString(),
 } = {}) {
   const lines = [];
-  lines.push("Hezuo diagnostics");
+  lines.push("HezuoBot diagnostics");
   lines.push(`Generated: ${now}`);
   lines.push("");
   lines.push("## App");
@@ -307,13 +305,6 @@ export function buildDiagnosticsReport({
     for (const line of redactSecretsInLine(logTail).split(/\r?\n/)) lines.push(line);
   } else {
     lines.push("(server log unavailable)");
-  }
-  lines.push("");
-  lines.push("## Updater log tail — credentials and URL parameters auto-masked");
-  if (updaterLogTail && updaterLogTail.trim()) {
-    for (const line of redactSecretsInLine(updaterLogTail).split(/\r?\n/)) lines.push(line);
-  } else {
-    lines.push("(updater log unavailable)");
   }
   lines.push("");
   return lines.join("\n");

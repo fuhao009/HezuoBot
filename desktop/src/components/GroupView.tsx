@@ -24,7 +24,7 @@ import { TurnPresence } from "./TurnPresence";
 import { showToolCallsEnabled } from "@/lib/feature-flags";
 import { CompactionChip, DigestChip } from "./DigestChip";
 import { roomActivityVisible } from "@/lib/room-activity";
-import { StatusActivityRow } from "@/components/StatusActivityRow"; import { BugReportNote } from "@/components/BugReportNote";
+import { StatusActivityRow } from "@/components/StatusActivityRow";
 import { normalizeState } from "@/lib/mascot";
 import { isProductWorkspace } from "@/lib/product-workspace";
 import { botTextShowsSpeaker, laterTextOwns, runShowsSpeaker } from "@/lib/room-speaker";
@@ -219,7 +219,7 @@ function RoomTextMessage({
                 data-citation-thread={group.threadId}
               >
                 <ThreadRefText text={display} peers={peers} everyone={!group.dm} />
-              </div>{m.bugReport && <BugReportNote report={m.bugReport} />}
+              </div>
               {cited && <SentCitations
                 citations={cited.citations}
                 onNavigate={async (citation: CitationAttachment) => {
@@ -576,7 +576,7 @@ function RoomSetup({ group, members }: { group: Group; members: Bot[] }) {
   };
 
   const pickFolder = async () => {
-    const chosen = await window.ogb?.pickFolder?.(folder || group.cwd);
+    const chosen = await window.hezuo?.pickFolder?.(folder || group.cwd);
     if (chosen) setFolder(chosen);
   };
 
@@ -614,7 +614,7 @@ function RoomSetup({ group, members }: { group: Group; members: Bot[] }) {
               placeholder={t("room.folder.own")}
               className="min-w-0 flex-1 rounded-xl border border-hairline/50 bg-inset px-3 py-2.5 font-mono text-[13px] text-ink placeholder:text-ink-secondary focus:border-accent focus:outline-none"
             />
-            {window.ogb?.pickFolder && (
+            {window.hezuo?.pickFolder && (
               <button
                 type="button"
                 onClick={() => void pickFolder()}
@@ -850,7 +850,7 @@ function RoomSetup({ group, members }: { group: Group; members: Bot[] }) {
 }
 export function GroupView({ group }: { group: Group }) {
   const { state, dispatch } = useStore();
-  const remoteClient = window.ogb?.remoteClient?.active === true;
+  const remoteClient = window.hezuo?.remoteClient?.active === true;
   const composerDockRef = useRef<HTMLDivElement>(null);
   const composerDock = useComposerDockPad(composerDockRef);
   const [folderOpen, setFolderOpen] = useState(false);

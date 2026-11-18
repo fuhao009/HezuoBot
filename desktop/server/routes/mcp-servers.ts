@@ -1,4 +1,4 @@
-import { hostedWorkspaceConfiguration } from "../enterprise.ts";
+import { hostedWorkspaceConfiguration } from "../workspace-access.ts";
 import { runsElsewhere, type McpConfig, type McpConfigDeps, type McpConfigResult } from "../host/mcp-config.ts";
 import { McpOAuthError, McpSignInError, mcpCallbackOrigin } from "../mcp-oauth.ts";
 import { isRemoteMcpServer, mcpServerBody, mcpServerServes, parseMcpServerMutation, parseMcpServersImport, parseStoredMcpServer } from "../mcp-registry.ts";
@@ -7,7 +7,7 @@ import { toolBudgetOf } from "../tool-budgets.ts";
 import { isLoopbackHost, isProxied, provesSameOrigin, requestOrigin } from "../request-auth.ts";
 import { PASS, type RouteHandler } from "./table.ts";
 import type { json } from "../harness/http.ts";
-import { sessionMember } from "./team-phone.ts";
+import { sessionMember } from "../session-membership.ts";
 
 type ListedMcpServer = { name: string; enabled: boolean; bot?: string; offFor?: readonly string[] };
 
@@ -22,7 +22,7 @@ function botMcpServers(listed: readonly ListedMcpServer[], bot: { id: string; mc
   }));
 }
 
-export interface McpServerRouteDeps extends Pick<McpConfigDeps, "cfg" | "sessions" | "mcpOAuth" | "teamConnections" | "cloudHome" | "fallbackPublicUrl" | "savedCustomDomain" | "appCatalog"> {
+export interface McpServerRouteDeps extends Pick<McpConfigDeps, "cfg" | "sessions" | "mcpOAuth" | "teamConnections" | "fallbackPublicUrl" | "appCatalog"> {
   config: McpConfig;
   bot(id: string): { id: string; mcpServers?: readonly string[] | null } | null;
   /** Secrets as booleans, sign-in state attached. */
@@ -45,8 +45,8 @@ export function createMcpServerRoutes(deps: McpServerRouteDeps): RouteHandler {
     };
   };
   const {
-    cfg, sessions, mcpOAuth, cloudHome: CLOUD_HOME, fallbackPublicUrl: FALLBACK_PUBLIC_URL,
-    mcpServerResponse, savedCustomDomain, config,
+    cfg, sessions, mcpOAuth, fallbackPublicUrl: FALLBACK_PUBLIC_URL,
+    mcpServerResponse, config,
   } = deps;
   const answer = (res: Parameters<typeof json>[0], send: typeof json, result: McpConfigResult) => "body" in result
     ? send(res, result.status, withServerDetails(result.body))
@@ -128,7 +128,7 @@ export function createMcpServerRoutes(deps: McpServerRouteDeps): RouteHandler {
           const remote = auth.kind === "session" && (isProxied(req) || !isLoopbackHost(req.headers.host));
           const origin = remote
             ? mcpCallbackOrigin(provesSameOrigin(req) ? requestOrigin(req) : null,
-              [CLOUD_HOME?.publicOrigin, hostedWorkspaceConfiguration()?.tenant.origin, savedCustomDomain(), FALLBACK_PUBLIC_URL])
+              [hostedWorkspaceConfiguration()?.tenant.origin, FALLBACK_PUBLIC_URL])
             : null;
           const started = await mcpOAuth.start(name!, url, undefined, owner, { remote, origin });
           if (auth.kind === "session" && !sessions.isLive(auth.session.id)) {

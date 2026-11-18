@@ -1,4 +1,4 @@
-import "../testing/scrub-ambient-omb-env.ts";
+import "../testing/scrub-ambient-hezuo-env.ts";
 
 import { existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
@@ -12,7 +12,7 @@ import type { HeadlessIo } from "./output.ts";
 import { safeName } from "./export.ts";
 import { runHeadless } from "./main.ts";
 
-const dir = mkdtempSync(join(tmpdir(), "omb-export-"));
+const dir = mkdtempSync(join(tmpdir(), "hezuo-export-"));
 let server: Server;
 let origin: string;
 

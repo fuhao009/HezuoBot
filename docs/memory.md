@@ -31,7 +31,7 @@ when it has no project folder set. It is created the first time the bot runs a
 turn. **Open in Obsidian** and **Show in Finder** (Explorer, or your file
 manager) in the Memory panel open this folder; because it is on the server's
 disk, those buttons only work from the computer running Hezuo — a
-paired phone or a remote browser is shown the path instead.
+remote companion client or browser is shown the path instead.
 
 Files are written with owner-only permissions (`0600`), atomically (a crash
 mid-write leaves the old file intact, never a torn one), and anything that
@@ -230,9 +230,9 @@ file, so adding the helper or taking it out again applies without a restart:
 { "helper": { "instanceId": "claude", "model": "claude-haiku-4-5" } }
 ```
 
-or set `OMB_HELPER_INSTANCE` (and, if you want, `OMB_HELPER_MODEL`) in the
+or set `HEZUO_HELPER_INSTANCE` (and, if you want, `HEZUO_HELPER_MODEL`) in the
 server's environment before it starts. The environment wins over the file,
-and an empty `OMB_HELPER_INSTANCE` switches a saved helper off. `instanceId` is the id of
+and an empty `HEZUO_HELPER_INSTANCE` switches a saved helper off. `instanceId` is the id of
 a connected instance as `config.json` and `GET /api/instances` name it, such
 as `claude`, `claudeApi`, `openai` or `openrouter`; it has to be Claude or an
 API model, the engines with a quick text call of their own. `model` is
@@ -340,7 +340,7 @@ guesses. Three things close that gap without attaching transcripts:
 
 - **The recent-work brief.** Every turn's system prompt, 1:1 or room, carries
   a short block: the newest thing the bot said in each of its *other*
-  conversations over the last two days — `today 09:05 · 1:1 with Milind ·
+  conversations over the last two days — `today 09:05 · 1:1 with the user ·
   "Invoice reconciliation" · you said: "Sent the three flagged invoices…"`.
   At most ten lines and about 350 tokens; the current conversation is not
   listed. When a brief in a room names a private 1:1 chat, the room gets a
@@ -436,7 +436,7 @@ free form, or one you rewrite by hand, works the same.
 All of them need the owner (admin) session, like the other bot-settings routes.
 
 On a Team Cloud each person also reaches what a bot remembers about them, their own layer of its memory
-(`workspaces/<bot>--member-<person>`, see [team-cloud.md](team-cloud.md)), from any session:
+(`workspaces/<bot>--member-<person>`, see team-cloud (retired historical guide)), from any session:
 `GET /api/bots/:id/memory/mine` is its overview, and `GET`, `PUT` and `DELETE /api/bots/:id/memory/mine/file` read,
 save and remove one of its files as above. Nobody reaches another person's layer. The bot panel's **What it
 remembers** shows these notes on a team.

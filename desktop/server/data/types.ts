@@ -41,7 +41,7 @@ export interface RunResult {
 }
 
 export interface MaterialiseResult {
-  /** Fully qualified: `omb_results.<name>`. */
+  /** Fully qualified: `hezuo_results.<name>`. */
   table: string;
   columns: DataColumn[];
   rowCount: number;

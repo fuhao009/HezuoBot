@@ -109,16 +109,9 @@ export interface ThreadRefAddress {
   botId?: string;
 }
 
-const THREAD_URL_PREFIX = "hezuo://thread/";
-const BOT_URL_PREFIX = "hezuo://bot/";
+const THREAD_URL_PREFIX = "hezuobot://thread/";
+const BOT_URL_PREFIX = "hezuobot://bot/";
 
-/** Read historical saved-message links; all newly emitted links use the Hezuo scheme. */
-function migrateSavedRefUrl(value: string): string {
-  const raw = value.trim();
-  return /^openmausbot:\/\/(?:thread|bot)\//i.test(raw)
-    ? "hezuo:" + raw.slice("openmausbot:".length)
-    : raw;
-}
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ID_LIMIT = 256;
 
@@ -133,7 +126,7 @@ export function threadRefUrl(ref: { botId: string; threadId: string }): string {
 }
 
 export function parseThreadRefUrl(value: string): ThreadRefAddress | null {
-  const raw = migrateSavedRefUrl(value);
+  const raw = value.trim();
   if (!raw.toLowerCase().startsWith(THREAD_URL_PREFIX)) return null;
   let url: URL;
   try {
@@ -161,7 +154,7 @@ export function parseThreadRefUrl(value: string): ThreadRefAddress | null {
 }
 
 export function parseBotRefUrl(value: string): { botId: string } | null {
-  const raw = migrateSavedRefUrl(value);
+  const raw = value.trim();
   if (!raw.toLowerCase().startsWith(BOT_URL_PREFIX)) return null;
   let url: URL;
   try {
@@ -185,7 +178,7 @@ export function parseBotRefUrl(value: string): { botId: string } | null {
 
 /** Even a link that fails strict parsing must never reach the shell as an external link. */
 export function looksLikeThreadRefUrl(value: string): boolean {
-  return migrateSavedRefUrl(value).toLowerCase().startsWith(THREAD_URL_PREFIX);
+  return value.trim().toLowerCase().startsWith(THREAD_URL_PREFIX);
 }
 
 export function isThreadUuid(value: string): boolean {

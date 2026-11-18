@@ -10,16 +10,13 @@ A new internal route factory (`createInternalMcpRoutes`) behind the bot capabili
 cards. One `mcp_server` tool replaces `add_mcp_server`. Approval cards reuse the generic option card. The sign-in card
 reuses the connector card with `source: "mcp"`, so every existing client can draw it.
 
-**Tech Stack:** TypeScript (Node server, React/Electron desktop), vitest, zod; Swift (iOS) and Kotlin (Android) in mausbot-mobile.
-
 **Spec:** `docs/superpowers/specs/2026-11-01-mcp-in-chat-design.md`. Read it before any task. Its tables ("The bot
 tool", "What a bot may touch", "Error handling") are the requirements.
 
 ## Global Constraints
 
-- Work only in `/Users/omkar/Desktop/hezuo/OpenGrokBot-mcp-in-chat` (branch `feat/mcp-in-chat`). Never touch the
+- Work only in `/Users/maintainer/Desktop/hezuo/OpenGrokBot-mcp-in-chat` (branch `feat/mcp-in-chat`). Never touch the
   `OpenGrokBot/` checkout.
-- Phone work goes only in a mausbot-mobile worktree, never in Hezuo.
 - Never push and never open a PR. Commit locally only.
 - Run tests with `pnpm vitest run <files>`, typecheck with `pnpm typecheck`, lint with `pnpm lint`.
 - Regenerate catalog goldens with `UPDATE_AGENTS_CATALOG_GOLDENS=1 pnpm vitest run desktop/server/drivers/agents-catalog-wire.test.ts desktop/server/drivers/agents-bridge-wire.test.ts`.
@@ -275,7 +272,6 @@ tool", "What a bot may touch", "Error handling") are the requirements.
   - The fallback `text` names the server and says "Open this conversation in Hezuo to sign in". It never
     includes the URL.
   - `authorize` returns `{ url }` and refuses with 409 plus these exact sentences:
-    - Companion phone on a home with no public https origin: "Open this chat on your Mac to sign in to Linear."
     - The flow would need paste-back: "Finish this sign-in in Settings → MCP servers."
   - `status` returns `{ connected, pending, status }`.
   - `dismiss` cancels the flow. The bot resumes with "The person didn't sign in. The server stays on but signed out."
@@ -291,7 +287,6 @@ tool", "What a bot may touch", "Error handling") are the requirements.
   - `completing the fake provider callback resumes the bot through onSettled without any status poll`
   - `the status poll path also resumes, and a second resume is a no-op` (Review Focus 2)
   - `a second authorize on the same card reuses the waiting flow`
-  - `a companion phone on a local home gets "Open this chat on your Mac to sign in to Linear."`
   - `a remote session uses the public callback origin`
   - `sign_in on a removed server refuses with "linear no longer exists"` (Review Focus 3)
   - `dismiss cancels the flow and resumes with the not-signed-in text`
@@ -313,30 +308,9 @@ tool", "What a bot may touch", "Error handling") are the requirements.
 - [ ] **Step 3: Implement.**
 - [ ] **Step 4: Run the whole suite.** Run `pnpm vitest run && pnpm typecheck && pnpm lint`. Expect PASS.
 - [ ] **Step 5: Commit** `feat(mcp): sign-in card wording on desktop`
-- [ ] **Step 6: Real-app check.** Use the `test-locally` skill (OMB2 side-by-side build, never the installed app):
+- [ ] **Step 6: Real-app check.** Use the `test-locally` skill (Hezuo side-by-side build, never the installed app):
   - A Full access bot adds Linear from chat, and the Sign in card completes in the browser.
   - The bot resumes by itself and lists Linear tools.
   - A bot on Ask shows a Turn on card.
   - A bot removes a server.
   - Capture screenshots for the report.
-
-### Task 7: Phone polish (mausbot-mobile, own worktree and branch)
-
-**Files (mausbot-mobile `origin/main` worktree, branch `feat/mcp-sign-in-card`):**
-- iOS:
-  - Modify `mobile/ios/Sources/CompanionCore/ConnectorRequest.swift` (decode `source`)
-  - Modify `mobile/ios/App/Cards/ConnectorRequestCardView.swift` (MCP title and button, refusal text)
-  - Modify `mobile/ios/App/Localizable.xcstrings` (four languages)
-  - Modify the preview fixture `ConnectorPreview.json`
-  - Tests: `ConnectorRequestTests`, `ConnectorCardUITests`
-- Android:
-  - Modify `mobile/android/core/.../ConnectorRequest.kt` (decode `source`)
-  - Modify `ui/ConnectorRequestCard.kt`
-  - Modify `res/values*/connector_card_strings.xml` (all three folders)
-  - Tests: `ConnectorRequestTest`, `ConnectorRequestCardTest`
-
-- [ ] **Step 1: Write failing tests on both platforms.** Decoding `source: "mcp"` gives the MCP presentation. A missing or unknown `source` gives today's Composio presentation. The title is `Sign in to Linear` and the button is `Sign in`. An authorize 409 sentence shows in the card as calm text, not a failure.
-- [ ] **Step 2: Run them and confirm they fail.** iOS uses the repo's XCTest scheme command (see `docs/` or the memory note on XCUITest), and Android uses `./gradlew test`.
-- [ ] **Step 3: Implement both platforms.**
-- [ ] **Step 4: Run the tests plus `node scripts/ios-strings.test.mjs`.** Expect PASS.
-- [ ] **Step 5: Commit** `feat: MCP sign-in wording on the connector card`

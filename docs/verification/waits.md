@@ -7,7 +7,7 @@ code checks it on a timer, and no model runs until it fires. See the
 ## Automated checks
 
 ```sh
-pnpm exec vitest run desktop/server/wait-probes.test.ts desktop/server/waits.test.ts desktop/server/wait-host.test.ts desktop/server/routes/waits.test.ts desktop/server/drivers/agents-wait-tools.test.ts desktop/server/bot-moves.test.ts desktop/server/move-freeze.test.ts desktop/server/waits.e2e.test.ts desktop/src/components/ApprovalCard.test.ts
+pnpm exec vitest run desktop/server/wait-probes.test.ts desktop/server/waits.test.ts desktop/server/wait-host.test.ts desktop/server/routes/waits.test.ts desktop/server/drivers/agents-wait-tools.test.ts desktop/server/bot-moves.test.ts desktop/server/waits.e2e.test.ts desktop/src/components/ApprovalCard.test.ts
 ```
 
 ## In a fixture
@@ -19,22 +19,22 @@ never renews itself.
 ```sh
 W=$(mktemp -d)
 printf '[{"server":"agents","name":"wait_until","input":{"label":"the report","kind":"file_exists","path":"%s/report.txt","follow_up":"Say the report is ready."}}]' "$W" > "$W/calls.json"
-FAKE_CLAUDE_TOOL_CALLS_FILE="$W/calls.json" node --experimental-strip-types scripts/control-omb.ts launch
+FAKE_CLAUDE_TOOL_CALLS_FILE="$W/calls.json" node --experimental-strip-types scripts/control-hezuo.ts launch
 ```
 
 Second terminal (same `W`; `DATA` is the `dataDir` the launcher printed):
 
 ```sh
-pnpm control:omb new-bot --name Pepper --url http://127.0.0.1:PORT
-pnpm control:omb send --bot BOT_ID --text "Tell me when report.txt is there, then say so" --url http://127.0.0.1:PORT
-pnpm control:omb wait --bot BOT_ID --timeout 30 --url http://127.0.0.1:PORT
-pnpm control:omb messages --bot BOT_ID --limit 12 --url http://127.0.0.1:PORT
+pnpm control:hezuo new-bot --name Pepper --url http://127.0.0.1:PORT
+pnpm control:hezuo send --bot BOT_ID --text "Tell me when report.txt is there, then say so" --url http://127.0.0.1:PORT
+pnpm control:hezuo wait --bot BOT_ID --timeout 30 --url http://127.0.0.1:PORT
+pnpm control:hezuo messages --bot BOT_ID --limit 12 --url http://127.0.0.1:PORT
 touch "$W/report.txt"; sleep 25
-pnpm control:omb wait --bot BOT_ID --timeout 60 --url http://127.0.0.1:PORT
-pnpm control:omb messages --bot BOT_ID --limit 12 --url http://127.0.0.1:PORT
+pnpm control:hezuo wait --bot BOT_ID --timeout 60 --url http://127.0.0.1:PORT
+pnpm control:hezuo messages --bot BOT_ID --limit 12 --url http://127.0.0.1:PORT
 curl -s http://127.0.0.1:PORT/api/notifications
 cat "$DATA/waits.json"
-sleep 10; pnpm control:omb messages --bot BOT_ID --limit 12 --url http://127.0.0.1:PORT
+sleep 10; pnpm control:hezuo messages --bot BOT_ID --limit 12 --url http://127.0.0.1:PORT
 ```
 
 Expected:

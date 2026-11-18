@@ -8,7 +8,6 @@ import { awayFromMainThread } from "@/state/thread-navigation";
 import { BotAvatar } from "./Avatar";
 import { ELEVATED_FLOAT, ELEVATED_HOVER } from "./elevated";
 import { sidebarBotActivityTasks } from "./SidebarBotActivity";
-import { BOT_PANEL_ID } from "./bot-panel/side-panel";
 
 /** The factory title a new conversation starts with. */
 const UNTITLED = "New thread";
@@ -27,9 +26,6 @@ function privacyLabelOf(privacy: ChatHeadPrivacy): string | null {
   }
 }
 
-/** Simple mode's whole chat header: the bot's face and name in one pill, which opens and closes the bot panel. Away from
- * the bot's main conversation it also names the one on screen. A dot says another of the bot's conversations needs a
- * look; a team chat says who can read it with one quiet glyph. */
 export function ChatHeadPill({ bot, avatar, privacy, open, onToggle }: {
   bot: Bot;
   avatar: Pick<ComponentProps<typeof BotAvatar>, "state" | "motion" | "motionKey" | "animated">;
@@ -55,7 +51,7 @@ export function ChatHeadPill({ bot, avatar, privacy, open, onToggle }: {
       title={t("chat.openProfile")}
       aria-label={conversation ? `${label}, ${conversation}` : label}
       aria-expanded={open}
-      aria-controls={open ? BOT_PANEL_ID : undefined}
+      aria-haspopup="dialog"
       className={cn("group flex min-w-0 max-w-full items-center gap-2 rounded-full py-[7.5px] pl-[7.5px] pr-[13.5px] text-ink", ELEVATED_FLOAT, ELEVATED_HOVER)}
     >
       <BotAvatar bot={bot} size={24} {...avatar} />

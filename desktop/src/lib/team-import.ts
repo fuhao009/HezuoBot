@@ -89,39 +89,7 @@ export function teamImportPreview(manifest: unknown): PendingTeamImport {
     };
   }
   if (root.format === "hezuo.package") return packagePreview(root, manifest);
-  if (root.format !== "hezuo.team") throw new Error("This is not an Hezuo backup, BotMRR playbook or legacy team.");
-  if (root.version !== 1 && root.version !== 2) throw new Error(`Team file version ${String(root.version)} is not supported.`);
-  if (!root.team || typeof root.team !== "object" || Array.isArray(root.team)) {
-    throw new Error("This team file is missing its team definition.");
-  }
-  const team = root.team as Record<string, unknown>;
-  if (typeof team.name !== "string" || !team.name.trim()) throw new Error("This team does not have a name.");
-  if (!Array.isArray(team.members) || team.members.length === 0) throw new Error("This team has no members.");
-  if (team.members.length > 200) throw new Error("This team has too many members.");
-  const members = team.members.map((member, index) => {
-    if (!member || typeof member !== "object" || Array.isArray(member)) {
-      throw new Error(`Team member ${index + 1} is invalid.`);
-    }
-    const value = member as Record<string, unknown>;
-    if (typeof value.name !== "string" || !value.name.trim()) {
-      throw new Error(`Team member ${index + 1} does not have a name.`);
-    }
-    return {
-      name: value.name.trim(),
-      title: typeof value.title === "string" ? value.title.trim() : "",
-    };
-  });
-  return {
-    manifest,
-    kind: "team",
-    name: team.name.trim(),
-    description: typeof team.description === "string" ? team.description.trim() : "",
-    members,
-    rooms: root.version === 1 && team.room && typeof team.room === "object" ? 1 : 0,
-    playbooks: 0,
-    routines: 0,
-    apps: [],
-  };
+  throw new Error("This is not a HezuoBot backup or BotMRR playbook.");
 }
 
 function markdownPackage(markdown: string): unknown {

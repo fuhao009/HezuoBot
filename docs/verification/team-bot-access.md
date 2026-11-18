@@ -2,16 +2,19 @@
 
 A Team Cloud bot is shared like a document: what everyone in the team gets (No access, Can view, Can chat or Can edit)
 and a level for each person added. Admins and the bot's owner always edit. The contract is in
-[team-cloud.md](../team-cloud.md#who-can-use-a-bot).
+team-cloud (retired historical guide).
+
+The Team Cloud end-to-end fixture is retired. Its scenario below is historical
+only; the retained unit and UI checks do not replace that server workflow.
 
 ## Driving it
 
 ```sh
-pnpm exec vitest run desktop/server/cloud-team-bot-access.e2e.test.ts desktop/server/bot-access.test.ts desktop/server/host/access-requests.test.ts \
+pnpm exec vitest run desktop/server/bot-access.test.ts desktop/server/host/access-requests.test.ts \
   desktop/server/bot-visibility.test.ts desktop/src/components/bot-access desktop/src/state/team-chats.test.ts desktop/src/components/SettingsModal.groups.test.ts
 ```
 
-- `desktop/server/cloud-team-bot-access.e2e.test.ts` starts a real Team Cloud (`OMB_CLOUD_ROLE=team`) with the Owner (Olive),
+- Historical retired Team Cloud scenario (not runnable): the fixture started with the Owner (Olive),
   an Admin (Ada) and four Users paired with the Admin's signed claims, and the synthetic Claude CLI. Payroll is shared
   with Bob to view, Cara to chat and Dan to edit; Eve is not added. As each of them it tries every route a member
   reaches: the bot list (each copy's `yourAccess`, the sharing only on an editor's), its chat, export, a room with it,
@@ -112,7 +115,7 @@ checkout of the code before levels.
 
 - No real Admin, phone, Slack worker or model was involved: the Admin's pairing is signed by the fixture, a relayed
   message is the guarded route called on loopback, and the engine is the synthetic CLI.
-- A routine a member wrote keeps its schedule when their level drops; its runs are the bot's (team-cloud.md "What a bot
+- A routine a member wrote keeps its schedule when their level drops; its runs are the bot's (team-cloud (retired historical guide) "What a bot
   keeps per bot").
 - A reply to a line in a person's inbox goes back to the bot that asked even if they can only view it: the bot asked
   them.

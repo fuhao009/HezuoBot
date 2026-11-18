@@ -33,5 +33,4 @@ After:
 
 Restrictions follow the scheduler computer's local timezone, matching existing
 daily schedules. Time windows must end on the same day; overnight windows are
-rejected. Native iOS/Android editors preserve these fields but do not yet expose
-the new selectors. No paid provider or live user workspace was used.
+rejected. No paid provider or live user workspace was used.

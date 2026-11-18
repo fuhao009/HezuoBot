@@ -2,8 +2,7 @@ import { describe, expect, it } from "vitest";
 import { phonePairingLink } from "./pairing-link";
 
 describe("phonePairingLink", () => {
-  const token = `omb_pair_${"a".repeat(43)}`;
-  const secretPublicKey = "BIPBQ12_dWnF1DZLsTZO3Vg0NGjds5-jp9h3jhjr2To7bJelczS0LM82rfXV68PmSJhz2ePosj3fL974XckCpDU";
+  const token = `hezuo_pair_${"a".repeat(43)}`;
 
   const decodedEndpoints = (link: string) => {
     const encoded = new URL(link).searchParams.get("endpoints");
@@ -27,27 +26,19 @@ describe("phonePairingLink", () => {
       port: 8810,
       code: "004209",
       token,
-      name: "Milind's Mac",
-      secretPublicKey,
+      name: "Alex's Mac",
     });
 
     const url = new URL(link!);
-    expect(url.protocol).toBe("openmausbot:");
+    expect(url.protocol).toBe("hezuobot:");
     expect(url.host).toBe("pair");
     expect(url.searchParams.get("address")).toBe("macbook.tail1234.ts.net:8810");
     expect(url.searchParams.get("token")).toBe(token);
     expect(url.searchParams.get("code")).toBe("004209");
-    expect(url.searchParams.get("name")).toBe("Milind's Mac");
-    expect(url.searchParams.get("secretKey")).toBe(secretPublicKey);
+    expect(url.searchParams.get("name")).toBe("Alex's Mac");
+    expect(url.searchParams.has("secretKey")).toBe(false);
   });
 
-  it("omits malformed secure-entry keys instead of advertising an unusable key", () => {
-    const base = { address: "mac.local", port: 8810, code: "123456", token };
-    expect(new URL(phonePairingLink({ ...base, secretPublicKey: secretPublicKey.slice(1) })!)
-      .searchParams.get("secretKey")).toBeNull();
-    expect(new URL(phonePairingLink({ ...base, secretPublicKey: `A${secretPublicKey.slice(1)}` })!)
-      .searchParams.get("secretKey")).toBeNull();
-  });
 
   it("refuses to make a link from an invalid pairing window", () => {
     expect(phonePairingLink({ address: "", port: 8810, code: "123456", token })).toBeNull();
@@ -154,10 +145,10 @@ describe("phonePairingLink", () => {
 
   it("is the server's link too: an https origin, a credential, a name and no code", () => {
     const link = phonePairingLink({ address: "https://mini.example", token, name: "Ada's server" })!;
-    expect(link).toBe(`openmausbot://pair?address=https%3A%2F%2Fmini.example&token=${token}&name=Ada's%20server`);
+    expect(link).toBe(`hezuobot://pair?address=https%3A%2F%2Fmini.example&token=${token}&name=Ada's%20server`);
     expect(rawField(link, "code")).toBeUndefined();
     expect(phonePairingLink({ address: "http://192.168.1.5:8787", token })).toBe(
-      `openmausbot://pair?address=http%3A%2F%2F192.168.1.5%3A8787&token=${token}`,
+      `hezuobot://pair?address=http%3A%2F%2F192.168.1.5%3A8787&token=${token}`,
     );
   });
 
@@ -170,8 +161,12 @@ describe("phonePairingLink", () => {
     expect(rawField(phonePairingLink({ address: "https://Mini.Example:443/", token })!, "address")).toBe(
       "https://mini.example",
     );
-    expect(phonePairingLink({ address: "https://mini.example/omb", token })).toBeNull();
+    expect(phonePairingLink({ address: "https://mini.example/nested", token })).toBeNull();
     expect(phonePairingLink({ address: "https://mini.example/?x=1", token })).toBeNull();
     expect(phonePairingLink({ address: "https://mini.example/#pair", token })).toBeNull();
+  });
+
+  it("rejects malformed credential prefixes", () => {
+    expect(phonePairingLink({ address: "https://mini.example", token: `invalid_pair_${"a".repeat(43)}` })).toBeNull();
   });
 });

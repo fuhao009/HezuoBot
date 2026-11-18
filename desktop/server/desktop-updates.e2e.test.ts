@@ -14,7 +14,7 @@ import { removeTempDir, waitForExit } from "./testing/cleanup.ts";
 import { freePortBlock } from "./testing/ports.ts";
 import { VPS_CONTAINER_LABEL, VPS_MANAGED_LABEL, vpsContainerName } from "./vps-computer.ts";
 
-const ROOT = fileURLToPath(new URL("../..", import.meta.url));
+const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const OLD_DESKTOP = { containers: ["shared"], outdated: ["shared"], imageMissing: true, holdPull: true };
 
 // Two VPS hosts that answer like Docker over SSH: neither has the image for this release, old-vps holds a bot's container on
@@ -103,12 +103,12 @@ describe.skipIf(process.platform === "win32")("a bot's old desktop after an app 
       "--import", pathToFileURL(join(ROOT, "server/testing/desktop-parent.mjs")).href, join(ROOT, "server/index.ts")], {
       cwd: ROOT, env: {
         PATH: dirname(process.execPath), ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}),
-        HOME: home, USERPROFILE: home, OMB_DATA_DIR: data,
+        HOME: home, USERPROFILE: home, HEZUO_DATA_DIR: data,
         APPDATA: join(home, "appdata"), LOCALAPPDATA: join(home, "localappdata"),
         TEMP: home, TMP: home, TMPDIR: home,
-        OMB_PORT: String(port), OMB_WEBHOOK_PORT: String(port + 1), OMB_STATIC_DIR: join(home, "static"), OMB_TEST_VM_STATE: stateFile,
-        OMB_TEST_DESKTOP_CUA_CONNECTION: join(home, "user-data", "cua-connection.json"), OMB_EXTRA_PATH: fakeBin,
-        FAKE_DOCKER_DIR: fakeBin, FAKE_DOCKER_LOG: join(fakeBin, "docker.log"), OMB_TEST_SEALED_PATH: "1",
+        HEZUO_PORT: String(port), HEZUO_WEBHOOK_PORT: String(port + 1), HEZUO_STATIC_DIR: join(home, "static"), HEZUO_TEST_VM_STATE: stateFile,
+        HEZUO_TEST_DESKTOP_CUA_CONNECTION: join(home, "user-data", "cua-connection.json"), HEZUO_EXTRA_PATH: fakeBin,
+        FAKE_DOCKER_DIR: fakeBin, FAKE_DOCKER_LOG: join(fakeBin, "docker.log"), HEZUO_TEST_SEALED_PATH: "1",
       }, stdio: ["ignore", "pipe", "pipe"],
     });
     child = proc;
@@ -134,7 +134,7 @@ describe.skipIf(process.platform === "win32")("a bot's old desktop after an app 
   }
 
   beforeAll(() => {
-    home = mkdtempSync(join(tmpdir(), "omb-desktop-updates-"));
+    home = mkdtempSync(join(tmpdir(), "hezuo-desktop-updates-"));
     data = join(home, "data");
     stateFile = join(home, "vm.json");
     dumpFile = join(home, "dump.json");
@@ -178,7 +178,7 @@ describe.skipIf(process.platform === "win32")("a bot's old desktop after an app 
     expect(sent.systemPrompt).toContain("This bot's Local VM desktop is being updated to the new version");
     expect(sent.systemPrompt).toContain("do not use another computer");
     expect((await api("GET", "/api/local-computer")).body.problem).toBe(LOCAL_VM_UPDATING_PROBLEM);
-    const token = sent.mcpConfig.mcpServers.agents.env.OMB_COMMS_TOKEN as string;
+    const token = sent.mcpConfig.mcpServers.agents.env.HEZUO_COMMS_TOKEN as string;
     const offered = await fetch(`${base}/api/internal/computer/select`, { headers: { authorization: `Bearer ${token}` } }).then(r => r.json() as any);
     expect(offered.options.find((option: any) => option.surface === "local")).toMatchObject({ available: false, reason: HOST_WHILE_UPDATING });
     expect(offered.options.find((option: any) => option.surface === "vm")).toMatchObject({ available: false, reason: LOCAL_VM_UPDATING_PROBLEM });
@@ -285,7 +285,7 @@ describe.skipIf(process.platform === "win32")("a bot's old desktop after an app 
     expect(sent.mcpConfig?.mcpServers?.computer, "this computer must not stand in for the VPS").toBeUndefined();
     expect(readFileSync(join(fakeBin, "docker.log"), "utf8")).toContain(`-H ssh://old-vps inspect ${vpsContainerName(bot.id)}`);
     // Nor can the bot pick it: select_computer offers this computer to no bot whose own desktop awaits its update.
-    const token = sent.mcpConfig.mcpServers.agents.env.OMB_COMMS_TOKEN as string;
+    const token = sent.mcpConfig.mcpServers.agents.env.HEZUO_COMMS_TOKEN as string;
     const select = (method: "GET" | "POST") => fetch(`${base}/api/internal/computer/select`, {
       method, headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
       ...(method === "POST" ? { body: JSON.stringify({ surface: "auto" }) } : {}),

@@ -309,13 +309,14 @@ describe("the chat header's pill", () => {
     }
   });
 
-  it("says the panel is open and points at it, then hides the hover chevron", () => {
+  it("says the profile dialog is open and hides the hover chevron", () => {
     fixture.settingsOpen = true;
     const { header, done } = pill();
     try {
       const button = header.querySelector<HTMLButtonElement>("[data-chathead-pill]")!;
       expect(button.getAttribute("aria-expanded")).toBe("true");
-      expect(button.getAttribute("aria-controls")).toBe("bot-panel");
+      expect(button.getAttribute("aria-haspopup")).toBe("dialog");
+      expect(button.hasAttribute("aria-controls")).toBe(false);
       expect(header.querySelector("[data-chathead-chevron]")).toBeNull();
     } finally {
       fixture.settingsOpen = false;

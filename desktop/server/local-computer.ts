@@ -49,14 +49,14 @@ export function gatedLocalComputer(
     args: ["--experimental-strip-types", SPAWNED_PROXIES.localComputer],
     env: {
       ...connection.env,
-      // Packaged, execPath is Electron: without this the MCP client relaunches OMB instead of the headless gate.
+      // Packaged, execPath is Electron: without this the MCP client relaunches Hezuo instead of the headless gate.
       ELECTRON_RUN_AS_NODE: "1",
-      OMB_CUA_COMMAND: connection.command,
-      OMB_CUA_ARGS: JSON.stringify(driverArgs(connection)),
-      OMB_CUA_PLATFORM: connection.platform,
-      OMB_CONTROL_URL: control.url,
-      OMB_CONTROL_TOKEN: control.token,
-      OMB_COMPUTER_JOURNAL: journal ? "1" : "0",
+      HEZUO_CUA_COMMAND: connection.command,
+      HEZUO_CUA_ARGS: JSON.stringify(driverArgs(connection)),
+      HEZUO_CUA_PLATFORM: connection.platform,
+      HEZUO_CONTROL_URL: control.url,
+      HEZUO_CONTROL_TOKEN: control.token,
+      HEZUO_COMPUTER_JOURNAL: journal ? "1" : "0",
     },
   };
 }

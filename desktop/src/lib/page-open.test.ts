@@ -2,26 +2,42 @@
 import { createElement } from "react";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { isPublishedPageUrl, pagePanelBot, requestPanelPage, usePanelPage, withPageOpen, type PageOpenFacts, type PanelPage } from "./page-open";
 
-const PAGE = "https://abcdefghijklmnopqrstuvwxyz.mausbot.page/";
+const PAGES_ORIGIN = "https://pages.example.test";
+const PAGE = "https://abcdefghijklmnopqrstuvwxyz.pages.example.test/";
 const facts = (over: Partial<PageOpenFacts> = {}): PageOpenFacts => ({
   selectedId: "pepper", bots: [{ id: "pepper" }], groups: [{ id: "room" }],
   config: { features: { browser: true }, browserEngine: { kind: "engine" } }, desktop: {}, ...over,
 });
 
+beforeEach(() => { vi.stubEnv("VITE_HEZUO_PAGES_ORIGIN", PAGES_ORIGIN); });
+afterEach(() => { vi.unstubAllEnvs(); });
+
 describe("a published page's link", () => {
-  it("is only https://<page id>.mausbot.page, never an app, chat or look-alike link", () => {
+  it("accepts only a page ID under the configured HTTPS hosting domain", () => {
     expect(isPublishedPageUrl(PAGE)).toBe(true);
     expect(isPublishedPageUrl(`${PAGE}charts/index.html?region=EU#top`)).toBe(true);
     for (const other of [
-      "hezuo://thread/t1?bot=pepper", "hezuo://bot/pepper", "http://abcdefghijklmnopqrstuvwxyz.mausbot.page/",
-      "https://mausbot.page/", "https://www.mausbot.page/", "https://upload.mausbot.page/", "https://a.b.abcdefghijklmnopqrstuvwxyz.mausbot.page/",
-      "https://abcdefghijklmnopqrstuvwxyz.mausbot.page.evil.test/", "https://abcdefghijklmnopqrstuvwxyz.mausbot.pages/",
-      "https://user:pw@abcdefghijklmnopqrstuvwxyz.mausbot.page/", "https://abcdefghijklmnopqrstuvwxyz.mausbot.page:8443/",
+      "hezuobot://thread/t1?bot=pepper", "hezuobot://bot/pepper", "http://abcdefghijklmnopqrstuvwxyz.pages.example.test/",
+      "https://pages.example.test/", "https://www.pages.example.test/", "https://upload.pages.example.test/", "https://a.b.abcdefghijklmnopqrstuvwxyz.pages.example.test/",
+      "https://abcdefghijklmnopqrstuvwxyz.pages.example.test.evil.test/", "https://abcdefghijklmnopqrstuvwxyz.pages.example.tests/",
+      "https://user:pw@abcdefghijklmnopqrstuvwxyz.pages.example.test/", "https://abcdefghijklmnopqrstuvwxyz.pages.example.test:8443/",
+      "https://abcdefghijklmnopqrstuvwxyz.hezuobot.page/",
+      "https://abcdefghijklmnopqrstuvwxyz.pages.example.test:443/",
+      "https://abcdefghijklmnopqrstuvwxyz.pages.example.test/\\evil.test",
       "javascript:alert(1)", "not a url", "", undefined, null,
     ]) expect(isPublishedPageUrl(other), String(other)).toBe(false);
+  });
+
+  it("does not route pages without a valid hosting origin", () => {
+    for (const origin of [undefined, "", "http://pages.example.test", `${PAGES_ORIGIN}:443`,
+      `${PAGES_ORIGIN}/path`, `${PAGES_ORIGIN}?`, "https://*.example.test", "https://user@pages.example.test"]) {
+      vi.stubEnv("VITE_HEZUO_PAGES_ORIGIN", origin);
+      expect(isPublishedPageUrl(PAGE), String(origin)).toBe(false);
+      expect(pagePanelBot(PAGE, facts())).toBeNull();
+    }
   });
 });
 
@@ -46,7 +62,7 @@ describe("where a published page opens", () => {
   });
 
   it("never sends any other link to the panel", () => {
-    for (const link of ["https://example.com/", "hezuo://thread/t1?bot=pepper", "https://mausbot.page/"]) expect(pagePanelBot(link, facts())).toBeNull();
+    for (const link of ["https://example.com/", "hezuobot://thread/t1?bot=pepper", "https://pages.example.test/"]) expect(pagePanelBot(link, facts())).toBeNull();
   });
 });
 

@@ -1,4 +1,4 @@
-// window.ogb.productAccount as a real preload in a real Electron process: the
+// window.hezuo.productAccount as a real preload in a real Electron process: the
 // isolation flags, the exact exposed surface, the sender guard and the pushed
 // state, with no stubbed ipcRenderer or BrowserWindow.
 const { app, BrowserWindow, ipcMain } = require("electron");
@@ -10,7 +10,7 @@ const say = message => console.log(message);
 
 // A disposable profile, chosen before any session or window exists, so
 // nothing in this fixture can touch the person's own Electron data.
-const profile = fs.mkdtempSync(path.join(os.tmpdir(), "omb-product-account-smoke-profile-"));
+const profile = fs.mkdtempSync(path.join(os.tmpdir(), "hezuo-product-account-smoke-profile-"));
 app.setPath("userData", profile);
 app.setPath("sessionData", profile);
 app.commandLine.appendSwitch("disable-features", "MediaRouter");
@@ -35,28 +35,28 @@ function cleanUp() {
 async function accountWindow() {
   const { createProductAccountWindow } = await import("../product-account-window.mjs");
   const { installProductAccountIpc } = await import("../product-account-ipc.mjs");
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "omb-product-account-smoke-"));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hezuo-product-account-smoke-"));
   ownedDirs.push(dir);
   const page = path.join(dir, "product-account.html");
   fs.writeFileSync(page, `<!doctype html><meta charset="utf-8"><title>Account</title>
     <script>
       window.results = {};
-      window.results.bridgeKeys = Object.keys(window.ogb ?? {});
+      window.results.bridgeKeys = Object.keys(window.hezuo ?? {});
       window.results.hasNode = typeof require !== "undefined" || typeof process !== "undefined";
-      window.results.accountKeys = Object.keys(window.ogb?.productAccount ?? {});
-      window.results.hasClose = typeof window.ogb?.productAccount?.close === "function";
-      window.ogb?.productAccount?.onState(state => { window.results.event = state; });
-      window.ogb?.productAccount?.state().then(state => { window.results.state = state; },
+      window.results.accountKeys = Object.keys(window.hezuo?.productAccount ?? {});
+      window.results.hasClose = typeof window.hezuo?.productAccount?.close === "function";
+      window.hezuo?.productAccount?.onState(state => { window.results.event = state; });
+      window.hezuo?.productAccount?.state().then(state => { window.results.state = state; },
         error => { window.results.stateError = String(error?.message ?? error); });
-      window.ogb?.productAccount?.requestCode({ token: "forged" }).catch(error => { window.results.badEmail = String(error?.message ?? error); });
-      window.ogb?.productAccount?.ledger("not a cursor").catch(error => { window.results.badCursor = String(error?.message ?? error); });
+      window.hezuo?.productAccount?.requestCode({ token: "forged" }).catch(error => { window.results.badEmail = String(error?.message ?? error); });
+      window.hezuo?.productAccount?.ledger("not a cursor").catch(error => { window.results.badCursor = String(error?.message ?? error); });
     </script>`);
   const state = {
     auth: "signed_in", runtime: "ready", user: { id: "user-1", email: "person@example.test" },
     accountToken: "account-bearer", dataDir: "/Users/person/Library/Product",
     ai: { state: "ready", unit: "points", availableMicroPoints: 3000, reservedMicroPoints: 0, defaultModel: "hezuo-default",
       upstreamBaseUrl: "https://upstream.invalid",
-      models: [{ id: "hezuo-default", label: "Hezuo", protocol: "chat", pricingVersion: "v1", upstreamModel: "vendor/model",
+      models: [{ id: "hezuo-default", label: "HezuoBot", protocol: "chat", pricingVersion: "v1", upstreamModel: "vendor/model",
         inputMicroPointsPerMillion: 2_000_000, cachedInputMicroPointsPerMillion: 500_000, outputMicroPointsPerMillion: 4_000_000,
         maxContextTokens: 1000, maxOutputTokens: 100 }] },
   };
@@ -108,16 +108,16 @@ async function workspacePreload() {
   const preload = path.join(__dirname, "..", "preload.cjs");
   const opened = [];
   const make = args => new BrowserWindow({ show: false, webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false,
-    preload, additionalArguments: [`--omb-local-origin=${origin}`, ...args] } });
+    preload, additionalArguments: [`--hezuo-local-origin=${origin}`, ...args] } });
   const inspect = win => win.webContents.executeJavaScript(
-    "({ hasAccount: typeof window.ogb?.productAccount?.state, own: window.ogb?.app?.ownPage, keys: Object.keys(window.ogb?.productAccount ?? {}) })");
-  const managed = make(["--omb-product-managed=1"]);
+    "({ hasAccount: typeof window.hezuo?.productAccount?.state, own: window.hezuo?.app?.ownPage, keys: Object.keys(window.hezuo?.productAccount ?? {}) })");
+  const managed = make(["--hezuo-product-managed=1"]);
   await managed.loadURL(`${origin}/`);
   opened.push(["managed", await inspect(managed)]);
   const ordinary = make([]);
   await ordinary.loadURL(`${origin}/`);
   opened.push(["ordinary", await inspect(ordinary)]);
-  const guarded = make(["--omb-product-managed=1"]);
+  const guarded = make(["--hezuo-product-managed=1"]);
   await guarded.loadURL("data:text/html,<title>elsewhere</title>");
   opened.push(["other-page", await inspect(guarded)]);
   say(`workspace ${JSON.stringify(opened)}`);

@@ -6,7 +6,7 @@ import test from "node:test";
 import { createCompanionStorage, sidecarEnvironment } from "./companion-storage.mjs";
 
 const folder = async t => {
-  const root = await mkdtemp(path.join(os.tmpdir(), "omb-companion-storage-"));
+  const root = await mkdtemp(path.join(os.tmpdir(), "hezuo-companion-storage-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   return root;
 };
@@ -61,23 +61,20 @@ test("an unreadable settings record reads as off, and a failed save leaves the o
 });
 
 test("the sidecar environment never inherits endpoints and an account folder beats an inherited paired-fleet folder", () => {
-  const base = { HOME: "/home/person", PATH: "/bin", OMB_COMPANION_DIR: "/home/person/.hezuo-companion",
-    OMB_COMPANION_HOSTED_URL: "https://other.example.test", OMB_COMPANION_INTERNAL_ORIGIN: "/tmp/other.sock", OMB_PHONE_SECRET_PUBLIC_KEY: "leak" };
+  const base = { HOME: "/home/person", PATH: "/bin", HEZUO_COMPANION_DIR: "/home/person/.hezuo-companion",
+    HEZUO_COMPANION_HOSTED_URL: "https://other.example.test", HEZUO_COMPANION_INTERNAL_ORIGIN: "/tmp/other.sock", HEZUO_PHONE_SECRET_PUBLIC_KEY: "leak" };
   const configured = sidecarEnvironment({ base, directory: "/accounts/abc/companion", internalOrigin: "/tmp/own.sock",
-    hostedUrl: "https://own.example.test", secretPublicKey: "A".repeat(87) });
-  assert.equal(configured.OMB_COMPANION_DIR, "/accounts/abc/companion");
-  assert.equal(configured.OMB_COMPANION_INTERNAL_ORIGIN, "/tmp/own.sock");
-  assert.equal(configured.OMB_COMPANION_HOSTED_URL, "https://own.example.test");
-  assert.equal(configured.OMB_PHONE_SECRET_PUBLIC_KEY, "A".repeat(87));
+    hostedUrl: "https://own.example.test" });
+  assert.equal(configured.HEZUO_COMPANION_DIR, "/accounts/abc/companion");
+  assert.equal(configured.HEZUO_COMPANION_INTERNAL_ORIGIN, "/tmp/own.sock");
+  assert.equal(configured.HEZUO_COMPANION_HOSTED_URL, "https://own.example.test");
+  assert.equal("HEZUO_PHONE_SECRET_PUBLIC_KEY" in configured, false);
   assert.equal(configured.HOME, "/home/person", "HOME stays: the sidecar only reads it to find Tailscale");
-  assert.equal(base.OMB_COMPANION_DIR, "/home/person/.hezuo-companion", "the parent environment is not mutated");
+  assert.equal(base.HEZUO_COMPANION_DIR, "/home/person/.hezuo-companion", "the parent environment is not mutated");
 
   const unconfigured = sidecarEnvironment({ base, internalOrigin: "/tmp/own.sock" });
-  assert.equal(unconfigured.OMB_COMPANION_DIR, "/home/person/.hezuo-companion", "no configured root keeps previous behaviour");
-  assert.equal("OMB_COMPANION_HOSTED_URL" in unconfigured, false);
-  assert.equal(unconfigured.OMB_COMPANION_INTERNAL_ORIGIN, "/tmp/own.sock", "the inherited endpoint is replaced, never kept");
-  assert.equal("OMB_PHONE_SECRET_PUBLIC_KEY" in unconfigured, false);
-
-  const shortKey = sidecarEnvironment({ base, secretPublicKey: "short" });
-  assert.equal("OMB_PHONE_SECRET_PUBLIC_KEY" in shortKey, false);
+  assert.equal(unconfigured.HEZUO_COMPANION_DIR, "/home/person/.hezuo-companion", "no configured root keeps previous behaviour");
+  assert.equal("HEZUO_COMPANION_HOSTED_URL" in unconfigured, false);
+  assert.equal(unconfigured.HEZUO_COMPANION_INTERNAL_ORIGIN, "/tmp/own.sock", "the inherited endpoint is replaced, never kept");
+  assert.equal("HEZUO_PHONE_SECRET_PUBLIC_KEY" in unconfigured, false);
 });

@@ -23,7 +23,7 @@ function makeBot(overrides: Partial<Bot> = {}): Bot {
   };
 }
 
-function renderCard(bot: Bot) {
+function renderCard(bot: Bot, allowGeneration?: boolean) {
   return renderToStaticMarkup(
     createElement(
       StoreProvider,
@@ -33,12 +33,24 @@ function renderCard(bot: Bot) {
         activeState: "idle",
         mascotMotion: null,
         onPatch: vi.fn(),
+        allowGeneration,
       }),
     ),
   );
 }
 
 describe("BotProfileAvatarCard body picker", () => {
+  it("keeps image generation in settings but omits it for simple creation", () => {
+    const settings = renderCard(makeBot());
+    const creation = renderCard(makeBot(), false);
+    expect(settings).toContain("Generate avatar");
+    expect(creation).not.toContain("Generate avatar");
+    expect(creation).not.toContain("Image provider");
+    expect(creation).not.toContain("API key");
+    expect(creation).toContain('type="file"');
+    expect(creation).toContain('aria-label="Use green mascot color"');
+    expect(creation).toContain(`aria-label="Use the ${MASCOT_BODIES.cursor.name} body"`);
+  });
   it("renders one option per body catalog entry, labeled by name", () => {
     const markup = renderCard(makeBot());
 

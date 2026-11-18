@@ -2,9 +2,9 @@ import { createPinnedHttpsFetch } from "./product-ca.mjs";
 import { instrumentDebugFetch } from "./debug-log.mjs";
 
 const INSTALLATION_CREDENTIAL =
-  /^omb_install_[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}$/;
+  /^hezuo_install_[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}$/;
 const PRODUCT_AI_CREDENTIAL =
-  /^omb_product_ai_[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}$/;
+  /^hezuo_product_ai_[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}$/;
 const INSTALLATION_ID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const CLIENT_INSTANCE = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
@@ -474,7 +474,7 @@ export function createControlPlaneClient({
       });
       if (
         payload.ok !== true ||
-        payload.service !== "openmausbot-control-plane"
+        payload.service !== "hezuobot-control-plane"
       ) {
         throw new ControlPlaneError("control_plane_unavailable");
       }

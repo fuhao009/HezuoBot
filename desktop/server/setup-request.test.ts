@@ -2,14 +2,18 @@
 // then only the person's next line in that conversation runs as setup.
 import { rmSync } from "node:fs";
 import { beforeEach, describe, expect, it } from "vitest";
+import ptBR from "../src/locales/pt-br.json" with { type: "json" };
 
 import { chiefOfStaffSystemPrompt } from "./chief-of-staff.ts";
 import { DATA_DIR } from "./config.ts";
 import { ProfileRequestService } from "./profile-requests.ts";
 import type { ModelSelection } from "./contracts.ts";
 import type { RequestAuth } from "./request-auth.ts";
+import { addServerLinePacks } from "./server-lines.ts";
 import { askForSetup, cancelSetupRequest, forgetSetupPresser, openSetupOffer, setupCommandText, setupPresser, setupTurnText, takeSetupRequest } from "./setup-request.ts";
 import { Store, type Message } from "./store.ts";
+
+addServerLinePacks({ "pt-br": ptBR });
 
 const selection = (): ModelSelection => ({ instanceId: "claude", model: "claude-sonnet-5" });
 const LINE = "Great. Tell me what you'd like help with, in your own words, and I'll set myself up for it. For example: \"sort my inbox every morning\" or \"research our competitors every week\".";
@@ -210,7 +214,7 @@ describe("the line after the press", () => {
   it("with one person, is anyone's next line: a press here and a message from the phone", () => {
     const s = setup();
     askForSetup(s.store, s.bot.id, s.threadId, "en");
-    expect(s.take(s.say("sort my inbox", s.threadId, { sender: { name: "Omkar's iPhone", id: "phone-session" } }))).toBe(true);
+    expect(s.take(s.say("sort my inbox", s.threadId, { sender: { name: "Morgan's iPhone", id: "phone-session" } }))).toBe(true);
   });
 
   it("clears without setting up when the bot was given instructions after the press", () => {

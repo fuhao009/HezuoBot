@@ -1,4 +1,4 @@
-// A Hezuo account session presented by a phone is enough to use this
+// A HezuoBot account session presented by a phone is enough to use this
 // companion: the desktop already signed into the same account on the local
 // gateway. The trust file names that account; tokens are verified with /v1/me.
 // Cloud-desktop and browser-control grants stay off — those are still explicit.

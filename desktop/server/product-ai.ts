@@ -24,7 +24,7 @@ export const PRODUCT_AI_PATH = "/v1/ai";
 export const ACCOUNT_SLOT_WAIT_MS = 600_000;
 
 const DISPLAY_NAME = "Hezuo AI";
-const TOKEN = /^omb_product_ai_[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}$/;
+const TOKEN = /^hezuo_product_ai_[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}$/;
 const MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/;
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]"]);
 const MAX_MODELS = 256;

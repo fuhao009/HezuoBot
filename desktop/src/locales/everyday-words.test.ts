@@ -20,8 +20,8 @@ const EVERYDAY_PREFIXES: Record<string, readonly string[]> = {
     "computer.screen.", "vm.cloud.", "browser.",
   ],
   "Hezuo Cloud: buying it, setting it up, moving to it and sharing with it": [
-    "cloudBuy.", "cloudIntro.", "cloudTrial.", "cloudCancel.", "cloudSetup.", "cloudIntent.", "cloudNotice.", "cloudHowTo.", "whatsNew.",
-    "cloudCredit.", "cloudPower.", "cloudSignIn.", "cloudAdd.", "cloudHome.", "cloudPhone.", "cloudAccount.", "pro.", "lending.",
+    "cloudBuy.", "cloudTrial.", "cloudCancel.", "cloudSetup.", "cloudIntent.", "cloudNotice.",
+    "cloudCredit.", "cloudPower.", "cloudSignIn.", "cloudHome.", "cloudPhone.", "cloudAccount.", "lending.",
     "files.", "usageMeter.", "roomCard.",
   ],
   "routines and automations": ["routines.", "automations."],

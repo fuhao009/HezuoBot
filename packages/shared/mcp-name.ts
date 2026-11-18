@@ -1,6 +1,7 @@
-/** Names Hezuo gives its own MCP servers; a custom server may not take one. */
+/** Names HezuoBot gives its own MCP servers; a custom server may not take one. */
 export const RESERVED_MCP_NAMES: ReadonlySet<string> = new Set([
-  "ogb",
+  "hezuo",
+  "ogb", // Prevent custom servers from impersonating built-in identities in persisted references.
   "computer",
   "agents",
   "composio",
@@ -18,7 +19,7 @@ export function slugMcpName(raw: string): string {
   return /^[a-z]/.test(slug) ? slug : slug ? `mcp-${slug}`.slice(0, 32) : "";
 }
 
-/** What Hezuo names a server another tool calls `raw`; a name Hezuo keeps for itself gets an mcp- prefix. */
+/** What HezuoBot names a server another tool calls `raw`; a name HezuoBot keeps for itself gets an mcp- prefix. */
 export function importedMcpServerName(raw: string): string {
   const slug = slugMcpName(raw);
   return RESERVED_MCP_NAMES.has(slug) ? `mcp-${slug}`.slice(0, 32) : slug;

@@ -6,8 +6,8 @@ import { createServer, type Server } from "node:http";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeAll, expect, it } from "vitest";
-import { launchVerificationServer, runControlOmb } from "../../scripts/control-omb.ts";
-import { FAKE_DESKTOP_TOKEN, fakePagesService } from "./testing/fake-pages.ts";
+import { launchVerificationServer, runControlHezuo } from "../../scripts/control-hezuo.ts";
+import { FAKE_DESKTOP_TOKEN, fakePagesService, fakePageUrl } from "./testing/fake-pages.ts";
 
 const owner = randomBytes(32).toString("base64url");
 const realFetch = globalThis.fetch;
@@ -39,8 +39,8 @@ async function serveStub() {
 beforeAll(async () => {
   stub = await serveStub();
   globalThis.fetch = (input, init = {}) => realFetch(input, { ...init, headers: { ...Object.fromEntries(new Headers(init.headers)), "x-hezuo-desktop-owner": owner } });
-  fixture = await launchVerificationServer({ ...process.env, OMB_TEST_DESKTOP_OWNER_TOKEN: owner,
-    OMB_TEST_DESKTOP_PAGES_ACCESS: JSON.stringify({ url: `${stub.url}/api/cloud/pages/token`, token: FAKE_DESKTOP_TOKEN }) }, undefined, undefined, undefined, undefined, { scripted: true });
+  fixture = await launchVerificationServer({ ...process.env, HEZUO_TEST_DESKTOP_OWNER_TOKEN: owner,
+    HEZUO_TEST_DESKTOP_PAGES_ACCESS: JSON.stringify({ url: `${stub.url}/api/cloud/pages/token`, token: FAKE_DESKTOP_TOKEN }) }, undefined, undefined, undefined, undefined, { scripted: true });
 }, 90_000);
 afterAll(async () => {
   globalThis.fetch = realFetch;
@@ -49,7 +49,7 @@ afterAll(async () => {
 });
 
 it("shows a dashboard folder inline, serves its Parquet to the frame by token only, keeps other bots out, and gives the card its link on publish", async () => {
-  const cli = (...args: string[]) => runControlOmb(args, { env: { HEZUO_URL: fixture.info.url } }) as Promise<any>;
+  const cli = (...args: string[]) => runControlHezuo(args, { env: { HEZUO_URL: fixture.info.url } }) as Promise<any>;
   const api = async (path: string, init: RequestInit = {}) => {
     const response = await fetch(`${fixture.info.url}${path}`, { ...init, headers: { "content-type": "application/json" } });
     return { status: response.status, body: await response.json() as any };
@@ -99,16 +99,16 @@ it("shows a dashboard folder inline, serves its Parquet to the frame by token on
 
   const [published] = await turn(analyst, [{ tool: "publish_page", arguments: { path: "dash", title: "Sales dashboard" } }]);
   const [pageId] = [...stub.service.pages.keys()];
-  expect(published).toContain(`Published “Sales dashboard” at https://${pageId}.mausbot.page/`);
+  expect(published).toContain(`Published “Sales dashboard” at ${fakePageUrl(pageId)}`);
   expect(Buffer.from(stub.service.pages.get(pageId!)!.files.get("data.parquet")!, "latin1").byteLength).toBeGreaterThan(0);
   const rows = (await api(`/api/threads/${analyst.activeTaskId}/messages?limit=50`)).body.messages as any[];
   expect(rows.filter((message) => message.kind === "app").map((message) => [message.id, message.publishedPage?.state, message.publishedPage?.url]))
-    .toEqual([[appId, "live", `https://${pageId}.mausbot.page/`]]);
+    .toEqual([[appId, "live", fakePageUrl(pageId)]]);
   expect(rows.filter((message) => message.publishedPage && message.kind !== "app")).toEqual([]);
 }, 120_000);
 
 it("streams a folder's video to the card by byte range, leaves it out of a publish, and refuses it once the file is replaced", async () => {
-  const cli = (...args: string[]) => runControlOmb(args, { env: { HEZUO_URL: fixture.info.url } }) as Promise<any>;
+  const cli = (...args: string[]) => runControlHezuo(args, { env: { HEZUO_URL: fixture.info.url } }) as Promise<any>;
   const api = async (path: string) => (await fetch(`${fixture.info.url}${path}`, { headers: { "content-type": "application/json" } })).json() as Promise<any>;
   const planPath = join(fixture.info.dataDir, "room-plan.json");
   const reply = (botId: string) => readFileSync(`${planPath}.evidence.jsonl`, "utf8").trim().split("\n").map((line) => JSON.parse(line)).filter((entry: any) => entry.botId === botId)

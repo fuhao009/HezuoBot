@@ -2,7 +2,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { json, readBody } from "../harness/http.ts";
 import type { RequestAuth } from "../request-auth.ts";
-import { cloudSyncRoutes } from "./cloud-sync.ts";
 import { ownMcpHttpRoutes } from "./own-mcp-http.ts";
 import { webPanelRoutes } from "./web-panels.ts";
 
@@ -22,11 +21,15 @@ export interface RouteContext {
 /** Resolve with PASS to decline; anything else means the request was answered. */
 export type RouteHandler = (ctx: RouteContext) => Promise<typeof PASS | void>;
 
+/** Internal handlers use their validated capability closure, not public request authority. */
+export type InternalRouteContext = Omit<RouteContext, "auth">;
+export type InternalRouteHandler = (ctx: InternalRouteContext) => Promise<typeof PASS | void>;
+
 /** Modules with no wiring from index.ts are listed here; index.ts pushes the rest. */
-export const ROUTES: RouteHandler[] = [cloudSyncRoutes, ownMcpHttpRoutes, webPanelRoutes];
+export const ROUTES: RouteHandler[] = [ownMcpHttpRoutes, webPanelRoutes];
 
 /** True means stop routing. A handler that wrote a response but returned PASS still counts as answered. */
-export async function dispatchRoutes(routes: readonly RouteHandler[], ctx: RouteContext): Promise<boolean> {
+export async function dispatchRoutes<Context extends InternalRouteContext>(routes: readonly ((ctx: Context) => Promise<typeof PASS | void>)[], ctx: Context): Promise<boolean> {
   for (const route of routes) {
     const out = await route(ctx);
     if (out !== PASS || ctx.res.headersSent || ctx.res.writableEnded) return true;

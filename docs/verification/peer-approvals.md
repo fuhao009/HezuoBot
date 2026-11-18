@@ -6,7 +6,7 @@ Run the focused regression tests and the isolated HTTP workflow:
 pnpm exec vitest run desktop/server/peer-approval.test.ts desktop/server/runtime-coordinator.test.ts desktop/server/peer-approval.e2e.test.ts
 ```
 
-The HTTP test uses `launchVerificationServer` and `control-omb` with disposable
+The HTTP test uses `launchVerificationServer` and `control-hezuo` with disposable
 data and the repository's fake Claude engine. It stops the initial server and
 restarts that same fixture with a provider turn that stays open. Unit tests
 advance fake timers by days to prove a card never expires.

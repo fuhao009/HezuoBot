@@ -16,7 +16,7 @@ const dirs: string[] = [];
 afterEach(() => { for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true }); });
 
 function setup(onePasswordProblem?: () => string | undefined) {
-  const dir = mkdtempSync(join(tmpdir(), "omb-login-handoff-"));
+  const dir = mkdtempSync(join(tmpdir(), "hezuo-login-handoff-"));
   dirs.push(dir);
   const store = new LoginStore({ dataDir: dir });
   const posted: LoginHandoffResult[] = [];

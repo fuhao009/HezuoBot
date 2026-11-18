@@ -14,7 +14,7 @@ const MODULE_URL = pathToFileURL(join(process.cwd(), "desktop", "server", "data-
 const dirs: string[] = [];
 
 function tempDataDir(): string {
-  const dir = mkdtempSync(join(tmpdir(), "omb-data-dir-lease-"));
+  const dir = mkdtempSync(join(tmpdir(), "hezuo-data-dir-lease-"));
   dirs.push(dir);
   return dir;
 }

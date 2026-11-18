@@ -1,12 +1,12 @@
 // Warm summaries end to end: the real server, the fake Claude Code. The fake's conversation grows 20k tokens a turn from
 // 110k and Claude Code's own compaction (at 162k, as measured on a Team trial) takes FAKE_CLAUDE_COMPACT_MS, standing in for
-// the 35-58 s a real one takes on Opus. Warm summaries run at 1/100 of their real delays (OMB_WARM_SUMMARY_TIME_SCALE).
+// the 35-58 s a real one takes on Opus. Warm summaries run at 1/100 of their real delays (HEZUO_WARM_SUMMARY_TIME_SCALE).
 import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, it } from "vitest";
 
-import { launchVerificationServer, runControlOmb } from "../../scripts/control-omb.ts";
+import { launchVerificationServer, runControlHezuo } from "../../scripts/control-hezuo.ts";
 import { request } from "../../scripts/mcp-server.ts";
 import { removeTempDir } from "./testing/cleanup.ts";
 
@@ -18,19 +18,19 @@ async function fixture(env: NodeJS.ProcessEnv, test: (f: Awaited<ReturnType<type
 }
 
 async function setup(extra: NodeJS.ProcessEnv) {
-  const scratch = mkdtempSync(join(tmpdir(), "omb-warm-summary-e2e-"));
+  const scratch = mkdtempSync(join(tmpdir(), "hezuo-warm-summary-e2e-"));
   const prompts = join(scratch, "prompts.jsonl");
   writeFileSync(prompts, "");
   const env = {
     ...process.env, FAKE_CLAUDE_VERSION: "2.1.312", FAKE_CLAUDE_TOOL_CALLS: "[]", FAKE_CLAUDE_PROMPTS: prompts,
     FAKE_CLAUDE_CONTEXT_GROWTH: "110000:20000", FAKE_CLAUDE_CONTEXT_STATE: join(scratch, "context"), FAKE_CLAUDE_AUTOCOMPACT_AT: "162000",
-    FAKE_CLAUDE_COMPACT_MS: String(COMPACT_MS), FAKE_CLAUDE_COMPACT_DUMP: join(scratch, "compact.json"), OMB_WARM_SUMMARY_TIME_SCALE: "0.01",
+    FAKE_CLAUDE_COMPACT_MS: String(COMPACT_MS), FAKE_CLAUDE_COMPACT_DUMP: join(scratch, "compact.json"), HEZUO_WARM_SUMMARY_TIME_SCALE: "0.01",
     ...extra,
   };
   const session = await launchVerificationServer(env);
   try {
     const url = session.info.url;
-    const cli = (...args: string[]) => runControlOmb(args, { env: { HEZUO_URL: url } }) as Promise<any>;
+    const cli = (...args: string[]) => runControlHezuo(args, { env: { HEZUO_URL: url } }) as Promise<any>;
     const bot = (await cli("new-bot", "--name", "Warm summary probe")).bot;
     const thread = bot.activeTaskId as string;
     // A 1M-window model, as on the trial: Hezuo's own fold would wait for 180k, so Claude Code's comes first.
@@ -66,7 +66,7 @@ const record = (entry: Record<string, unknown>) => {
   appendFileSync(join(dir, "warm-summary-timings.jsonl"), `${JSON.stringify({ at: new Date().toISOString(), compactMs: COMPACT_MS, ...entry })}\n`);
 };
 
-it("before: the next turn waits for Claude Code to summarize a conversation past its point", () => fixture({ OMB_WARM_SUMMARY: "0" }, async (f) => {
+it("before: the next turn waits for Claude Code to summarize a conversation past its point", () => fixture({ HEZUO_WARM_SUMMARY: "0" }, async (f) => {
   for (const text of ["MSG-1 build the landing page", "MSG-2 make the title bold", "MSG-3 and the subtitle"]) await f.send(text);
   await sleep(COMPACT_MS + 3_000);
   const before = await f.send("MSG-4 what changed?");

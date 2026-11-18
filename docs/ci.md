@@ -28,7 +28,7 @@ areas run the union of their jobs. Why the mapping is what it is:
   the renderer smoke, and those renderer files count as server.
   `scripts/ci-scope.test.ts` holds the list equal to the import graph.
 - The macOS smokes run the packaged server inside Electron (approval modes,
-  app frames, phone relay, login handoff), so a server change runs them.
+  app frames, companion relay, login handoff), so a server change runs them.
 - A renderer change runs no Windows or macOS shard: the renderer's tests read
   the platform from the desktop bridge, never the host. The full lane still
   runs both.
@@ -95,9 +95,9 @@ Windows run eight shards each, macOS four (the full lane only);
 `scripts/ci-scope.mjs` builds the matrix.
 
 **Which files run where.** Linux runs every file. Most e2e files drive
-OMB's own logic through a real server and fake engines, which is the same on
+HezuoBot's own logic through a real server and fake engines, which is the same on
 every OS, and they were 70% of a Windows shard's time, so only Linux runs
-them: the Windows and macOS shards set `OMB_VITEST_E2E=host`, and
+them: the Windows and macOS shards set `HEZUO_VITEST_E2E=host`, and
 `desktop/vite.config.ts` then leaves out every e2e file not listed in
 `scripts/testing/host-e2e.ts`. The list keeps an e2e file on every host when
 it has a test that never runs on Linux (Auto on the person's own desktop, the
@@ -134,28 +134,28 @@ To reproduce a failing Vitest job locally:
 2. Use the same OS. Shard weights are platform-specific, so Windows shard 3
    and Linux shard 3 do not contain the same files.
 3. Copy the expanded command from **Run tests**, including any file filters
-   and the complete `--shard=n/count` fraction. Copy its `OMB_VITEST_E2E`
-   and `OMB_VITEST_SUBSET` environment values too. On Boat, the static job
+   and the complete `--shard=n/count` fraction. Copy its `HEZUO_VITEST_E2E`
+   and `HEZUO_VITEST_SUBSET` environment values too. On Boat, the static job
    contains each shard's output in a `vitest (ubuntu-latest, ...)` lane's
    log group; the lane uses the same matrix values.
 
 For example, a full Windows shard 3/8 uses PowerShell syntax:
 
 ```powershell
-$env:OMB_VITEST_E2E = "host"
-$env:OMB_VITEST_SUBSET = ""
+$env:HEZUO_VITEST_E2E = "host"
+$env:HEZUO_VITEST_SUBSET = ""
 pnpm exec vitest run --shard=3/8
 ```
 
 The full Linux shard 3/8 uses a POSIX shell:
 
 ```sh
-OMB_VITEST_E2E=all OMB_VITEST_SUBSET= pnpm exec vitest run --shard=3/8
+HEZUO_VITEST_E2E=all HEZUO_VITEST_SUBSET= pnpm exec vitest run --shard=3/8
 ```
 
 Docs and locale jobs select smaller file lists and have their own shard
 counts. Keep their file filters: removing them changes the set the sequencer
-divides, even with the same `--shard`. `OMB_VITEST_SUBSET` suppresses the CI
+divides, even with the same `--shard`. `HEZUO_VITEST_SUBSET` suppresses the CI
 warning about missing weighted files; the command's file filters select the
 tests. Copy the current job's list rather than assuming it is the full suite.
 
@@ -168,7 +168,7 @@ only after one is a real ordering dependency between test files.
 
 The account runs at most five macOS jobs at a time, and a PR used to queue
 seven (four Vitest shards, two smokes, the iOS job with its hour-long
-simulator suite). With 25 open PRs the macOS jobs waited a median of six and a
+simulator suite; that native-client lane is now retired from supported scope). With 25 open PRs the macOS jobs waited a median of six and a
 half hours. Now:
 
 - A PR runs the Vitest shards on Ubuntu (and Windows where its change can
@@ -216,7 +216,7 @@ PR's running checks.
 
 ## Browser driver (S4)
 
-`browser driver S4 (<os>)` runs the omb-cdp conformance suites
+`browser driver S4 (<os>)` runs the hezuo-cdp conformance suites
 (`desktop/server/browser/cdp/s4-*.e2e.test.ts`) against real Chrome: snapshots across
 out-of-process frames and closed shadow roots, every action, dialogs,
 downloads, popups and tabs, both evaluation worlds, waiting, the calibrated
@@ -236,7 +236,7 @@ browser, erase and temporary profiles, uploads, downloads, dialogs, popups,
 HTTP sign-in, a person's hold, restart and idle close) and
 `desktop/server/browser/viewers/viewers.e2e.test.ts` (the page filling the viewer
 at the screen's device scale, resizes, presets, acknowledged frames, a
-scroll ending on a sharp frame, and the phone's v1 live view against its
+scroll ending on a sharp frame, and the legacy companion v1 live view against its
 golden from agent-browser), `desktop/server/browser/passkey-wall.e2e.test.ts` (a
 sign-in shaped like Google's that stops at a passkey or a security key: the
 bot's notice, the request ending at once as unavailable, Try another way, the
@@ -247,14 +247,14 @@ options and a code, and no passkey registered) and
 answered by an upload, a dropdown list drawn by the viewer, a download served
 to it, the page's cursor and copied text).
 
-- The job uses the runner's installed Google Chrome (`OMB_CDP_E2E=1`) on the
+- The job uses the runner's installed Google Chrome (`HEZUO_CDP_E2E=1`) on the
   same platforms as the vitest shards: Linux, and Windows where a PR runs it,
   on PRs, all three in the full lane. Pushes to main and merge groups leave it
   out. Linux runs
   under Xvfb so the headed-identity case has a display.
 - On Linux it then builds the server image's `runtime` stage and runs the
   suites inside it as a non-root user against the image's Chrome for
-  Testing, with `OMB_BROWSER_SANDBOX=0` because the image has no setuid
+  Testing, with `HEZUO_BROWSER_SANDBOX=0` because the image has no setuid
   sandbox helper yet.
 - It is advisory, outside the `CI` gate, until it has run green for a while.
 - The latency targets hold wherever Chrome itself can meet them. The suite
@@ -268,11 +268,11 @@ to it, the page's cursor and copied text).
   release, and the GoogleUpdater it starts swaps the new version into the app
   about a minute and a half after Chrome first runs, in the middle of the
   suites.
-- Locally: `OMB_CDP_CHROME=<chrome executable> pnpm exec vitest run
+- Locally: `HEZUO_CDP_CHROME=<chrome executable> pnpm exec vitest run
   desktop/server/browser/cdp/s4- desktop/server/browser/checklist.e2e desktop/server/browser/passkey-wall.e2e
   desktop/server/browser/viewers/viewers.e2e desktop/server/browser/viewers/stream-v2.e2e` (or
-  `OMB_CDP_E2E=1` for the installed Google Chrome). Without either the suites
-  skip. `OMB_CDP_TEST_TMP` moves the throwaway profiles.
+  `HEZUO_CDP_E2E=1` for the installed Google Chrome). Without either the suites
+  skip. `HEZUO_CDP_TEST_TMP` moves the throwaway profiles.
 - `pnpm bench:browser-stream` measures the panel's stream on the installed
   Google Chrome with this computer's display: frame and page sizes, input to
   photon, frame rate, bytes and CPU. It is not part of CI.
@@ -362,7 +362,7 @@ instead (Settings → Secrets and variables → Actions → Variables; anything 
   this repository, when the repository owner authored the PR and both pushed
   and started the run (`github.actor`, `github.triggering_actor`). Boat runs a
   public repository's job only for the users on its allow-list
-  (`boat ci public milind-soni on --users "milind-soni"`) and fails any
+  (configured by the repository operator for its approved contributor accounts) and fails any
   other job at once (a teammate's PR got nine failed Boat jobs that way), so
   every other run stays on GitHub: forks, teammates, bots, re-runs by anyone
   else, the nightly run and manual runs (the release lane needs every
@@ -413,13 +413,10 @@ a `merge_group` event, and the group's commit lands only when its `CI` check
 passes. The workflow is ready: the `merge_group` trigger, a concurrency group
 per merge group, the main lane, and the same `CI` check name.
 
-GitHub offers the queue only to repositories an organization owns ("Pull
-request merge queues are available in any public repository owned by an
-organization", GitHub's docs, October 2026). `milind-soni/OpenMausBot` is
-owned by a user account, so the rule below appears only after the repository
-moves to an organization (such as `SupaMaus`). The move changes the URL the
-desktop updater reads (see Updater migration invariant in `releasing.md`), so
-it is the owner's decision. Then:
+Merge queue availability depends on the repository's current ownership and
+GitHub plan. The operator must confirm availability before enabling the rule
+below. Repository transfers and any resulting updater changes require an
+explicit owner decision; this document does not prescribe a transfer.
 
 **Settings → Rules → Rulesets → `main-ci-gate` → Edit** (it targets the
 default branch):

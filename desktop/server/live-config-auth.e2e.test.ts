@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { launchVerificationServer } from "../../scripts/control-omb.ts";
+import { launchVerificationServer } from "../../scripts/control-hezuo.ts";
 import type { LiveSettings } from "../../packages/shared/wire.ts";
 
 describe("Live credential config authorization", () => {

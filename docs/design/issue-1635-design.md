@@ -4,13 +4,11 @@
 
 要件・設計の初回レビュー（Claude / Grok。Codex は実装前に取り込む）で、コードと突き合わせて残したもの。
 
-- スレッド一覧の比較は新しい `orderedThreadList`。既存の `orderedSidebarThreads` は注意順のまま残し、ベル、折りたたみ中の他スレッド、All-threads の注意セクションはそれを使い続ける。iOS の Updates / Live Activity も `threadGroups` ではなく注意順の専用列を使う。
 - All-threads ピッカー（`ConversationTaskPicker` / `groupThreadTasks`）とチャンネル一覧も `orderedThreadList` で並べる。
 - 6 件は、ピンと「注意が必要」を数に入れず、開いているスレッドを更新が新しい順に 6 件。ピンは閉じていてもアーカイブされていても残る。モバイルの Archived セクションへはピンを送らない。
 - デスクトップのフォルダ順は、見えているスレッドの先頭が上になるように直す。今の比較は逆順で、コメントと一致していない。
 - チャンネルのピンは、作業中でも付け外しできる。タイトル変更は今どおり作業中は 409。クライアントは `{ pinned, title: 今のタイトル }` を送る。古いサーバは未知の `pinned` を無視して同じタイトルを書き戻すだけで、空タイトルにして「Untitled」にしない。
 - `updatedAt` は進むだけ。起動時は未設定、または SQLite の `MAX(at)` の方が新しいときだけ直す。メッセージ行の削除は無いので、下げない。レガシー JSON の取り込みのあとで行う。`appendMessage` / `insertMessageAfter` / `branchMessage` / `importTranscript` がメモリを進める。`saveBots` はメッセージのたびに呼ばない。
-- クライアントはスナップショットで `updatedAt` を `max(手元, サーバ)` にする。デスクトップは背面スレッドの early-return と、アクティブでないチャンネルタスクでも進める。楽観送信は進め、取り消しは残っているメッセージの最大に戻す。iOS / Android の `Store` の message 適用でもタスクを進める。
 - `pinned: false` は `saveBots` / `saveGroups` の直前に落とす。`TASK_PATCH_FIELDS` に `pinned` を入れる。
 - チームバックアップは `pinned` を運び、復元時の `updatedAt` はバックアップ内メッセージの最大 `at`（無ければ `createdAt`）。
 - 文言は既存の `sidebar.bot.pin` / `sidebar.bot.unpin` を使う。モバイルのピンラベルは Archive と同じく画面側の英語。
@@ -63,14 +61,11 @@
 ### 行の操作
 
 - デスクトップ: `SidebarThreadRow` のメニューに Pin / Unpin。行にピンアイコン。`onPin` が無い行（渡していない呼び出し）には出さない。
-- iOS: 管理シートの context menu と swipe に Pin / Unpin。ツリーとシートの `BotThreadRow` にピンアイコン。相対時刻は `updatedAt ?? createdAt`。
-- Android: スレッドシートの Archive の隣に Pin / Unpin。行の相対時刻は同じ。ピンアイコンを出す。
 
 文言は `en.json` の `task.pin` / `task.unpin` のみ足す。他言語は英語へフォールバックする。
 
 ### 変えないもの
 
-- `mobile/ios/Sources/CompanionCore/AttentionInbox.swift` と `mobile/android/.../ui/AttentionInbox.kt` の attention 順位
 - フォルダの保存順（モバイル）。デスクトップのフォルダは、今日どおり「見えているスレッドの最先頭」に付いて動く。順序が変わるので、ピンや直近の更新を含むフォルダが上に来る。
 - ルーチン内部実行（`routineRunId`）は一覧から除外したまま
 - bot-to-bot DM はタスク配列を持たない
@@ -78,18 +73,6 @@
 ## 影響範囲
 
 ### 変更対象
-
-| 対象 | 変更 |
-|---|---|
-| `packages/shared/wire.ts` `WireTask` / `GroupTask` | `pinned?: true`、`updatedAt?: number` |
-| `desktop/server/store.ts` `TaskRecord`（`WireTask` を extends）、`GroupTaskRecord` | 同じフィールド。作成・追記・起動時の埋め |
-| `desktop/server/message-db.ts` | スレッドごとの `MAX(at)` |
-| `desktop/server/index.ts` タスク PATCH | `pinned` の許可と検証 |
-| `desktop/src/state/store.tsx` `Task` / `GroupTask` | 同じフィールド。メッセージ受信で `updatedAt` を進める |
-| `desktop/src/components/SidebarThreadRow.tsx` | 順序と比較、メニュー |
-| `desktop/src/components/Sidebar.tsx` | 検索とグループ一覧も同じ順 |
-| iOS `Models.swift` `BotTask`、`ThreadNavigation.swift`、`BotThreadRow.swift`、`TaskManagerView.swift`、`Client.swift` | デコード、順序、ピン操作 |
-| Android `Models.kt` `BotTask`、`ThreadNavigation.kt`、`BotThreadRow.kt`、`TaskSheet.kt`、`Client.kt` | 同じ |
 
 `TaskRecord` は `WireTask` を継承し、`toWireTask` は私有キーを除いた残りを返す（`desktop/server/store.ts` の `TaskWireProjectionIsExact`）。新しい公開フィールドは `WireTask` に足せばワイヤへ乗る。私有キーには入れない。
 
@@ -99,17 +82,12 @@
 
 - `orderedSidebarThreads` の呼び出し: `Sidebar.tsx`、`SidebarBotActivity.tsx`、`TaskPicker.tsx`
 - `visibleSidebarThreads` の呼び出し: `Sidebar.tsx`（ボットとグループ）
-- `Bot.threadGroups` の呼び出し: iOS `BotThreadTree.swift`、`TaskManagerView.swift`、`ChatListView.swift`、`Updates.swift`。Android `BotThreadTree.kt`、`TaskSheet.kt`、`TaskRules.kt`
-- `orderedThreads` / `attentionRank`（スレッド一覧用）: `ThreadNavigation.kt`。Android `TaskRules.kt`
 
 順序を変えてはいけないもの:
-
-- `AttentionInbox.swift` の `attentionRank`、`AttentionInbox.kt` の `attentionRank`。別関数。スレッド一覧の `attentionRank` を消してもこちらは残す。
 
 永続化とワイヤ:
 
 - `saveBots` はタスクから `busy` / `activity` を除いて書く。`pinned` と `updatedAt` は残る。`updatedAt` はメッセージのたびに保存しない。
-- コンパニオンの JSON は未知キーを無視する（Android `CompanionJson.ignoreUnknownKeys = true`、iOS `JSONDecoder` の既定）。古いアプリは新しいフィールドが付いても落ちない。
 
 ### 影響種別
 
@@ -134,9 +112,6 @@
 
 - `desktop/src/components/SidebarThreadRow.test.ts`: ピン、更新順、同時刻の安定、6 件が更新順、ピンと attention は 6 件の外でも残る、閉じたピンは残る。
 - `server` のタスク API テスト: `pinned: true` が再読込後に残る、`false` でキーが消える、boolean 以外は 400、`updatedAt` を PATCH しても 400、メッセージ追記でワイヤの `updatedAt` が進む、メッセージの無いタスクは `createdAt`。
-- iOS `ThreadNavigationTests`、Android `ThreadNavigationTest`: 同じ順序契約。
 - 変異: ピン比較を外すとピンのテストが落ちる。`updatedAt` の比較を外すと更新順のテストが落ちる。6 件を配列順のままに戻すと「古い行を更新したら入る」テストが落ちる。
 
 ## UI 確認
-
-デスクトップは隔離したフィクスチャで、ピンと更新順をサイドバーで操作する。iOS / Android はユニットテストで順序と PATCH ボディを固定し、実機の headed 操作はこの環境ではしない。

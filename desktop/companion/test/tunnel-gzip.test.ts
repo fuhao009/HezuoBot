@@ -1,5 +1,4 @@
 // The managed HTTPS origin gzips large JSON; the LAN listener, sharing the same handler, never does.
-import { readFileSync } from "node:fs";
 import { createServer, request, type IncomingHttpHeaders, type Server } from "node:http";
 import { gunzipSync } from "node:zlib";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -7,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createProxyHandler } from "../src/proxy.ts";
 import { gzipTunnelReplies } from "../src/tunnel-gzip.ts";
 
-const TOKEN = "omb_test_token";
+const TOKEN = "hezuo_test_token";
 const BOTS = { bots: Array.from({ length: 100 }, (_, i) => ({ id: `b${i}`, name: `Bot ${i}` })), resumeCursors: { agent: "secret" } };
 const SCRUBBED = JSON.stringify({ bots: BOTS.bots });
 /** Long enough that the sidecar's own endpoints reply passes 1 KB. */
@@ -74,11 +73,6 @@ function phone(port: number, path: string): Promise<{ headers: IncomingHttpHeade
 }
 
 describe("gzip on the managed HTTPS origin", () => {
-  it("is the same file as the server's", () => {
-    const read = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
-    expect(read("../src/tunnel-gzip.ts")).toBe(read("../../server/harness/tunnel-gzip.ts"));
-  });
-
   it("gzips the scrubbed JSON and keeps the private headers", async () => {
     const reply = await phone(ports.origin, "/api/bots");
     expect(reply.headers["content-encoding"]).toBe("gzip");

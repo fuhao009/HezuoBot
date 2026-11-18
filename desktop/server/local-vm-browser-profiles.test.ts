@@ -14,7 +14,7 @@ afterEach(() => {
   for (const path of temporary.splice(0)) rmSync(path, { recursive: true, force: true });
 });
 const scratch = () => {
-  const dir = mkdtempSync(join(tmpdir(), "omb-vm-profiles-"));
+  const dir = mkdtempSync(join(tmpdir(), "hezuo-vm-profiles-"));
   temporary.push(dir);
   return dir;
 };

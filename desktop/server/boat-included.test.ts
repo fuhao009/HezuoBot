@@ -2,13 +2,12 @@
 // both Boat (/boat) and the Admin's relay (/relay). The relay knows only the
 // Admin's account, so the person's own key must never reach it and the
 // included token must never reach Boat; the own key always wins.
-import { createHash } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AppConfig } from "./config.ts";
 
-const INCLUDED = "box_omb_included-relay-token";
+const INCLUDED = "box_hezuo_included-relay-token";
 const LIMIT = "Your Pro plan's 200 cloud computer hours for September are used up. They reset on 1 October.";
 const botId = "included-boat-test";
 const boxId = "bx_23456789";
@@ -34,8 +33,7 @@ let loadConfig: typeof import("./config.ts").loadConfig;
 const underBoat = () => requests.filter((request) => request.path.startsWith("/boat/"));
 const underRelay = () => requests.filter((request) => request.path.startsWith("/relay/"));
 
-// The legacy deterministic name findBoat still recognises.
-const machineName = `ogb-${botId.slice(0, 8).toLowerCase().replace(/[^a-z0-9]/g, "")}-${createHash("sha256").update(botId).digest("hex").slice(0, 6)}`;
+let machineName = "";
 
 beforeAll(async () => {
   api = createServer((req, res) => {
@@ -50,7 +48,7 @@ beforeAll(async () => {
       if (rejectCredentials) return send(401, { ok: false, code: "unauthorized", message: "This cloud computer key is not valid." });
       if (serverError) return send(500, { ok: false, message: "internal error" });
       // Boat speaks its public API v1; the Admin relay at /api/box/v1 still speaks the old box dialect, and at /api/v1, v1.
-      const [, base = "", rest = ""] = /^(\/boat\/api\/v1|\/relay\/api\/box\/v1|\/relay\/api\/v1)(\/.*)$/.exec(url.pathname) ?? [];
+      const [, base = "", rest = ""] = /^(\/boat\/api\/v1|\/boat\/api\/box\/v1|\/relay\/api\/box\/v1|\/relay\/api\/v1)(\/.*)$/.exec(url.pathname) ?? [];
       const legacy = base === "/relay/api/box/v1";
       const [root, one, many] = legacy ? ["/boxes", "box", "boxes"] : ["/sandboxes", "sandbox", "sandboxes"];
       if (rest === root && dropLists > 0) { dropLists--; return void req.socket.destroy(); }
@@ -87,10 +85,11 @@ beforeEach(async () => {
   dropLists = 0;
   wakeOnResume = true;
   vi.stubEnv("BOX_TOKEN", undefined);
-  vi.stubEnv("OMB_BOAT_API", `${base}/boat/api/v1`);
-  vi.stubEnv("OMB_CLOUD_BOAT_URL", `${base}/relay/api/box/v1`);
-  vi.stubEnv("OMB_CLOUD_BOAT_TOKEN", INCLUDED);
+  vi.stubEnv("HEZUO_BOAT_API", `${base}/boat/api/v1`);
+  vi.stubEnv("HEZUO_CLOUD_BOAT_URL", `${base}/relay/api/box/v1`);
+  vi.stubEnv("HEZUO_CLOUD_BOAT_TOKEN", INCLUDED);
   boat ??= await import("./boat.ts");
+  machineName = await boat.boatNameFor(botId);
   loadConfig ??= (await import("./config.ts")).loadConfig;
 });
 
@@ -157,13 +156,13 @@ describe("included Boat computers", () => {
   });
 
   it("speaks only v1 with an own key, whatever its base is called", async () => {
-    vi.stubEnv("OMB_BOAT_API", `${base}/boat/api/box/v1`);
+    vi.stubEnv("HEZUO_BOAT_API", `${base}/boat/api/box/v1`);
     await boat.runCommand({ box: { token: "box_own" } }, boxId, "true");
     expect(requests).toEqual([{ method: "POST", path: `/boat/api/box/v1/sandboxes/${boxId}/commands`, auth: "Bearer box_own" }]);
   });
 
   it("speaks v1 to a relay once the Admin wires a v1 base", async () => {
-    vi.stubEnv("OMB_CLOUD_BOAT_URL", `${base}/relay/api/v1`);
+    vi.stubEnv("HEZUO_CLOUD_BOAT_URL", `${base}/relay/api/v1`);
     await boat.runCommand({}, boxId, "true");
     expect(requests).toEqual([{ method: "POST", path: `/relay/api/v1/sandboxes/${boxId}/commands`, auth: `Bearer ${INCLUDED}` }]);
   });
@@ -192,14 +191,14 @@ describe("included Boat computers", () => {
     expect((await boat.listManagedBoats({ box: { token: "box_own" } }, [])).problem).toMatch(/update it in Settings/);
   });
 
-  it("lists again once after a dropped connection, and names Hezuo Cloud's computer service when it stays unreachable", async () => {
+  it("lists again once after a dropped connection, and names HezuoBot's computer service when it stays unreachable", async () => {
     const lists = () => requests.filter((request) => request.path === "/relay/api/box/v1/boxes");
     dropLists = 1;
     await expect(boat.findBoat({}, "unlisted-bot")).resolves.toBeNull();
     expect(lists()).toHaveLength(2);
     dropLists = 2;
     await expect(boat.findBoat({}, "unlisted-bot")).rejects.toMatchObject({
-      message: "Could not reach Hezuo Cloud's computer service to list cloud computers — check your connection and refresh", status: 503, transient: true,
+      message: "Could not reach HezuoBot's computer service to list cloud computers — check your connection and refresh", status: 503, transient: true,
     });
     expect(lists()).toHaveLength(4);
     dropLists = 2;
@@ -212,7 +211,7 @@ describe("included Boat computers", () => {
     expect(boat.describeBoatAccount({})).toEqual({ configured: true, included: true });
     expect(boat.describeBoatAccount({ box: { token: "box_own" } })).toEqual({ configured: true });
     expect(JSON.stringify(boat.describeBoatAccount({}))).not.toContain(INCLUDED);
-    vi.stubEnv("OMB_CLOUD_BOAT_TOKEN", undefined);
+    vi.stubEnv("HEZUO_CLOUD_BOAT_TOKEN", undefined);
     expect(boat.boatConfigured({})).toBe(false);
     expect(boat.describeBoatAccount({})).toEqual({ configured: false });
   });

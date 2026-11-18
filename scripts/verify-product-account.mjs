@@ -2,7 +2,7 @@
 // The real app, the real Worker, the real gateway, in one disposable place.
 //
 //   node scripts/verify-product-account.mjs
-//   node scripts/verify-product-account.mjs --app "/absolute/Hezuo Product.app"
+//   node scripts/verify-product-account.mjs --app "/absolute/HezuoBot.app"
 //   node scripts/verify-product-account.mjs --keep     (keep the disposable profile)
 //   node scripts/verify-product-account.mjs --worker-project /path/to/gateway/control-plane
 // The selected project supplies the Worker, migrations and pinned Wrangler runtime.
@@ -19,12 +19,12 @@
 //     real account and workspace windows, its own server child, the product AI
 //     provider, and a real stdio MCP server that writes one file.
 //   * no personal key, engine CLI, Cloud account or operator secret is used.
-//     The fixture's explicit test entry (OMB_PRODUCT_FIXTURE=1 plus a temp
+//     The fixture's explicit test entry (HEZUO_PRODUCT_FIXTURE=1 plus a temp
 //     root argument) is what lets a loopback HTTPS origin stand in for the
 //     operator's own service.
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
@@ -35,7 +35,14 @@ import { electronBinary, packagedBinary, workerProjectPaths } from "./product-fi
 import { fileURLToPath } from "node:url";
 import { startWorkerFixture, trustFixtureCertificate, FIXTURE_CHARGE_MICRO_POINTS, MODELS } from "./product-fixture/worker-fixture.mjs";
 import { signIn, signInWithPassword, operatorLookup, operatorSetAccount, operatorGrant } from "./product-fixture/operator.mjs";
-import { attachPage, clickButtonByText, fillField, listPages, waitForPage } from "./product-fixture/cdp.mjs";
+import { attachPage, clickButtonByText, fillField, waitForPage } from "./product-fixture/cdp.mjs";
+import { startPanelAbsenceObservation, checkpointPanelAbsence } from "./product-fixture/panel-absence-ui.mjs";
+import { verifySignInCancellation } from "./product-fixture/sign-in-cancel-ui.mjs";
+import {
+  openAccountSettings, closeSettings, sendMessage, waitForText, waitSettled, workspaceApi,
+  signOutWorkspace, signUpThroughPasswordGate, signInThroughPasswordGate, signInThroughGate,
+  verifyNewBotAvatars,
+} from "./product-fixture/account-ui.mjs";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const ACCOUNT_A = "person-a@fixture.test";
@@ -64,7 +71,7 @@ function parseCli() {
 /** A temp root whose canonical path keeps the gate's own basename rule; macOS's
  * /var → /private/var means the argument must be the real path. */
 function fixtureRoot() {
-  const created = mkdtempSync(join(tmpdir(), "omb-product-verify-"));
+  const created = mkdtempSync(join(tmpdir(), "hezuo-product-verify-"));
   const root = realpathSync(created);
   for (const name of ["home", "evidence", "bin"]) mkdirSync(join(root, name), { recursive: true, mode: 0o700 });
   return root;
@@ -85,7 +92,7 @@ async function freePort() {
  * account, key or operator secret inherited from this shell. TMPDIR is the
  * parent's own system temp, canonicalised exactly as main's fixture gate does,
  * so the app resolves the same temporary root this script created. */
-function appEnvironment({ root, origin, certPath, verbose }) {
+function appEnvironment({ root, origin, certPath, verbose, socketDirectory }) {
   const environment = {};
   const keep = new Set(["SYSTEMROOT", "WINDIR", "COMSPEC", "PATHEXT", "LANG", "LC_ALL", "TZ", "TERM", "USER"]);
   for (const [key, value] of Object.entries(process.env)) if (value !== undefined && keep.has(key)) environment[key] = value;
@@ -96,29 +103,31 @@ function appEnvironment({ root, origin, certPath, verbose }) {
   environment.TMPDIR = temporary;
   environment.TEMP = temporary;
   environment.TMP = temporary;
+  environment.XDG_RUNTIME_DIR = socketDirectory;
   if (certPath) environment.NODE_EXTRA_CA_CERTS = certPath;
-  environment.OMB_PRODUCT_FIXTURE = "1";
-  environment.OMB_PRODUCT_FIXTURE_ORIGIN = origin;
+  environment.HEZUO_PRODUCT_FIXTURE = "1";
+  environment.HEZUO_PRODUCT_FIXTURE_ORIGIN = origin;
   if (verbose) environment.ELECTRON_ENABLE_LOGGING = "1";
   return environment;
 }
 
-function launchApp({ appBinary, devBinary, root, origin, certPath, debugPort, verbose }) {
+function launchApp({ appBinary, devBinary, root, origin, certPath, debugPort, verbose, socketDirectory }) {
   const common = [
     `--remote-debugging-port=${debugPort}`,
     "--remote-allow-origins=*",
     "--no-sandbox",
     "--lang=en-US",
+    "--host-resolver-rules=MAP example.test 127.0.0.1",
     ...(process.platform === "linux" ? ["--disable-gpu"] : []),
     // The fixture's HOME is disposable, so there is no login keychain to unlock. Electron's own
     // mock keychain keeps `safeStorage` (and therefore the encrypted record store) real without
     // raising an OS permission prompt nobody is at the machine to answer.
     ...(process.platform === "darwin" ? ["--use-mock-keychain"] : []),
   ];
-  const args = appBinary ? [...common, `--omb-product-fixture-root=${root}`]
-    : [...common, `--omb-product-fixture-root=${root}`, ROOT];
+  const args = appBinary ? [...common, `--hezuo-product-fixture-root=${root}`]
+    : [...common, `--hezuo-product-fixture-root=${root}`, ROOT];
   const child = spawn(appBinary ?? devBinary, args, {
-    env: appEnvironment({ root, origin, certPath, verbose }),
+    env: appEnvironment({ root, origin, certPath, verbose, socketDirectory }),
     stdio: ["ignore", "pipe", "pipe"],
   });
   let stdout = "", stderr = "";
@@ -144,7 +153,7 @@ async function main() {
   if (options.app && !appBinary) throw new Error(`no executable inside ${options.app}`);
   const devBinary = appBinary ? null : electronBinary();
   if (!appBinary && !devBinary) {
-    throw new Error("no Electron binary: run `pnpm install` for this checkout, set ELECTRON_OVERRIDE_DIST_PATH/OMB_VERIFY_ELECTRON, or pass --app");
+    throw new Error("no Electron binary: run `pnpm install` for this checkout, set ELECTRON_OVERRIDE_DIST_PATH/HEZUO_VERIFY_ELECTRON, or pass --app");
   }
 
   const root = fixtureRoot();
@@ -175,7 +184,7 @@ async function main() {
   /** The account bridge's own state, with no credential anywhere in it. */
   const accountSnapshot = async target => {
     if (!target) return null;
-    return await target.evaluate(`window.ogb?.productAccount?.state?.().then(state => ({
+    return await target.evaluate(`window.hezuo?.productAccount?.state?.().then(state => ({
       auth: state.auth,
       runtime: state.runtime,
       ai: state.ai ? { state: state.ai.state, unit: state.ai.unit, availableMicroPoints: state.ai.availableMicroPoints, reservedMicroPoints: state.ai.reservedMicroPoints } : null,
@@ -184,15 +193,17 @@ async function main() {
     }))`).catch(() => null);
   };
 
-  let worker, app, page, gate, liveGate;
+  let worker, app, page, gate, liveGate, socketDirectory;
   try {
+    socketDirectory = mkdtempSync("/tmp/hb-");
+    receipt.browserSocketDirectory = { path: socketDirectory, environmentKey: "XDG_RUNTIME_DIR", scope: "this fixture child only", cleaned: false };
     console.log("starting the real Worker (Miniflare + D1 + EMAIL + egress)…");
     worker = await startWorkerFixture({ root: join(root, "worker-run"), mail: !options.password, workerProject: workerProject.root,
       log: line => console.log(`  worker: ${line}`) });
     receipt.origin = worker.origin;
     trustFixtureCertificate(worker.certPath);
     if (options["bundled-trust"]) {
-      const copy = join(root, "Hezuo Product.app");
+      const copy = join(root, "HezuoBot.app");
       cpSync(options.app, copy, { recursive: true, verbatimSymlinks: true });
       writeFileSync(join(copy, "Contents", "Resources", "product-service.json"), JSON.stringify({
         version: 2, origin: worker.origin, ca: readFileSync(worker.certPath, "utf8"),
@@ -204,7 +215,7 @@ async function main() {
 
     const debugPort = Number(options.port) || await freePort();
     console.log(`launching ${appBinary ?? devBinary} (debugger on 127.0.0.1:${debugPort})…`);
-    app = launchApp({ appBinary, devBinary, root, origin: worker.origin, certPath: options["bundled-trust"] ? null : worker.certPath, debugPort, verbose: options.verbose });
+    app = launchApp({ appBinary, devBinary, root, origin: worker.origin, certPath: options["bundled-trust"] ? null : worker.certPath, debugPort, verbose: options.verbose, socketDirectory });
 
     // ---------- 1. The real account window: email → code → pending ----------
     const gateTarget = await waitForPage(debugPort, /\/product-account\.html/, { description: "account window" });
@@ -253,11 +264,11 @@ async function main() {
     // The workspace window replaces the gate; its own server child and provider load here.
     const workspaceTarget = await waitForPage(debugPort, /^http:\/\/127\.0\.0\.1:\d+\/(\?|$)/, { description: "workspace window", timeoutMs: 120_000 });
     page = await attachPage(workspaceTarget);
-    await page.until("Boolean(window.ogb?.productAccount)", { label: "workspace product bridge", timeoutMs: 120_000 });
+    await page.until("Boolean(window.hezuo?.productAccount)", { label: "workspace product bridge", timeoutMs: 120_000 });
     await page.until("document.querySelector('[data-sidebar-product-account]')", { label: "the product sidebar", timeoutMs: 120_000 });
     await page.until(`document.querySelector('[data-sidebar-product-email]')?.textContent?.trim() === ${JSON.stringify(ACCOUNT_A)}`, { label: "the signed-in email in the sidebar" });
     assert.equal(await page.evaluate("document.querySelector('[data-sidebar-product-email]').textContent.trim()"), ACCOUNT_A);
-    assert.equal(await page.evaluate("Boolean(window.ogb.productAccount?.state)"), true, "the account bridge is the one main installed");
+    assert.equal(await page.evaluate("Boolean(window.hezuo.productAccount?.state)"), true, "the account bridge is the one main installed");
     receipt.workspaceUrl = workspaceTarget.url;
     receipt.accounts.a = { email: ACCOUNT_A };
 
@@ -265,7 +276,7 @@ async function main() {
     await openAccountSettings(page);
     await page.until("Boolean(document.querySelector('[data-product-account]'))", { label: "the account settings page" });
     // The account's own bridge reports the Worker's status; the page shows the same words.
-    const pendingState = await page.untilValue("window.ogb.productAccount.state().then(state => state.ai ? state : null)", {
+    const pendingState = await page.untilValue("window.hezuo.productAccount.state().then(state => state.ai ? state : null)", {
       label: "the Worker's pending status", timeoutMs: 60_000,
     });
     assert.equal(pendingState.ai.state, "pending", `new account status was ${pendingState.ai.state}`);
@@ -301,7 +312,7 @@ async function main() {
 
     // ---------- 3. Refresh in the app; the account becomes ready ----------
     await page.click("Refresh", clickButtonByText("Refresh"));
-    const readyState = await page.untilValue("window.ogb.productAccount.state().then(state => state.ai?.state === 'ready' ? state : null)", {
+    const readyState = await page.untilValue("window.hezuo.productAccount.state().then(state => state.ai?.state === 'ready' ? state : null)", {
       label: "the account becomes ready", timeoutMs: 90_000,
     });
     assert.equal(readyState.runtime, "ready", `runtime after readiness was ${readyState.runtime}`);
@@ -316,7 +327,7 @@ async function main() {
     assert.ok(!modelSurface.includes(MODELS[0].label) && !modelSurface.includes(MODELS[0].id), "account page must not disclose execution models");
     await capture(page, "03-account-ready");
     record("ready status", { balance: readyBalance, state: await accountSnapshot(page) });
-    assert.equal(await page.evaluate("window.ogb.computerUsePolicy.get()"), "ask");
+    assert.equal(await page.evaluate("window.hezuo.computerUsePolicy.get()"), "ask");
     await page.evaluate("document.querySelector('[data-settings-page=computer], [data-settings-section=computer]').click()");
     await page.until("Boolean(document.querySelector('select[aria-label=\"Execute on this computer\"]:not(:disabled)'))", { label: "computer permission control" });
     await page.evaluate(`(() => {
@@ -325,7 +336,7 @@ async function main() {
       select.dispatchEvent(new Event("change", { bubbles: true }));
     })()`);
     await page.until("document.querySelector('select[aria-label=\"Execute on this computer\"]')?.value === 'allow' && !document.querySelector('select[aria-label=\"Execute on this computer\"]')?.disabled", { label: "saved computer permission" });
-    assert.equal(await page.evaluate("window.ogb.computerUsePolicy.get()"), "allow");
+    assert.equal(await page.evaluate("window.hezuo.computerUsePolicy.get()"), "allow");
     await capture(page, "03-computer-permission-allow");
     await page.evaluate("document.querySelector('[data-settings-page=botAccess], [data-settings-section=botAccess]').click()");
     await page.until("[...document.querySelectorAll('button')].some(button => button.textContent.trim() === 'Configure permissions')", { label: "per-bot permission settings" });
@@ -405,12 +416,12 @@ async function main() {
       restart.previousAppLogTail = app.logs();
       page.close(); gate?.close();
       page = null; gate = null; liveGate = null;
-      app = launchApp({ appBinary, devBinary, root, origin: worker.origin, certPath: options["bundled-trust"] ? null : worker.certPath, debugPort, verbose: options.verbose });
+      app = launchApp({ appBinary, devBinary, root, origin: worker.origin, certPath: options["bundled-trust"] ? null : worker.certPath, debugPort, verbose: options.verbose, socketDirectory });
       restart.reopenedPid = app.child.pid;
       assert.notEqual(restart.reopenedPid, restart.previousPid, "a new app process was launched");
       const reopenedTarget = await waitForPage(debugPort, /^http:\/\/127\.0\.0\.1:\d+\/(\?|$)/, { description: "workspace restored after app restart", timeoutMs: 120_000 });
       page = await attachPage(reopenedTarget);
-      await page.until(`window.ogb?.productAccount?.state().then(state => state.auth === 'signed_in' && state.runtime === 'ready' && state.user?.email === ${JSON.stringify(ACCOUNT_A)})`, {
+      await page.until(`window.hezuo?.productAccount?.state().then(state => state.auth === 'signed_in' && state.runtime === 'ready' && state.user?.email === ${JSON.stringify(ACCOUNT_A)})`, {
         label: "same account restored without signing in", timeoutMs: 120_000,
       });
       await page.until(`document.querySelector('[data-sidebar-product-email]')?.textContent?.trim() === ${JSON.stringify(ACCOUNT_A)}`, { label: "restored account sidebar" });
@@ -430,6 +441,8 @@ async function main() {
       restart.durationMs = restart.finishedAtMs - restart.startedAtMs;
       record("account restart finished", { ...restart });
     }
+    await startPanelAbsenceObservation(page, receipt);
+    await checkpointPanelAbsence(page, receipt, "restored account chat");
     // ---------- 5. Real MCP write, approval required ----------
     console.log("adding the fixture MCP server and asking for a file write…");
     const allowedArtifact = join(root, "allowed-artifact.txt");
@@ -448,6 +461,7 @@ async function main() {
     assert.equal(existsSync(allowedArtifact), false, "no file exists before approval");
     assert.equal(existsSync(startedMarker), true, "the MCP server really started");
     await capture(page, "05-approval-pending");
+    await checkpointPanelAbsence(page, receipt, "real MCP write approval pending");
     record("approval pending", { artifactExists: false });
 
     await page.click("Allow once", clickButtonByText("Allow once"));
@@ -457,6 +471,7 @@ async function main() {
     assert.equal(readFileSync(allowedArtifact, "utf8"), "verified");
     receipt.files.allowed = { path: allowedArtifact, content: readFileSync(allowedArtifact, "utf8") };
     await capture(page, "06-chat-tool-allowed");
+    await checkpointPanelAbsence(page, receipt, "real MCP write completed");
     record("tool allowed", { artifact: "verified" });
 
     // ---------- 6. Denial writes nothing ----------
@@ -476,10 +491,12 @@ async function main() {
     await page.click("Deny", clickButtonByText("Deny"));
     await waitForText(page, "The write was denied.");
     await waitSettled(page);
+    await checkpointPanelAbsence(page, receipt, "real MCP write denied");
     assert.equal(existsSync(deniedArtifact), false, "a denied call writes nothing");
     receipt.files.denied = { path: deniedArtifact, exists: false };
     await capture(page, "07-chat-tool-denied");
     record("tool denied", { artifactExists: false });
+    await verifySignInCancellation({ page, worker, botId, receipt, capture });
 
     // Every tool round is separate metered requests, not one chat charge.
     const toolLedger = await operatorSession.client.aiLedger(operatorSession.token);
@@ -495,9 +512,9 @@ async function main() {
     await page.until("Boolean(document.querySelector('[data-product-ledger-entry]'))", { label: "ledger rows", timeoutMs: 60_000 });
     // The page's own Refresh re-reads the gateway; then the shown figures are the gateway's latest.
     await page.click("Refresh", clickButtonByText("Refresh"));
-    await page.untilValue("window.ogb.productAccount.state().then(state => state.ai ? state : null)", { label: "the refreshed account status" });
+    await page.untilValue("window.hezuo.productAccount.state().then(state => state.ai ? state : null)", { label: "the refreshed account status" });
     const current = await operatorSession.client.aiStatus(operatorSession.token);
-    await page.untilValue(`window.ogb.productAccount.state().then(state => Math.abs((state.ai?.availableMicroPoints ?? -1) - ${current.availableMicroPoints}) <= 0)`, {
+    await page.untilValue(`window.hezuo.productAccount.state().then(state => Math.abs((state.ai?.availableMicroPoints ?? -1) - ${current.availableMicroPoints}) <= 0)`, {
       label: "the page's balance equals the gateway's",
     });
     const shownBalance = await page.evaluate("document.querySelector('[data-product-balance]').textContent.trim()");
@@ -539,14 +556,14 @@ async function main() {
     assert.equal(enabledB.account.state, "insufficient_balance", "enabled without funds is insufficient_balance");
     await openAccountSettings(pageB);
     await pageB.click("Refresh", clickButtonByText("Refresh"));
-    await pageB.untilValue("window.ogb.productAccount.state().then(state => state.ai?.state === 'insufficient_balance' ? state : null)", {
+    await pageB.untilValue("window.hezuo.productAccount.state().then(state => state.ai?.state === 'insufficient_balance' ? state : null)", {
       label: "B's insufficient-balance status", timeoutMs: 90_000,
     });
     const noticeB = await pageB.evaluate("document.querySelector('[data-product-account]').textContent.trim()");
     assert.equal(await pageB.evaluate("document.querySelector('[data-product-balance]').textContent.trim()"), "0.000000");
-    assert.equal(await pageB.evaluate("window.ogb.computerUsePolicy.get()"), "ask", "B must not inherit A's computer permission");
-    assert.equal((await pageB.evaluate("window.ogb.productAccount.operatorStatus()")).eligible, false);
-    assert.equal((await pageB.evaluate("window.ogb.productAccount.grantMaximum()")).outcome, "failed");
+    assert.equal(await pageB.evaluate("window.hezuo.computerUsePolicy.get()"), "ask", "B must not inherit A's computer permission");
+    assert.equal((await pageB.evaluate("window.hezuo.productAccount.operatorStatus()")).eligible, false);
+    assert.equal((await pageB.evaluate("window.hezuo.productAccount.grantMaximum()")).outcome, "failed");
     await capture(pageB, "10-account-b-insufficient");
     receipt.accounts.b = { email: ACCOUNT_B, notice: noticeB, seesA: false };
     await closeSettings(pageB);
@@ -579,24 +596,155 @@ async function main() {
     await pageA.until("document.querySelector('[data-sidebar-product-email]')?.textContent?.trim()", { label: "A's sidebar again" });
     assert.equal(await pageA.evaluate("document.querySelector('[data-sidebar-product-email]').textContent.trim()"), ACCOUNT_A);
     await pageA.until("document.body.innerText.includes('Hello from your account.')", { label: "A's own history", timeoutMs: 90_000 });
-    assert.equal(await pageA.evaluate("window.ogb.computerUsePolicy.get()"), "allow", "A's permission persists across workspace restart");
+    assert.equal(await pageA.evaluate("window.hezuo.computerUsePolicy.get()"), "allow", "A's permission persists across workspace restart");
     receipt.accounts.aRestored = true;
     await capture(pageA, "12-account-a-returned");
     record("account switch", { isolated: true, restored: true });
+    // ---------- C. Simple creation UI, isolated from the default-bot assertions ----------
+    // The loopback model cannot establish adherence to standing instructions. This
+    // acceptance covers renderer controls and persistence only; it sends no turn.
+    {
+      const selectors = {
+        newMenu: '[data-sidebar] button[aria-label="New or share"]',
+        dialog: '[role="dialog"][aria-label="New Bot"]',
+        name: '[data-new-bot-name]', prompt: '[data-new-bot-soul]',
+        create: '[data-new-bot-create]', warning: '#new-bot-soul-limit[role="alert"]',
+      };
+      const c = receipt.simpleNewBot = {
+        selectors, passed: false, promptAdherenceVerified: false,
+        scope: "Renderer creation and persisted profile/SOUL only; synthetic model cannot prove prompt adherence",
+      };
+      const snapshot = () => pageA.evaluate(`fetch('/api/bots').then(response => {
+        if (!response.ok) throw new Error('bot snapshot HTTP ' + response.status);
+        return response.json();
+      }).then(snapshot => snapshot.bots)`);
+      const before = await snapshot();
+      const originalId = await pageA.evaluate(`document.querySelector('[data-sidebar-bot-row][aria-current="page"]')?.getAttribute('data-sidebar-bot-row')`);
+      assert.ok(originalId, "C: original selected bot is identifiable before creation");
+      c.originalBotId = originalId;
+      const accountRoot = join(root, "user-data", "product-accounts");
+      const profileFiles = readdirSync(accountRoot).map(key => join(accountRoot, key, "workspace", "bots.json"));
+      const profileFile = profileFiles.find(file => existsSync(file) && JSON.parse(readFileSync(file, "utf8")).some(bot => bot.id === originalId));
+      assert.ok(profileFile, "C: selected account's persisted profile exists");
+      const profileBeforeCancel = readFileSync(profileFile, "utf8");
+      const openNewBot = async () => {
+        await pageA.click("C: open New or share", `document.querySelector(${JSON.stringify(selectors.newMenu)})`);
+        await pageA.click("C: choose New Bot", `(() => [...document.querySelectorAll('[role="menu"] [role="menuitem"]')].find(node => /^New bot$/i.test(node.textContent.trim())))()`);
+        await pageA.until(`Boolean(document.querySelector(${JSON.stringify(selectors.dialog)})?.querySelector('[data-new-bot-name]'))`, { label: "C: simple creation draft", timeoutMs: 15_000 });
+      };
+      const cancel = () => pageA.click("C: Cancel", clickButtonByText("Cancel", `document.querySelector(${JSON.stringify(selectors.dialog)})`));
+      try {
+        await openNewBot();
+        const controls = await pageA.evaluate(`(() => {
+          const dialog = document.querySelector(${JSON.stringify(selectors.dialog)});
+          return {
+            fields: [...dialog.querySelectorAll('input, textarea, select, [contenteditable="true"], [role="combobox"]')].map(node =>
+              node.matches('[data-new-bot-name]') ? 'name' : node.matches('[data-new-bot-soul]') ? 'prompt' : node.matches('input[type="file"][accept^="image/"]') ? 'avatar' : 'unexpected'),
+            actions: [...dialog.querySelectorAll(':scope > div:last-child button')].map(node => node.textContent.trim()),
+            extraNavigation: dialog.querySelectorAll('[role="tab"], [role="tablist"], a, [role="menuitem"]').length,
+          };
+        })()`);
+        assert.deepEqual(controls.fields.sort(), ["avatar", "name", "prompt"], "C: only avatar/name/prompt inputs");
+        assert.deepEqual(controls.actions, ["Cancel", "Create bot"], "C: only Cancel/Create footer actions");
+        assert.equal(controls.extraNavigation, 0, "C: no advanced navigation in simple dialog");
+        c.controls = controls;
+        await capture(pageA, "12c-new-bot-controls");
+        assert.equal(await pageA.evaluate(fillField(selectors.name, "Cancelled fixture bot")), true);
+        assert.equal(await pageA.evaluate(fillField(selectors.prompt, "This draft must never be saved.")), true);
+        await cancel();
+        await pageA.until(`!document.querySelector(${JSON.stringify(selectors.dialog)})`, { label: "C: cancelled dialog closes", timeoutMs: 15_000 });
+        assert.deepEqual(await snapshot(), before, "C: cancel causes no bot mutation");
+        assert.equal(readFileSync(profileFile, "utf8"), profileBeforeCancel, "C: cancel leaves persisted profiles unchanged");
+        c.cancelUnchanged = true;
+        await openNewBot();
+        assert.equal(await pageA.evaluate(fillField(selectors.name, "")), true);
+        await pageA.until("document.querySelector('[data-new-bot-create]')?.disabled", { label: "C: empty name disables Create", timeoutMs: 15_000 });
+        await capture(pageA, "12c-new-bot-empty-name");
+        const name = "C acceptance custom bot";
+        const prompt = "You are the C acceptance assistant. Answer in short, clear Chinese sentences.";
+        const oversizedPrompt = "界".repeat(8001); // 24,003 UTF-8 bytes, not merely characters.
+        assert.ok(Buffer.byteLength(oversizedPrompt, "utf8") > 24_000);
+        assert.equal(await pageA.evaluate(fillField(selectors.name, name)), true);
+        assert.equal(await pageA.evaluate(fillField(selectors.prompt, oversizedPrompt)), true);
+        await pageA.until("document.querySelector('[data-new-bot-create]')?.disabled && document.querySelector('[data-new-bot-soul]')?.getAttribute('aria-invalid') === 'true' && Boolean(document.querySelector('#new-bot-soul-limit[role=alert]')?.textContent.trim())", { label: "C: UTF-8 overflow disables Create with warning", timeoutMs: 15_000 });
+        c.overflow = { bytes: Buffer.byteLength(oversizedPrompt, "utf8"), warning: await pageA.evaluate("document.querySelector('#new-bot-soul-limit').textContent.trim()") };
+        await capture(pageA, "12c-new-bot-prompt-overflow");
+        assert.equal(await pageA.evaluate(fillField(selectors.prompt, prompt)), true);
+        await pageA.until("document.querySelector('[data-new-bot-create]')?.disabled === false && !document.querySelector('#new-bot-soul-limit[role=alert]')", { label: "C: valid draft enables Create and clears warning", timeoutMs: 15_000 });
+        await capture(pageA, "12c-new-bot-valid");
+        await pageA.click("C: Create", "document.querySelector('[data-new-bot-create]')");
+        await pageA.until(`!document.querySelector(${JSON.stringify(selectors.dialog)})`, { label: "C: creation completes", timeoutMs: 30_000 });
+        const after = await snapshot();
+        const added = after.filter(bot => !before.some(previous => previous.id === bot.id));
+        assert.equal(after.length, before.length + 1, "C: exactly one bot created");
+        assert.equal(added.length, 1, "C: a new bot identity was created");
+        const created = added[0];
+        assert.equal(created.name, name, "C: custom name round-trips through workspace API");
+        assert.equal(created.soul, prompt, "C: custom prompt round-trips through workspace API");
+        const saved = JSON.parse(readFileSync(profileFile, "utf8")).find(bot => bot.id === created.id);
+        assert.equal(saved?.name, name, "C: custom name persisted in profile");
+        assert.equal(saved?.soul, prompt, "C: custom prompt persisted in profile");
+        const soulFile = join(profileFile, "..", "bots", created.id, "SOUL.md");
+        assert.equal(readFileSync(soulFile, "utf8"), prompt, "C: SOUL.md contains exact custom prompt");
+        await pageA.until(`Boolean(document.querySelector('[data-sidebar-bot-row="${created.id}"]'))`, { label: "C: created bot in sidebar", timeoutMs: 15_000 });
+        await capture(pageA, "12c-new-bot-created");
+        c.created = { id: created.id, name, prompt, profileFile, soulFile };
+        c.avatarCreation = {};
+        await verifyNewBotAvatars({ page: pageA, openNewBot, snapshot, profileFile, root, capture, evidence: c.avatarCreation });
+        c.passed = true;
+      } finally {
+        if (await pageA.evaluate(`Boolean(document.querySelector(${JSON.stringify(selectors.dialog)}))`)) await cancel();
+        await pageA.click("C: restore original selected bot", `document.querySelector(${JSON.stringify(`[data-sidebar-bot-row="${originalId}"]`)})`);
+        await pageA.until(`Boolean(document.querySelector(${JSON.stringify(`[data-sidebar-bot-row="${originalId}"][aria-current="page"]`)})) && Boolean(document.querySelector('[data-product-chat] textarea'))`, { label: "C: original selected bot restored", timeoutMs: 15_000 });
+        c.originalSelectionRestored = true;
+      }
+      record("C simple new bot UI acceptance", c);
+    }
+
 
     // ---------- 10. Responsive layout: the widths, and the phone's bot list ----------
-    // The product's three bands: the fixed 260/240px list, and below 800px a bot list that is off-screen until asked
-    // for. Every assertion reads the real painted geometry, so a panel caught half-way out cannot pass as a layout.
+    // Requirement A: desktop has only the sidebar and responsive chat, with no right-panel entry.
+    // Geometry and hit-testing are read-only; navigation is exercised through real clicks.
     // A's settings sheet from the account page is a sheet over the workspace, not a column of it.
     assert.equal(await pageA.evaluate("Boolean(document.querySelector('[role=dialog] [data-product-account]'))"), false, "A's account sheet is closed before the layout is measured");
-    // The bot panel holds details, activity, library and the computer, and the chat's avatar pill opens and closes it.
-    // Whatever the workspace restored, a wide window still gives the chat its 420px beside the 260px list and the panel.
-    const panelWasOpen = await pageA.evaluate("Boolean(document.querySelector('[data-bot-panel]'))");
-    if (panelWasOpen) {
-      await pageA.click("the chat's bot pill", `(() => document.querySelector('[data-chathead-pill]'))()`);
-      await pageA.until("!document.querySelector('[data-bot-panel]')", { label: "the restored bot panel closed" });
-    }
-    receipt.botPanelRestored = panelWasOpen;
+    const noRightPanel = async (width, height) => {
+      const state = await pageA.evaluate(`(() => {
+        const visible = node => node.getClientRects().length > 0 && getComputedStyle(node).visibility !== "hidden";
+        const entries = [...document.querySelectorAll('[data-product-work-entry], [data-panel-tab], [aria-controls="bot-panel"], [aria-controls="product-work-panel"]')].filter(visible);
+        return {
+          panel: Boolean(document.querySelector('[data-bot-panel], [data-computer-panel]')),
+          scrim: Boolean(document.querySelector('[data-product-work-scrim]')),
+          entries: entries.length,
+          entryDetails: entries.slice(0, 8).map(node => {
+            // Keep only static UI labels/attributes: bot names, account data and arbitrary text stay private.
+            const safeLabel = value => /^(computer|activity|details|library|tasks|work|open computer|open work panel)$/i.test((value ?? "").trim()) ? value.trim() : value ? "[redacted]" : "";
+            const describe = (element, depth = 0) => {
+              const tag = element.tagName.toLowerCase();
+              const attrs = [...element.attributes].filter(attr => /^(data-product-work-entry|data-panel-tab|aria-controls|role|type)$/.test(attr.name))
+                .map(attr => attr.name + '="' + (/^[a-z0-9_-]{0,64}$/i.test(attr.value) ? attr.value : "[redacted]") + '"').join(" ");
+              const children = depth < 2 ? [...element.children].slice(0, 6).map(child => describe(child, depth + 1)).join("") : "";
+              return "<" + tag + (attrs ? " " + attrs : "") + ">" + (children || safeLabel(element.textContent)) + "</" + tag + ">";
+            };
+            return { tag: node.tagName.toLowerCase(), text: safeLabel(node.textContent), outerHTML: describe(node).slice(0, 1600) };
+          }),
+        };
+      })()`);
+      (receipt.noRightPanelChecks ??= []).push({ width, height, ...state });
+      record("no right panel check", { width, height, ...state });
+      assert.equal(state.panel, false, `${width}x${height}: no right-side bot or computer panel`);
+      assert.equal(state.scrim, false, `${width}x${height}: no right-panel scrim`);
+      assert.equal(state.entries, 0, `${width}x${height}: no visible right-panel opening entry or tabs: ${JSON.stringify(state.entryDetails)}`);
+      return state;
+    };
+    const navigateToBot = async label => {
+      const row = `(() => [...document.querySelectorAll('#product-bot-list [data-sidebar-bot-row]')].find(node => {
+        const box = node.getBoundingClientRect();
+        return box.width > 0 && box.height > 0 && box.left >= 0 && box.right <= innerWidth && !node.closest('[inert]');
+      }))()`;
+      await pageA.until(`Boolean(${row})`, { label: `${label}: a usable sidebar bot row` });
+      await pageA.click(`${label}: navigate to a sidebar bot`, row);
+      await pageA.until(`Boolean(document.querySelector('[data-product-chat] textarea'))`, { label: `${label}: chat available after bot navigation` });
+    };
     const drawerState = `(() => {
       const list = document.querySelector('#product-bot-list');
       const menu = document.querySelector('button[aria-controls="product-bot-list"]');
@@ -637,68 +785,37 @@ async function main() {
       record("viewport", { width, height, overflow, listWidth: list.width, composerClear: true });
     }
 
-    // Wide: the bot panel is a real third column, opened from the chat's avatar pill and closed from it again. The
-    // computer, tasks and library live in its tabs: the header carries no buttons of their own for them.
-    await pageA.setViewport(1440, 900);
-    await pageA.until(`!!document.querySelector('[data-chathead-pill]')`, { label: "the wide chat header" });
-    assert.equal(await pageA.evaluate(`Boolean(document.querySelector('[data-product-work-entry]'))`), false, "the chat header has no work-panel buttons");
-    const panelGeometry = `(() => {
-      const panel = document.querySelector('[data-bot-panel]');
-      const chat = document.querySelector('[data-product-chat]');
-      if (!panel || !chat) return null;
-      // Only once its entrance and width transition have finished: a panel mid-slide is not a layout.
-      if (panel.getAnimations().some(animation => animation.playState === "running")) return null;
-      const theirs = panel.getBoundingClientRect();
-      const ours = chat.getBoundingClientRect();
-      return { tab: panel.dataset.tab, role: panel.getAttribute('role'), width: Math.round(theirs.width), right: Math.round(theirs.right), chat: Math.round(ours.width), scrim: Boolean(document.querySelector('[data-product-work-scrim]')), overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth };
-    })()`;
-    const pressEscape = async () => {
+    receipt.noRightPanel = [];
+    for (const [width, height] of [[1440, 900], [1000, 800]]) {
+      await pageA.setViewport(width, height);
+      await pageA.until(`document.querySelector('[data-sidebar]')?.inert === false`, { label: `${width}: desktop sidebar usable` });
+      const before = await noRightPanel(width, height);
+      await navigateToBot(`${width}x${height}`);
+      // Even a dormant header affordance must not resurrect the removed panel.
+      await pageA.click("the chat's bot identity", `document.querySelector('[data-chathead-pill]')`);
+      const after = await noRightPanel(width, height);
+      // Bot settings are legitimate; dismiss them with a real key event before measuring chat.
       for (const type of ["keyDown", "keyUp"]) {
         await pageA.connection.send("Input.dispatchKeyEvent", { type, key: "Escape", code: "Escape", windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27 });
       }
-    };
-    const openComputerTab = async label => {
-      await pageA.click(`the chat's bot pill (${label})`, `(() => document.querySelector('[data-chathead-pill]'))()`);
-      await pageA.until(`document.querySelector('[data-bot-panel]')?.dataset.tab === "details"`, { label: "the bot panel on its details tab" });
-      await pageA.click("the computer tab", `(() => document.querySelector('[data-panel-tab="computer"]'))()`);
-      await pageA.until(`document.querySelector('[data-bot-panel]')?.dataset.tab === "computer"`, { label: "the bot panel on its computer tab" });
-    };
-    await pageA.click("the chat's bot pill", `(() => document.querySelector('[data-chathead-pill]'))()`);
-    await pageA.until(`document.querySelector('[data-bot-panel]')?.dataset.tab === "details"`, { label: "the bot panel on its details tab" });
-    await pageA.untilValue(panelGeometry, { label: "the details tab settled" });
-    await capture(pageA, "13-layout-1440x900-details-tab");
-    await pageA.click("the activity tab", `(() => document.querySelector('[data-panel-tab="activity"]'))()`);
-    await pageA.until(`document.querySelector('[data-bot-panel]')?.dataset.tab === "activity"`, { label: "the bot panel on its activity tab" });
-    await pageA.untilValue(panelGeometry, { label: "the activity tab settled" });
-    await capture(pageA, "13-layout-1440x900-activity-tab");
-    await pageA.click("the computer tab", `(() => document.querySelector('[data-panel-tab="computer"]'))()`);
-    await pageA.until(`document.querySelector('[data-bot-panel]')?.dataset.tab === "computer"`, { label: "the bot panel on its computer tab" });
-    const docked = await pageA.untilValue(panelGeometry, { label: "the docked bot panel at 1440x900" });
-    assert.ok(docked.right >= 1438, `the bot panel ends at the window's right edge (${docked.right})`);
-    assert.ok(docked.width >= 440 && docked.width <= 480, `the computer tab is the 460px column (${docked.width}px)`);
-    assert.ok(docked.chat >= 420, `the chat keeps its 420px beside the panel (${docked.chat}px)`);
-    assert.ok(docked.overflow <= 1, `the docked panel adds no horizontal overflow (${docked.overflow}px)`);
-    assert.equal(await pageA.evaluate(`Boolean(document.querySelector('[data-bot-panel] [data-computer-panel]'))`), true, "the computer tab embeds the computer panel");
-    await capture(pageA, "13-layout-1440x900-work-panel");
-    await pageA.click("the chat's bot pill again", `(() => document.querySelector('[data-chathead-pill]'))()`);
-    await pageA.until("!document.querySelector('[data-bot-panel]')", { label: "the bot panel closed again" });
-    receipt.botPanel = docked;
-    record("bot panel", docked);
-
-    // Mid: the computer tab is a drawer over the chat, and Escape gives the chat back.
-    await pageA.setViewport(1000, 800);
-    await pageA.until(`!!document.querySelector('[data-chathead-pill]')`, { label: "the medium chat header" });
-    assert.equal(await pageA.evaluate(`Boolean(document.querySelector('[data-product-work-entry]'))`), false, "the medium chat header has no work-panel buttons");
-    await openComputerTab("mid");
-    const overlay = await pageA.untilValue(panelGeometry, { label: "the bot panel as a drawer at 1000x800" });
-    assert.equal(overlay.role, "dialog", "below 1200px the bot panel is a dialog over the chat");
-    assert.ok(overlay.right >= 998, `the drawer is flush with the window's right edge (${overlay.right})`);
-    assert.ok(overlay.width >= 360 && overlay.width <= 1000 - 32, `the drawer keeps the computer tab's width, inside the window (${overlay.width}px)`);
-    await capture(pageA, "13-layout-1000x800-work-panel");
-    await pressEscape();
-    await pageA.until("!document.querySelector('[data-bot-panel]')", { label: "Escape closed the mid-width bot panel drawer" });
-    receipt.botPanelDrawer = overlay;
-    record("bot panel drawer", overlay);
+      await pageA.until(`!document.querySelector('[role="dialog"], [aria-modal="true"]')`, { label: `${width}: bot settings dismissed before layout measurement` });
+      await noRightPanel(width, height);
+      const geometry = await pageA.evaluate(`(() => {
+        const chat = document.querySelector('[data-product-chat]');
+        const box = chat?.getBoundingClientRect();
+        return { chatWidth: box?.width ?? 0, chatRight: box?.right ?? 0,
+          overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+          chatOverflow: chat ? chat.scrollWidth - chat.clientWidth : null };
+      })()`);
+      assert.ok(geometry.chatWidth >= 420, `${width}: chat keeps at least 420px (${geometry.chatWidth}px)`);
+      assert.ok(geometry.chatRight <= width + 1, `${width}: chat stays inside the viewport`);
+      assert.ok(geometry.overflow <= 1, `${width}: no horizontal page overflow after navigation`);
+      assert.ok(geometry.chatOverflow !== null && geometry.chatOverflow <= 1, `${width}: no horizontal chat overflow`);
+      const evidence = { width, height, before, after, ...geometry, botNavigation: true, chatheadClicked: true };
+      receipt.noRightPanel.push(evidence);
+      record("no right panel", evidence);
+      await capture(pageA, `13-layout-${width}x${height}-no-right-panel`);
+    }
 
     // The phone's list opens over the chat, dims it, and both Escape and its own close button put it away again.
     await pageA.setViewport(390, 844);
@@ -737,16 +854,24 @@ async function main() {
     assert.equal(afterCloseButton.refocused, "menu", "the close button returns focus to the bot list button");
     receipt.drawer = { width: openedByButton.width, scrim: openedByButton.scrim, escape: afterEscape.refocused, closeButton: afterCloseButton.refocused };
     record("viewport drawer", receipt.drawer);
+    await openDrawer();
+    await navigateToBot("phone bot list");
+    await pageA.untilValue(`(() => { const state = ${drawerState};
+      return state.expanded === "false" && state.right <= 0 && state.inert ? state : null; })()`, { label: "phone bot navigation closes the list" });
+    const phoneOverflow = await pageA.evaluate("document.documentElement.scrollWidth - document.documentElement.clientWidth");
+    assert.ok(phoneOverflow <= 1, `phone bot navigation adds no horizontal overflow (${phoneOverflow}px)`);
+    receipt.drawer.botNavigation = true;
+    await capture(pageA, "13-layout-390x844-bot-selected");
     await pageA.setViewport(1440, 900);
 
-    const operatorCredit = await pageA.evaluate("window.ogb.productAccount.operatorStatus()");
+    const operatorCredit = await pageA.evaluate("window.hezuo.productAccount.operatorStatus()");
     assert.equal(operatorCredit.eligible, true);
-    const maximumCredit = await pageA.evaluate("window.ogb.productAccount.grantMaximum()");
+    const maximumCredit = await pageA.evaluate("window.hezuo.productAccount.grantMaximum()");
     assert.equal(maximumCredit.outcome, "granted");
     assert.equal(maximumCredit.amountMicroPoints, operatorCredit.maxGrantMicroPoints);
     const afterMaximum = await operatorSession.client.aiStatus(operatorSession.token);
     assert.equal(BigInt(afterMaximum.availableMicroPoints) + BigInt(afterMaximum.reservedMicroPoints), BigInt(Number.MAX_SAFE_INTEGER));
-    const repeatedMaximum = await pageA.evaluate("window.ogb.productAccount.grantMaximum()");
+    const repeatedMaximum = await pageA.evaluate("window.hezuo.productAccount.grantMaximum()");
     assert.equal(repeatedMaximum.outcome, "already_max");
     receipt.operatorCredit = { outcome: maximumCredit.outcome, amountMicroPoints: maximumCredit.amountMicroPoints, repeated: repeatedMaximum.outcome };
 
@@ -800,10 +925,21 @@ async function main() {
       receipt.processes.appExit = await Promise.race([app.exited, sleep(3_000).then(() => null)]);
       receipt.processes.appLogTail = app.logs();
     }
+    if (socketDirectory) {
+      try {
+        rmSync(socketDirectory, { recursive: true, force: true });
+        receipt.browserSocketDirectory.cleaned = !existsSync(socketDirectory);
+        if (!receipt.browserSocketDirectory.cleaned) receipt.errors.push("Owned browser socket directory still exists");
+      } catch (error) {
+        receipt.browserSocketDirectory.cleanupError = error.message;
+        receipt.errors.push(`Owned browser socket cleanup failed: ${error.message}`);
+      }
+    }
     await worker?.close().catch(() => {});
     if (worker) {
       receipt.inferenceRequests = worker.inferenceRequests;
       receipt.inferenceLog = worker.inferenceLog;
+      receipt.upstreamCalls = worker.upstream.state.calls.slice();
       const rejectedBilling = worker.inferenceRequests.find(request => request.status === 400
         && request.errorCode === "invalid_request" && request.fields.includes("billing"));
       if (rejectedBilling) receipt.compatibilityDiagnostic = "The desktop sent billing, but this checkout Worker rejected the request. Check the gateway billing contract; do not strip the desktop budget to make this fixture pass.";
@@ -823,221 +959,6 @@ async function main() {
     if (!receipt.passed) console.log(receipt.errors.join("\n"));
   }
   if (!receipt.passed) process.exitCode = 1;
-}
-
-/** Opens Settings → Your account from the product sidebar's account button. */
-async function openAccountSettings(page) {
-  // The account button main marks for this purpose, never "the first button in the footer" (that is Automations).
-  await page.until("Boolean(document.querySelector('[data-product-account-open]'))", { label: "the product account button" });
-  if (!await page.evaluate("Boolean(document.querySelector('[role=dialog]'))")) {
-    await page.evaluate("(() => { document.querySelector('[data-product-account-open]').click(); return true; })()");
-  }
-  await page.until("Boolean(document.querySelector('[role=dialog]'))", { label: "the settings dialog" });
-  // Simple mode lists pages (Usage & billing) rather than the advanced per-section rail; either way the
-  // account page must end up rendered, and opening the sidebar account button normally lands there.
-  await page.until("Boolean(document.querySelector('[data-settings-section=account], [data-settings-page]'))", { label: "the settings navigation" });
-  if (!await page.evaluate("Boolean(document.querySelector('[data-product-account]'))")) {
-    const clicked = await page.evaluate(`(() => {
-      const direct = document.querySelector('[data-settings-section=account]');
-      if (direct) { direct.click(); return "section"; }
-      if (document.querySelector('[data-product-account]')) return "already";
-      const pageButton = [...document.querySelectorAll('[data-settings-page]')]
-        .find(button => button.getAttribute("data-settings-page") === "billing");
-      if (!pageButton) return "";
-      pageButton.click();
-      return "billing";
-    })()`);
-    if (clicked === "billing") {
-      // Usage & billing opens on Usage; the account page is its own section in the mobile selector.
-      const selected = await page.evaluate(`(() => {
-        const select = document.querySelector('[role=dialog] select');
-        const option = [...(select?.options ?? [])].find(item => item.value === "account");
-        if (!select || !option) return false;
-        select.value = "account";
-        select.dispatchEvent(new Event("change", { bubbles: true }));
-        return true;
-      })()`);
-      if (!selected) {
-        await page.evaluate(`(() => {
-          const section = document.querySelector('[data-settings-section=account]');
-          if (section) section.click();
-          return true;
-        })()`);
-      }
-    }
-  }
-  await page.until("Boolean(document.querySelector('[data-product-account]'))", { label: "the account page" });
-}
-
-async function closeSettings(page) {
-  await page.evaluate(`(() => {
-    const dialog = document.querySelector('[role=dialog]');
-    if (!dialog) return true;
-    const close = [...dialog.querySelectorAll("button")].find(button => button.getAttribute("aria-label") === "Close settings");
-    if (!close) return false;
-    close.click();
-    return true;
-  })()`);
-  await page.until("!document.querySelector('[role=dialog]')", { label: "settings closed", timeoutMs: 20_000 });
-}
-
-/** Types and sends through the app's own composer (its Enter handler). */
-async function sendMessage(page, text) {
-  const filled = await page.evaluate(`(() => {
-    const field = document.querySelector("textarea[aria-label]");
-    if (!field) return false;
-    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set.call(field, ${JSON.stringify(text)});
-    field.dispatchEvent(new Event("input", { bubbles: true }));
-    field.dispatchEvent(new Event("change", { bubbles: true }));
-    field.focus();
-    return true;
-  })()`);
-  if (!filled) throw new Error("the composer is not on screen");
-  await page.evaluate(`(() => {
-    const field = document.querySelector("textarea[aria-label]");
-    field.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", bubbles: true, cancelable: true }));
-    return true;
-  })()`);
-  await page.until('(document.querySelector("textarea[aria-label]")?.value ?? "").length === 0', {
-    label: "the composer clears after send", timeoutMs: 30_000,
-  });
-}
-
-async function waitForText(page, text, timeoutMs = 120_000) {
-  await page.until(`document.body.innerText.includes(${JSON.stringify(text)})`, { label: `the text ${JSON.stringify(text)}`, timeoutMs });
-}
-
-/** No pending approval and no Stop control: the turn is over. */
-async function waitSettled(page, timeoutMs = 120_000) {
-  await page.until("!([...document.querySelectorAll('button')].find(button => button.textContent.trim() === 'Allow once'))", { label: "no pending approval", timeoutMs });
-  await page.until("!document.querySelector('[data-composer-stop], button[aria-label=\"Stop this turn\"]')", {
-    label: "the turn finished", timeoutMs,
-  });
-}
-
-/** A mutating workspace call through the app's own page (the account session
- * adds the desktop owner header), never a direct Node request. */
-async function workspaceApi(page, method, path, body) {
-  const result = await page.evaluate(`(async () => {
-    const response = await fetch(${JSON.stringify(path)}, {
-      method: ${JSON.stringify(method)},
-      headers: { "content-type": "application/json" },
-      body: ${JSON.stringify(JSON.stringify(body))},
-    });
-    return { status: response.status, text: (await response.text()).slice(0, 600) };
-  })()`);
-  if (result.status < 200 || result.status >= 300) throw new Error(`${method} ${path} refused (${result.status}): ${result.text}`);
-  return result;
-}
-
-/** Sign out from the workspace: the account page owns that button. */
-async function signOutWorkspace(page) {
-  await openAccountSettings(page);
-  await page.until("Boolean(document.querySelector('[data-product-account]'))", { label: "the account page" });
-  // The page's own Sign out (the sidebar has none in a product workspace).
-  await page.evaluate(`(() => {
-    const scope = document.querySelector('[data-product-account]');
-    const button = [...scope.querySelectorAll("button")].find(candidate => candidate.textContent.trim() === "Sign out");
-    if (!button) return false;
-    button.click();
-    return true;
-  })()`);
-}
-
-/** Completes the real email-code form in the account window, then waits for the
- * workspace window that main opens for that account. */
-/** Creates an account through the password form of a deployment that asks for
- * no emailed code, then waits for that account's workspace window. */
-async function signUpThroughPasswordGate(gatePage, email, password) {
-  await gatePage.click("Create an account", clickButtonByText("Create an account"));
-  await gatePage.evaluate(fillField('input[type="email"]', email));
-  await gatePage.evaluate(fillField('input[autocomplete="new-password"]', password));
-  await gatePage.evaluate(`(() => {
-    const repeat = document.querySelectorAll('input[autocomplete="new-password"]')[1];
-    if (!repeat) return false;
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(repeat, ${JSON.stringify(password)});
-    repeat.dispatchEvent(new Event("input", { bubbles: true }));
-    return true;
-  })()`);
-  await gatePage.click("Create an account", `(() => [...document.querySelectorAll('button[type=submit]')].find(button => !button.disabled))()`);
-  await gatePage.until("document.querySelector('[data-product-account-window]')?.dataset.productAccountWindow === 'signed-in'", {
-    label: `password sign-up for ${email}`, timeoutMs: 120_000,
-  });
-  return await workspaceAfterGate(gatePage, email);
-}
-
-/** Signs in through the password form itself (the default first screen). */
-async function signInThroughPasswordGate(gatePage, email, password) {
-  await gatePage.evaluate(fillField('input[type="email"]', email));
-  await gatePage.evaluate(fillField('input[autocomplete="current-password"]', password));
-  await gatePage.click("Sign in", `(() => [...document.querySelectorAll('button[type=submit]')].find(button => !button.disabled))()`);
-  await gatePage.until("document.querySelector('[data-product-account-window]')?.dataset.productAccountWindow === 'signed-in'", {
-    label: `password sign-in for ${email}`, timeoutMs: 120_000,
-  });
-  return await workspaceAfterGate(gatePage, email);
-}
-
-/** The workspace window main opened for a gate that just signed in, proved by
- * that account's own sidebar line. */
-async function workspaceAfterGate(gatePage, email) {
-  const debugPort = Number(new URL(gatePage.target.webSocketDebuggerUrl.replace(/^ws:/, "http:")).port);
-  const deadline = Date.now() + 150_000;
-  const tried = new Set();
-  while (Date.now() < deadline) {
-    const pages = (await listPages(debugPort).catch(() => []))
-      .filter(target => /^http:\/\/127\.0\.0\.1:\d+\/(\?|$)/.test(target.url) && !tried.has(target.id));
-    for (const target of pages) {
-      tried.add(target.id);
-      const page = await attachPage(target).catch(() => null);
-      if (!page) continue;
-      const ok = await page.until("Boolean(window.ogb?.productAccount)", { label: `${email}'s bridge`, timeoutMs: 15_000 })
-        .then(() => page.until(`document.querySelector('[data-sidebar-product-email]')?.textContent?.trim() === ${JSON.stringify(email)}`, {
-          label: `${email}'s sidebar`, timeoutMs: 45_000,
-        }))
-        .then(() => true, () => false);
-      if (ok) return { page, url: target.url, workspace: true };
-      page.close();
-    }
-    await sleep(400);
-  }
-  throw new Error(`no workspace window ever showed ${email}`);
-}
-
-async function signInThroughGate(gatePage, email, mailbox) {
-  await gatePage.click("Email me a sign-in code", clickButtonByText("Email me a sign-in code"));
-  await gatePage.evaluate(fillField('input[type="email"]', email));
-  await gatePage.click("Send code", clickButtonByText("Send code"));
-  const code = await mailbox.nextCode();
-  await gatePage.until("Boolean(document.querySelector('input[inputmode=\"numeric\"]'))", { label: "the code field" });
-  await gatePage.evaluate(fillField('input[inputmode="numeric"]', code));
-  await gatePage.click("Verify and sign in", `(() => [...document.querySelectorAll("button[type=submit]")].find(button => !button.disabled))()`);
-  await gatePage.until("document.querySelector('[data-product-account-window]')?.dataset.productAccountWindow === 'signed-in'", {
-    label: `sign-in for ${email}`, timeoutMs: 120_000,
-  });
-  const debugPort = Number(new URL(gatePage.target.webSocketDebuggerUrl.replace(/^ws:/, "http:")).port);
-  // Sign-out closes the previous workspace, so one of the matching pages belongs to this sign-in; the
-  // sidebar's own account line is what proves which (both accounts share the same loopback origin).
-  const deadline = Date.now() + 150_000;
-  // A closed account's page can linger in the debugger list while its window is torn down; never retry the same target.
-  const tried = new Set();
-  while (Date.now() < deadline) {
-    const pages = (await listPages(debugPort).catch(() => []))
-      .filter(target => /^http:\/\/127\.0\.0\.1:\d+\/(\?|$)/.test(target.url) && !tried.has(target.id));
-    for (const target of pages) {
-      tried.add(target.id);
-      const page = await attachPage(target).catch(() => null);
-      if (!page) continue;
-      const ok = await page.until("Boolean(window.ogb?.productAccount)", { label: `${email}'s bridge`, timeoutMs: 15_000 })
-        .then(() => page.until(`document.querySelector('[data-sidebar-product-email]')?.textContent?.trim() === ${JSON.stringify(email)}`, {
-          label: `${email}'s sidebar`, timeoutMs: 45_000,
-        }))
-        .then(() => true, () => false);
-      if (ok) return { page, url: target.url, workspace: true };
-      page.close();
-    }
-    await sleep(400);
-  }
-  throw new Error(`no workspace window ever showed ${email}`);
 }
 
 await main();

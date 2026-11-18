@@ -18,7 +18,6 @@ const TOOLKIT_NAMES: Record<string, string> = {
   GOOGLEDRIVE: "Google Drive",
   GOOGLEDOCS: "Google Docs",
   HUBSPOT: "HubSpot",
-  HIGHLEVEL: "HighLevel",
   LINKEDIN: "LinkedIn",
   YOUTUBE: "YouTube",
   TWITTER: "X",
@@ -122,7 +121,6 @@ export function describeTool(name: string, input?: unknown): { app: string | nul
       const member = (AGENTS_ACTION_TOOLS[action]?.members.length ?? 0) > 1 ? agentsCallMember(action, callArguments(input)) : action;
       return Object.hasOwn(RESEARCH_TOOL_LABELS, member) ? RESEARCH_TOOL_LABELS[member]! : { app: "Team", label: humanize(member) };
     }
-    if (server === "highlevel") return { app: "HighLevel", label: humanize(action.replace(/^HIGHLEVEL_/, "")) };
     if (server === "device") return { app: "Phone", label: humanize(action.replace(/^PHONE_/, "")) };
     if (server.startsWith("claude_ai_")) {
       return { app: server.slice("claude_ai_".length).replace(/_/g, " "), label: humanize(action) };

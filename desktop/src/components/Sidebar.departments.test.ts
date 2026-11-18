@@ -136,7 +136,7 @@ beforeEach(() => {
     sections: ["Work"],
   };
   vi.stubGlobal("window", Object.assign(new EventTarget(), {
-    innerWidth: 1280, innerHeight: 800, ogb: undefined, setTimeout, clearTimeout,
+    innerWidth: 1280, innerHeight: 800, hezuo: undefined, setTimeout, clearTimeout,
     matchMedia: (query: string) => ({ matches: fixture.phone && query === PHONE_LAYOUT, addEventListener() {}, removeEventListener() {} }),
   }));
   vi.stubGlobal("document", { body: {}, querySelector: () => null });
@@ -661,6 +661,31 @@ describe("a department's menu in Simple", () => {
     openMenu("Work").onDelete();
     const dialog = render().find((node) => node.type === ConfirmDialog && node.props.open === true)!;
     expect(dialog.props.body).toBe("Its bots and group chats stay, with their conversations, outside any department. The department and its shared instructions are deleted. This cannot be undone.");
+  });
+
+  it.each([false, true])("deletes an empty section through its menu in Simple (product=%s), without deleting members", async productManaged => {
+    const name = "Empty & spare";
+    fixture.state = { ...fixture.state, sections: ["Work", name], config: { ...initialState.config, productManaged } as AppState["config"] };
+    expect(header(name).onMenu).toBeTypeOf("function");
+    openMenu(name).onDelete();
+    const dialog = render().find(node => node.type === ConfirmDialog && node.props.open === true)!;
+    expect(dialog.props.title).toBe(`Delete ${name} department?`);
+    expect(fixture.requests).toEqual([]);
+    (dialog.props.onConfirm as () => void)();
+    await vi.waitFor(() => expect(actions()).toEqual([{ type: "sectionDeleted", section: name, sections: ["Clients"] }]));
+    expect(fixture.requests).toEqual([{ path: `/api/sidebar-sections?section=${encodeURIComponent(name)}`, method: "DELETE", body: undefined }]);
+    expect(render().some(node => node.type === ConfirmDialog && node.props.open === true)).toBe(false);
+  });
+
+  it("cancels deleting an empty product section without changing any bots, chats or sections", () => {
+    fixture.state = { ...fixture.state, sections: ["Work", "Empty"], config: { ...initialState.config, productManaged: true } as AppState["config"] };
+    openMenu("Empty").onDelete();
+    const dialog = render().find(node => node.type === ConfirmDialog && node.props.open === true)!;
+    (dialog.props.onCancel as () => void)();
+    expect(fixture.requests).toEqual([]);
+    expect(actions()).toEqual([]);
+    expect(render().some(node => node.type === ConfirmDialog && node.props.open === true)).toBe(false);
+    expect(header("Empty").onMenu).toBeTypeOf("function");
   });
 
   it("keeps Advanced's rename dialog", () => {

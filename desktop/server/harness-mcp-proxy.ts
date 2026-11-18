@@ -10,7 +10,7 @@ export { harnessMcpRequest } from "./harness-mcp-request.ts";
 const MAX_PENDING = 16;
 
 function run(kind: HarnessMcpKind): void {
-  const connection = { url: process.env.OMB_HARNESS_URL ?? "", token: process.env[harnessMcpTokenEnv(kind)] ?? "", kind, toolLimit: toolLimitFromEnv() };
+  const connection = { url: process.env.HEZUO_HARNESS_URL ?? "", token: process.env[harnessMcpTokenEnv(kind)] ?? "", kind, toolLimit: toolLimitFromEnv() };
   let input = Buffer.alloc(0);
   let pending = 0;
   const output = (message: unknown) => {
@@ -50,7 +50,7 @@ function run(kind: HarnessMcpKind): void {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const kind = parseHarnessMcpKind(process.argv[2]);
   if (!kind) {
-    process.stderr.write("usage: harness-mcp-proxy browser|computer|data|highlevel|device\n");
+    process.stderr.write("usage: harness-mcp-proxy browser|computer|data|device\n");
     process.exitCode = 2;
   } else run(kind);
 }

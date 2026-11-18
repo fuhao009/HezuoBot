@@ -34,7 +34,7 @@ type CompactFn = (threadId: string, options: { instructions: string; session?: s
 export interface WarmSummaryHostDeps {
   store: Pick<Store, "taskByThread" | "botByThread" | "groupByThread" | "activePath" | "appendMessage" | "setResumeCursor" | "setHandedMessages">;
   instance(instanceId: string): { adapter: { cacheKeepWarm?: { compact?: CompactFn; hold(threadId: string, until: number | null): boolean } } } | null | undefined;
-  /** Off with `context.autoCompact: false` or OMB_WARM_SUMMARY=0. */
+  /** Off with `context.autoCompact: false` or HEZUO_WARM_SUMMARY=0. */
   enabled(): boolean;
   /** Where the engine summarizes by itself, in tokens (Claude Code's --autocompact); undefined when Hezuo set none. */
   nativeCompactAt(instanceId: string): number | undefined;
@@ -116,7 +116,7 @@ export function createWarmSummaryHost(deps: WarmSummaryHostDeps) {
 
   const warm = createWarmSummary({
     now,
-    timeScale: Number(process.env.OMB_WARM_SUMMARY_TIME_SCALE) || 1,
+    timeScale: Number(process.env.HEZUO_WARM_SUMMARY_TIME_SCALE) || 1,
     after: deps.after ?? ((ms, fn) => { const timer = setTimeout(fn, ms); timer.unref?.(); return { cancel: () => clearTimeout(timer) }; }),
     plan: (target, contextTokens): WarmSummaryPlan | null => {
       if (!deps.enabled() || store.groupByThread(target.threadId) || !store.taskByThread(target.botId, target.threadId)) return null;

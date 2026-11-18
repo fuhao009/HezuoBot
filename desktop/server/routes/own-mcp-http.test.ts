@@ -71,13 +71,13 @@ describe("Hezuo's own MCP servers over HTTP", () => {
     const list = async (settings: Record<string, string>) =>
       ((await (await post("agents", { jsonrpc: "2.0", id: 1, method: "tools/list" }, agentsHeaders(settings))).json()) as { result: { tools: Array<{ name: string }> } })
         .result.tools.map((tool) => tool.name);
-    const worker = await list({ OMB_BOT_ID: "w2", OMB_THREAD_ID: "t2" });
-    const chief = await list({ OMB_BOT_ID: "chief", OMB_THREAD_ID: "t1", OMB_CHIEF_OF_STAFF: "1" });
+    const worker = await list({ HEZUO_BOT_ID: "w2", HEZUO_THREAD_ID: "t2" });
+    const chief = await list({ HEZUO_BOT_ID: "chief", HEZUO_THREAD_ID: "t1", HEZUO_CHIEF_OF_STAFF: "1" });
     expect(worker).toContain("coordinate_bots");
     expect(chief.length).toBeGreaterThan(worker.length);
     internalCalls.length = 0;
     const call = await (await post("agents", { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "list_bots", arguments: {} } },
-      agentsHeaders({ OMB_BOT_ID: "chief", OMB_THREAD_ID: "t1", OMB_HARNESS_URL: "http://203.0.113.9:1" }))).json();
+      agentsHeaders({ HEZUO_BOT_ID: "chief", HEZUO_THREAD_ID: "t1", HEZUO_HARNESS_URL: "http://203.0.113.9:1" }))).json();
     expect(call).toMatchObject({ id: 2, result: { content: [{ type: "text", text: expect.stringContaining("W1") }] } });
     expect(internalCalls).toEqual([
       expect.objectContaining({ path: "/api/internal/agents?self=chief", authorization: "Bearer turn-capability" }),
@@ -92,7 +92,7 @@ describe("Hezuo's own MCP servers over HTTP", () => {
     const agents = async (settings: Record<string, string>) =>
       ((await (await post("agents", { jsonrpc: "2.0", id: 6, method: "tools/list" }, agentsHeaders(settings))).json()) as { result: { tools: Array<{ name: string }> } })
         .result.tools.map((tool) => tool.name);
-    const whole = await agents({ OMB_BOT_ID: "w2", OMB_THREAD_ID: "t2" });
-    expect(await agents({ OMB_BOT_ID: "w2", OMB_THREAD_ID: "t2", [TOOL_LIMIT_ENV]: "3" })).toEqual(whole.slice(0, 3));
+    const whole = await agents({ HEZUO_BOT_ID: "w2", HEZUO_THREAD_ID: "t2" });
+    expect(await agents({ HEZUO_BOT_ID: "w2", HEZUO_THREAD_ID: "t2", [TOOL_LIMIT_ENV]: "3" })).toEqual(whole.slice(0, 3));
   });
 });

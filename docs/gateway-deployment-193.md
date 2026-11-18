@@ -1,5 +1,14 @@
 # 192.168.66.193 网关部署
 
+> 本页保留既有部署与诊断记录，时间、状态及结果只代表各条记录当时的观察。
+> 本次仅更新文档，未运行检查、构建或部署，也未重新验证网关状态或既有报告。
+> 移动端目前暂缓；本页不能作为移动端已构建、部署或验收的证据。
+>
+> 持久化身份例外：现有 193 的 D1 binding、Worker 名称、host 与数据库文件标识
+> 必须按实际部署原值保留，即使含旧品牌也不做展示名替换；不能据目标品牌推断
+> 已迁移数据或新建数据库。协调方报告的只读状态为 active、18 项迁移；这不是
+> 本次文档编辑执行的检查，也不表示本次部署或重新验证。
+
 ## 电脑端 Bot 模型链路（2026-11-14 实机核对）
 
 安装版 `/Applications/Hezuo.app/Contents/Resources/product-service.json` 指向
@@ -20,7 +29,10 @@
 - 已启用渠道：`omp-fuhaoliang`（OMP Fuhaoliang），地址 `https://api.muzeai.top/v1`；数据库存在加密凭据，不读取、复制或输出其内容。
 - 服务状态：`hezuo-gateway.service` 为 active。
 - 本次检查时，最近三条 `account_ai_requests` 均为 `settled`，模型为 `gpt-6-luna-chat`，记录耗时为 6141、5669、5194 ms。这些是已有推理记录，不是浏览器验收结果。
-- 实际数据库文件：`/var/lib/hezuo-gateway/state/d1/miniflare-D1DatabaseObject/ebc39d1dd414791fd5b9687094fc221f1605b876d0f2096b673dbaf585b55bd2.sqlite`。路径若变化，从服务数据目录定位；只读检查，不修改生产数据。
+- 实际数据库文件（本轮只读确认）：`/var/lib/hezuo-gateway/state/d1/miniflare-D1DatabaseObject/f609ce580f7cf4852707d4b4b482cbc1312a27e491311d71fa7cfc37a59ba2ad.sqlite`；旧 `ebc39d1dd414791fd5b9687094fc221f1605b876d0f2096b673dbaf585b55bd2.sqlite` 路径不存在。路径若变化，从服务数据目录定位；只读检查，不修改生产数据。
+- 本轮只读确认（区别于上文历史快照）：`hezuo-gateway.service` 为 `active/running`；`WorkingDirectory=/var/lib/hezuo-gateway`；`ExecStart=/opt/hezuo-gateway/runtime/node_modules/node/bin/node /opt/hezuo-gateway/app/gateway/local/local-gateway.mjs start --config /var/lib/hezuo-gateway/gateway.json`。
+- 本轮数据库只读统计：余额账号数为 8，`account_ai_requests` 状态计数为 `review=9`、`settled=320`；上述最近三条请求及耗时为历史快照，不代表本轮新增请求。
+- 本轮已完成备份和部署：备份目录 `/opt/hezuo-gateway/backups/pre-mobile-retire-20261115-161645/`，属主为 root、权限为 `0700`，代码、数据及 service 均已完整备份；已替换 4 个源码文件并删除 `push.ts`，迁移目录保持一致，未删除任何表；停服替换前后的数据库逻辑摘要一致，重启后逐表核对仅 `_cf_METADATA` 发生变化，其他表摘要相同；余额账号数为 8，`review=9`、`settled=320`；TLS 校验通过，`/healthz` 返回 `ok`、service 为当前版本，admin 返回 200，service 为 active。用户重登录未执行。
 - 上表是核对时的快照，之后以账号模型目录和实际请求记录为准。
 
 ### Bot 网页验收要求
@@ -61,7 +73,7 @@
 - 独立 Node 24.16.0：`/opt/hezuo-gateway/runtime/node_modules/node/bin/node`；未替换系统 Node。
 - 数据和配置：`/var/lib/hezuo-gateway/`、`/var/lib/hezuo-gateway/gateway.json`。
 - 证书：`/var/lib/hezuo-gateway/tls/gateway-cert.pem`；私钥只留服务器。
-- 本机证书副本：`.omb-scratch/remote-gateway-193/gateway-cert.pem`。
+- 本机证书副本：`.hezuo-scratch/remote-gateway-193/gateway-cert.pem`。
 
 初次部署时为全新环境，未迁移原电脑数据库、账户或上游凭据；当时仅开启密码登录，未配置邮件、上游模型、价格或运营者。模型配置现状以上方实机核对为准。没有修改现有 nginx 或其他服务。
 
@@ -93,7 +105,7 @@ ssh root@192.168.66.193 'systemctl restart hezuo-gateway'
 
 账号注册后，通过现有 `operator --operator-email <已注册邮箱>` 命令显式指定管理员，再重启服务。授权命令应以 `hezuo-gateway` 用户运行以保持配置文件所有权；不会自动给账号开通 AI 或增加积分。
 
-手机需填写上述网关地址并导入/粘贴该证书；桌面包需绑定新地址和 CA。当前桌面安装不会自动切换到新服务器。浏览器不信任自签证书时，不应关闭 TLS 校验；使用可信域名证书或显式信任此证书。
+远程客户端必须信任上述网关地址的证书；桌面包需绑定新地址和 CA。当前桌面安装不会自动切换到新服务器。浏览器不信任自签证书时，不应关闭 TLS 校验；使用可信域名证书或显式信任此证书。
 
 ## 初次管理后台验证（历史记录）
 
@@ -105,7 +117,7 @@ ssh root@192.168.66.193 'systemctl restart hezuo-gateway'
 - 独立临时数据库 + 真实网关 CLI + 假上游 fixture 已成功启动；此前直接程序调用的隔离检查曾超时，不作为通过证据。
 - 浏览器在 fixture 中实际验证：普通账号拒绝、运营者登录、精确邮箱查询、增加 1.000001 积分、停用/启用 AI、拒绝超出 0.204 积分预占的结算、按 0.1 积分成功结算、系统状态、退出。最终可用 5.900001 积分，预占 0。
 - 桌面宽度 1440px、窄屏 390px 已观察真实页面；窄屏无整页横向溢出，localStorage/sessionStorage 均为空，浏览器无页面错误。仅本机一次性 fixture 浏览器放行自签证书；生产跨机器检查使用 CA 校验。
-- 生产环境只执行用户授权的管理员注册与授权，没有注入测试积分或推理请求。手机/桌面中继和真实模型推理未验证。
+- 生产环境只执行用户授权的管理员注册与授权，没有注入测试积分或推理请求。远程 companion 中继和真实模型推理未验证。
 
 实现包含账号查询、权限启停、增加积分、请求记录/详情/人工结算、渠道模型管理、系统状态和智能计费。接口契约见 [gateway-admin-api.md](gateway-admin-api.md) 与 [gateway-channels.md](gateway-channels.md)。全局用户列表、设备管理不在此版界面内。
 

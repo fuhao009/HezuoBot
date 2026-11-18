@@ -25,7 +25,7 @@ export function SecretRequestCard({
 }) {
   const { dispatch } = useStore();
   const secret = message.secret!;
-  const remoteClient = window.ogb?.remoteClient?.active === true;
+  const remoteClient = window.hezuo?.remoteClient?.active === true;
   const [value, setValue] = useState("");
   const [saving, setSaving] = useState(false);
   const [savedLocally, setSavedLocally] = useState(false);
@@ -116,8 +116,8 @@ export function SecretRequestCard({
         const request = credentialSaveRequest(target, next);
         const slot = desktopCredentialSlot(target);
         if (isConfigCredentialTarget(target)) {
-          const status: ConfigStatus = slot && window.ogb?.setCredential
-            ? await window.ogb.setCredential(slot, next)
+          const status: ConfigStatus = slot && window.hezuo?.setCredential
+            ? await window.hezuo.setCredential(slot, next)
             : await api(request.path, { method: request.method, body: JSON.stringify(request.body) });
           dispatch({ type: "configStatus", config: status });
         } else await api(request.path, { method: request.method, body: JSON.stringify(request.body) });

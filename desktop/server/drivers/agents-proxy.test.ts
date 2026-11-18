@@ -4,7 +4,7 @@ import { createServer, type Server } from "node:http";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { childEnv } from "../testing/omb-env.ts";
+import { childEnv } from "../testing/hezuo-env.ts";
 import { ToolResults } from "../tool-results.ts";
 import { waitForExit } from "../testing/cleanup.ts";
 import { fullInputSchema } from "./agents-catalog.ts";
@@ -452,17 +452,17 @@ beforeAll(async () => {
       ...childEnv(),
       // Recalled lines are dated on the machine's clock, so the proxy runs in a fixed zone (+05:30).
       TZ: "Asia/Kolkata",
-      OMB_HARNESS_URL: `http://127.0.0.1:${stubPort}`,
-      OMB_BOT_ID: "bot-asker",
-      OMB_THREAD_ID: "thread-asker-routine",
-      OMB_COMMS_TOKEN: TOKEN,
-      OMB_TURN_DEPTH: "0",
-      OMB_SKILL_AUTHORING_ENABLED: "1",
-      OMB_SHARED_COMPUTERS_ENABLED: "1",
+      HEZUO_HARNESS_URL: `http://127.0.0.1:${stubPort}`,
+      HEZUO_BOT_ID: "bot-asker",
+      HEZUO_THREAD_ID: "thread-asker-routine",
+      HEZUO_COMMS_TOKEN: TOKEN,
+      HEZUO_TURN_DEPTH: "0",
+      HEZUO_SKILL_AUTHORING_ENABLED: "1",
+      HEZUO_SHARED_COMPUTERS_ENABLED: "1",
       // A Chief's turn, so the Chief-only team tools are mounted too.
-      OMB_CHIEF_OF_STAFF: "1",
+      HEZUO_CHIEF_OF_STAFF: "1",
       // A person's own request, which may pick its computer.
-      OMB_COMPUTER_SELECTION: "1",
+      HEZUO_COMPUTER_SELECTION: "1",
     },
     stdio: ["pipe", "pipe", "inherit"],
   });
@@ -1051,8 +1051,6 @@ describe("agents-proxy MCP surface", () => {
       reason: "The selected model needs it.",
     });
     expect(res.result.content[0].text).toContain("secure OpenCode API key request");
-    expect(res.result.content[0].text).toContain("freshly QR-paired mobile app show its secure entry card");
-    expect(res.result.content[0].text).toContain("older mobile pairings explain how to pair again");
     expect(res.result.content[0].text).toContain("End this turn");
     expect(lastCredentialBody).toEqual({
       fromBotId: "bot-asker",
@@ -1101,7 +1099,8 @@ describe("agents-proxy MCP surface", () => {
   it("asks for any other secret by its name, reason and delivery, never its value", async () => {
     const res = await callTool("request_credential", { label: "Stripe secret key", reason: "To create test charges.", placeholder: "sk_test_…", delivery: "file" });
     expect(res.result.isError).toBeFalsy();
-    expect(res.result.content[0].text).toMatch(/^A secure card for OpenCode API key is ready in Hezuo, on the computer and on a freshly QR-paired phone\. End this turn now/u);
+    expect(res.result.content[0].text).toMatch(/^A secure card for OpenCode API key is ready in Hezuo/u);
+    expect(res.result.content[0].text).toContain("End this turn now");
     expect(lastCredentialBody).toEqual({
       fromBotId: "bot-asker",
       fromThreadId: "thread-asker-routine",
@@ -2015,10 +2014,10 @@ describe("standing external runtime", () => {
 
   beforeAll(async () => {
     external = spawn(process.execPath, [PROXY], {
-      env: { ...childEnv(), OMB_HARNESS_URL: `http://127.0.0.1:${stubPort}`, OMB_BOT_ID: "bot-asker",
-        OMB_THREAD_ID: "thread-asker-routine", OMB_COMMS_TOKEN: TOKEN, OMB_TURN_DEPTH: "0",
-        OMB_EXTERNAL_RUNTIME: "1", OMB_ROOM_TURN: "1", OMB_OWN_THREAD_CREATION: "1",
-        OMB_SKILL_AUTHORING_ENABLED: "1", OMB_SHARED_COMPUTERS_ENABLED: "1" },
+      env: { ...childEnv(), HEZUO_HARNESS_URL: `http://127.0.0.1:${stubPort}`, HEZUO_BOT_ID: "bot-asker",
+        HEZUO_THREAD_ID: "thread-asker-routine", HEZUO_COMMS_TOKEN: TOKEN, HEZUO_TURN_DEPTH: "0",
+        HEZUO_EXTERNAL_RUNTIME: "1", HEZUO_ROOM_TURN: "1", HEZUO_OWN_THREAD_CREATION: "1",
+        HEZUO_SKILL_AUTHORING_ENABLED: "1", HEZUO_SHARED_COMPUTERS_ENABLED: "1" },
       stdio: ["pipe", "pipe", "inherit"],
     });
     let buffer = "";
@@ -2041,7 +2040,7 @@ describe("standing external runtime", () => {
   it("sees the same one tool surface as every turn: the switches it sets change nothing", async () => {
     const list = await externalRpc("tools/list");
     // the main child is a Chief's turn that may pick its computer; this one is neither, so only those differ
-    const chiefOnly = ["create_bot", "list_team_setup", "list_team_library", "propose_team_setup", "propose_bot_deletion", "manage_room", "retry_thread"];
+    const chiefOnly = ["create_bot", "list_team_setup", "propose_team_setup", "propose_bot_deletion", "manage_room", "retry_thread"];
     const everyTurn = (await rpc("tools/list")).result.tools.filter((tool: any) => !chiefOnly.includes(tool.name) && tool.name !== "select_computer");
     const names = list.result.tools.map((tool: any) => tool.name);
     expect(names).toEqual(everyTurn.map((tool: any) => tool.name));
@@ -2110,13 +2109,13 @@ describe("with computer sharing off and no Chief of Staff (the defaults)", () =>
     gated = spawn(process.execPath, [PROXY], {
       env: {
         ...childEnv(),
-        OMB_HARNESS_URL: `http://127.0.0.1:${stubPort}`,
-        OMB_BOT_ID: "bot-asker",
-        OMB_THREAD_ID: "thread-asker-routine",
-        OMB_COMMS_TOKEN: TOKEN,
-        OMB_TURN_DEPTH: "0",
-        OMB_SKILL_AUTHORING_ENABLED: "1",
-        // deliberately no OMB_SHARED_COMPUTERS_ENABLED or OMB_CHIEF_OF_STAFF
+        HEZUO_HARNESS_URL: `http://127.0.0.1:${stubPort}`,
+        HEZUO_BOT_ID: "bot-asker",
+        HEZUO_THREAD_ID: "thread-asker-routine",
+        HEZUO_COMMS_TOKEN: TOKEN,
+        HEZUO_TURN_DEPTH: "0",
+        HEZUO_SKILL_AUTHORING_ENABLED: "1",
+        // deliberately no HEZUO_SHARED_COMPUTERS_ENABLED or HEZUO_CHIEF_OF_STAFF
       },
       stdio: ["pipe", "pipe", "inherit"],
     });
@@ -2265,8 +2264,8 @@ describe("tool bridge", () => {
   function startProxy(env: Record<string, string>): Rpc {
     const proxy = spawn(process.execPath, [PROXY], {
       env: {
-        ...childEnv(), TZ: "Asia/Kolkata", OMB_HARNESS_URL: `http://127.0.0.1:${stubPort}`, OMB_BOT_ID: "bot-asker",
-        OMB_THREAD_ID: "thread-asker-routine", OMB_COMMS_TOKEN: TOKEN, OMB_TURN_DEPTH: "0", ...env,
+        ...childEnv(), TZ: "Asia/Kolkata", HEZUO_HARNESS_URL: `http://127.0.0.1:${stubPort}`, HEZUO_BOT_ID: "bot-asker",
+        HEZUO_THREAD_ID: "thread-asker-routine", HEZUO_COMMS_TOKEN: TOKEN, HEZUO_TURN_DEPTH: "0", ...env,
       },
       stdio: ["pipe", "pipe", "inherit"],
     });
@@ -2295,7 +2294,7 @@ describe("tool bridge", () => {
   }
 
   /** The main child's switches: a Chief with skills and shared computers. */
-  const CHIEF = { OMB_SKILL_AUTHORING_ENABLED: "1", OMB_SHARED_COMPUTERS_ENABLED: "1", OMB_CHIEF_OF_STAFF: "1", OMB_COMPUTER_SELECTION: "1" };
+  const CHIEF = { HEZUO_SKILL_AUTHORING_ENABLED: "1", HEZUO_SHARED_COMPUTERS_ENABLED: "1", HEZUO_CHIEF_OF_STAFF: "1", HEZUO_COMPUTER_SELECTION: "1" };
   const CHIEF_ONLY = ["create_bot", "list_team_setup", "propose_team_setup", "propose_bot_deletion", "manage_room", "retry_thread"];
   const HOT = ["tool_result_read", "list_room_targets", "coordinate_bots", "list_bots", "list_rooms", "select_computer", "attach_file", "publish_page", "post_to_room", "request_credential", "request_sign_in", "fill_login", "memory_update"];
   let chief: Rpc;
@@ -2315,10 +2314,10 @@ describe("tool bridge", () => {
   };
 
   beforeAll(async () => {
-    chief = startProxy({ ...CHIEF, OMB_AGENTS_TOOL_BRIDGE: "1" });
+    chief = startProxy({ ...CHIEF, HEZUO_AGENTS_TOOL_BRIDGE: "1" });
     // not a Chief, nothing optional, a person's own request: bridged
-    plain = startProxy({ OMB_COMPUTER_SELECTION: "1", OMB_AGENTS_TOOL_BRIDGE: "1" });
-    off = startProxy({ ...CHIEF, OMB_AGENTS_TOOL_BRIDGE: "0" });
+    plain = startProxy({ HEZUO_COMPUTER_SELECTION: "1", HEZUO_AGENTS_TOOL_BRIDGE: "1" });
+    off = startProxy({ ...CHIEF, HEZUO_AGENTS_TOOL_BRIDGE: "0" });
     for (const proxy of [chief, plain, off]) {
       expect((await proxy("initialize", { protocolVersion: "2024-11-05" })).result.serverInfo.name).toBe("hezuo-agents");
     }

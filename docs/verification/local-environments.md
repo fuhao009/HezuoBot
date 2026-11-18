@@ -94,8 +94,8 @@ Simulate an environment on a drive that is gone, without a real drive:
 Make the **active** environment unbootable:
 
 1. Quit the app. Create an unwritable parent, e.g.
-   `sudo mkdir /opt/omb-locked && sudo chmod 500 /opt/omb-locked`, set the
-   active entry's `dataDir` to `/opt/omb-locked/env` and `activeId` to that
+   `sudo mkdir /opt/hezuo-locked && sudo chmod 500 /opt/hezuo-locked`, set the
+   active entry's `dataDir` to `/opt/hezuo-locked/env` and `activeId` to that
    entry's id.
 2. Launch. Expect the boot to fail across the port schedule (a child that
    cannot create its data dir exits quickly; a hung child burns the full

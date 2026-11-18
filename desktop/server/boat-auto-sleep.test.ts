@@ -1,16 +1,15 @@
 // The idle sleep over HTTP, against one stub that plays both Boat (/boat, public API v1) and the Admin's relay (/relay,
 // the legacy box dialect): the stop reaches whichever one the credential belongs to, after Chrome is asked to exit.
-import { createHash } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { hostTimeout } from "./testing/host-timeout.ts";
 
-const INCLUDED = "box_omb_included-relay-token";
+const INCLUDED = "box_hezuo_included-relay-token";
 const OWN = "boat_own-key";
 const botId = "auto-sleep-test";
 const boxId = "bx_23456789";
-const machineName = `ogb-${botId.slice(0, 8).toLowerCase().replace(/[^a-z0-9]/g, "")}-${createHash("sha256").update(botId).digest("hex").slice(0, 6)}`;
+let machineName = "";
 
 let api: Server;
 let base = "";
@@ -71,6 +70,7 @@ describe("a cloud computer goes to sleep after its idle window", () => {
 
   async function powerFor(cfg: import("./config.ts").AppConfig) {
     vi.resetModules();
+    machineName = await (await import("./boat.ts")).boatNameFor(botId);
     const { createCloudComputerPower } = await import("./host/cloud-computer-power.ts");
     power = createCloudComputerPower({
       cfg,
@@ -92,10 +92,10 @@ describe("a cloud computer goes to sleep after its idle window", () => {
     logs = [];
     busy = false;
     vi.stubEnv("BOX_TOKEN", undefined);
-    vi.stubEnv("OMB_BOAT_API", `${base}/boat/api/v1`);
-    vi.stubEnv("OMB_CLOUD_BOAT_URL", `${base}/relay/api/box/v1`);
-    vi.stubEnv("OMB_CLOUD_BOAT_TOKEN", INCLUDED);
-    vi.stubEnv("OMB_CLOUD_COMPUTER_IDLE_MS", "1000");
+    vi.stubEnv("HEZUO_BOAT_API", `${base}/boat/api/v1`);
+    vi.stubEnv("HEZUO_CLOUD_BOAT_URL", `${base}/relay/api/box/v1`);
+    vi.stubEnv("HEZUO_CLOUD_BOAT_TOKEN", INCLUDED);
+    vi.stubEnv("HEZUO_CLOUD_COMPUTER_IDLE_MS", "1000");
   });
 
   afterEach(() => {

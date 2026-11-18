@@ -39,10 +39,20 @@ function readResource(value) {
   throw new Error("product_service_invalid");
 }
 
+export class ObsoleteDesktopEnvironmentError extends Error {
+  constructor(replacements) {
+    super(`Replace obsolete environment variables before restarting: ${replacements.join(", ")}.`);
+  }
+}
+
 export async function resolveProductService({ isPackaged, appPath, resourcesPath, environment = process.env, fixtureOrigin }) {
+  const replacements = [];
+  if (environment.OMB_PRODUCT_SERVICE_URL !== undefined) replacements.push("OMB_PRODUCT_SERVICE_URL → HEZUO_PRODUCT_SERVICE_URL");
+  if (environment.OMB_DATA_DIR !== undefined) replacements.push("OMB_DATA_DIR → HEZUO_DATA_DIR");
+  if (replacements.length) throw new ObsoleteDesktopEnvironmentError(replacements);
   if (isPackaged) {
     const metadata = JSON.parse(await readFile(path.join(appPath, "package.json"), "utf8"));
-    if (metadata.ombProductManaged !== true) return null;
+    if (metadata.hezuoProductManaged !== true) return null;
     let resource;
     try { resource = JSON.parse(await readFile(path.join(resourcesPath, "product-service.json"), "utf8")); }
     catch { throw new Error("product_service_missing"); }
@@ -60,6 +70,6 @@ export async function resolveProductService({ isPackaged, appPath, resourcesPath
     }
     return { origin: bundled.origin, ca: bundled.ca, managed: true };
   }
-  if (!environment.OMB_PRODUCT_SERVICE_URL) return null;
-  return { origin: validateProductOrigin(environment.OMB_PRODUCT_SERVICE_URL, { allowLoopback: true }), ca: null, managed: true };
+  if (!environment.HEZUO_PRODUCT_SERVICE_URL) return null;
+  return { origin: validateProductOrigin(environment.HEZUO_PRODUCT_SERVICE_URL, { allowLoopback: true }), ca: null, managed: true };
 }

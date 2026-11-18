@@ -20,10 +20,10 @@ describe("serialized request token diagnostics", () => {
   it("logs only inference dispatches when explicitly enabled, never headers or payload text", () => {
     const log = vi.spyOn(console, "info").mockImplementation(() => {});
     const init = { body: JSON.stringify({ input: "SECRET PROMPT" }), headers: { authorization: "Bearer SECRET TOKEN" } };
-    vi.stubEnv("OMB_REQUEST_TOKEN_DIAGNOSTICS", "0");
+    vi.stubEnv("HEZUO_REQUEST_TOKEN_DIAGNOSTICS", "0");
     reportRequestTokens("https://fixture.invalid/responses", init);
     expect(log).not.toHaveBeenCalled();
-    vi.stubEnv("OMB_REQUEST_TOKEN_DIAGNOSTICS", "1");
+    vi.stubEnv("HEZUO_REQUEST_TOKEN_DIAGNOSTICS", "1");
     reportRequestTokens("https://fixture.invalid/quote", init);
     expect(log).not.toHaveBeenCalled();
     reportRequestTokens("https://fixture.invalid/responses", init);

@@ -12,7 +12,7 @@ const bob = personKey({ id: "", email: BOB });
 const name = (n: number) => `0000000${n}-0000-4000-8000-000000000000.txt`;
 
 function fixture() {
-  const dataDir = mkdtempSync(join(tmpdir(), "omb-member-left-"));
+  const dataDir = mkdtempSync(join(tmpdir(), "hezuo-member-left-"));
   const attachments = join(dataDir, "attachments");
   mkdirSync(attachments, { recursive: true });
   const messages = new Map<string, unknown[]>();

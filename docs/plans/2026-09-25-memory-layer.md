@@ -1,4 +1,4 @@
-# A robust memory layer (one PR)
+# A robust memory layer (one PR) — Hezuo
 
 Date: 2026-09-25. Base: `main` @ cd4b9842. Branch: `memory/robust-layer`.
 
@@ -31,7 +31,7 @@ Lessons carried in from the closed PRs #1362/#1363/#1281:
 | 5. Nightly tidy-up (expired → archive, exact duplicates, contradictions) | per-bot **Memory upkeep**, on | yes, journaled as *upkeep* |
 | 6. *About me* learned from the person's own words, listed with Remove | per-bot **Memory upkeep**, on | yes, the shared About me |
 
-**Decision change (2026-09-26, Omkar, after hand testing):** the first cut
+**Decision change (2026-09-26, maintainer, after hand testing):** the first cut
 kept writing opt-in and About me behind approval, to answer the maintainer's
 regression concern on #1362/#1363. In use that asked people to curate by
 hand, which they will not do. Upkeep is now on unless a bot's switch is off

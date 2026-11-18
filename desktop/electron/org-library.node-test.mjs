@@ -21,7 +21,7 @@ const release = (bytes, extra = {}) => ({ version: "1.3.0", sha256: sha256Hex(by
 const entry = (packageId, extra = {}) => ({ packageId, ref: "acme/sales-desk", name: "Sales desk", tagline: "Qualify leads.", kind: "team",
   publisher: { organizationId: PUBLISHER, name: "Acme Partners", self: false }, mode: "available", offAction: "keep", release: release(teamBytes), withdrawnReleases: [],
   contents: { bots: 3, skills: 2, presets: 0, rooms: 1, routines: 2, connections: 1, botNames: ["Scout", "Closer", "Pixel"] }, scanFindings: 0, ...extra });
-const catalogOf = (packages, extra = {}) => ({ format: "openmaus.org-library", version: 1, libraryVersion: 1, organization: { id: ORG, name: "Beta Clinic" }, packages, ...extra });
+const catalogOf = (packages, extra = {}) => ({ format: "hezuo.org-library", version: 1, libraryVersion: 1, organization: { id: ORG, name: "Beta Clinic" }, packages, ...extra });
 const standard = (extra = {}) => catalogOf([
   entry(TEAM),
   entry(SKILLS, { ref: "acme/refund-skills", name: "Refund skills", kind: "library", release: release(skillBytes, { version: "2.0.0" }) }),
@@ -35,7 +35,7 @@ const mode = async file => process.platform === "win32" ? 0o600 : (await fs.stat
 const exists = file => fs.access(file).then(() => true, () => false);
 
 async function fixture(t, { catalog = standard(), relayOk = true } = {}) {
-  const home = await fs.mkdtemp(path.join(os.tmpdir(), "omb-org-library-"));
+  const home = await fs.mkdtemp(path.join(os.tmpdir(), "hezuo-org-library-"));
   t.after(() => fs.rm(home, { recursive: true, force: true }));
   const dataDir = path.join(home, "org-library");
   const f = {
@@ -222,7 +222,7 @@ test("another organization's or a malformed catalog keeps the last good one, and
   const f = await fixture(t);
   await f.sync();
   const good = { record: structuredClone(f.record.value), file: await fs.readFile(path.join(f.dataDir, "catalog.json")) };
-  for (const bad of [catalogOf([entry(TEAM)], { organization: { id: PUBLISHER, name: "Acme Partners" }, libraryVersion: 2 }), { format: "openmaus.org-library", version: 1 }]) {
+  for (const bad of [catalogOf([entry(TEAM)], { organization: { id: PUBLISHER, name: "Acme Partners" }, libraryVersion: 2 }), { format: "hezuo.org-library", version: 1 }]) {
     const digest = f.setCatalog(bad);
     f.requests.length = 0;
     await f.sync({ version: 2, digest });
@@ -461,12 +461,12 @@ function desktop(t, { capability = 1, pointer = true, catalog = standard(), sess
     if (route === "/api/desktop/library") return new Response(f.catalogBytes, { headers: { "content-type": "application/json" } });
     if (route === "/api/desktop/library/report") { f.reports = [...(f.reports ?? []), JSON.parse(options.body)]; return Response.json({ accepted: 1, ignored: 0 }); }
     const sha = /^\/api\/desktop\/library\/blobs\/([a-f0-9]{64})$/.exec(route)?.[1];
-    if (sha && f.blobs.has(sha)) return new Response(f.blobs.get(sha), { headers: { "x-openmaus-sha256": sha } });
+    if (sha && f.blobs.has(sha)) return new Response(f.blobs.get(sha), { headers: { "x-hezuo-sha256": sha } });
     if (sha) return Response.json({ error: "Not found." }, { status: 404 });
     throw new Error(`Unexpected fixture route ${route}`);
   };
   return f.setup = (async () => {
-    const home = await fs.mkdtemp(path.join(os.tmpdir(), "omb-org-library-client-"));
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), "hezuo-org-library-client-"));
     t.after(() => fs.rm(home, { recursive: true, force: true }));
     f.dataDir = path.join(home, "org-library");
     const libraryRecord = { value: null };

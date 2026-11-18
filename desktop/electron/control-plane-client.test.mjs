@@ -17,7 +17,7 @@ import { setDebugLogSink } from "./debug-log.mjs";
 
 /** A throwaway certificate for 127.0.0.1, or null where openssl is absent. */
 function certificate(altName = "IP:127.0.0.1", commonName = "127.0.0.1") {
-  const directory = mkdtempSync(join(tmpdir(), "omb-client-ca-"));
+  const directory = mkdtempSync(join(tmpdir(), "hezuo-client-ca-"));
   try {
     const made = spawnSync("openssl", ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "2",
       "-keyout", join(directory, "key.pem"), "-out", join(directory, "cert.pem"),
@@ -38,7 +38,7 @@ async function startTls(fixture, handler) {
 }
 
 const ACCOUNT = `signed.${"a".repeat(40)}`;
-const INSTALL = `omb_install_${"a".repeat(22)}.${"b".repeat(43)}`;
+const INSTALL = `hezuo_install_${"a".repeat(22)}.${"b".repeat(43)}`;
 const INSTALL_ID = "11111111-1111-4111-8111-111111111111";
 const jsonResponse = (body, init = {}) =>
   new Response(JSON.stringify(body), {
@@ -52,7 +52,7 @@ describe("control-plane desktop client", () => {
     setDebugLogSink(record => records.push(record));
     try {
       const cause = Object.assign(new Error("connect EHOSTUNREACH"), { code: "EHOSTUNREACH" });
-      const client = createControlPlaneClient({ baseURL: "https://accounts.openmausbot.com",
+      const client = createControlPlaneClient({ baseURL: "https://accounts.example.test",
         fetchImpl: async () => { throw new TypeError("fetch failed", { cause }); } });
       await expect(client.signInWithPassword("ada@example.com", "private-password-123")).rejects.toMatchObject({ code: "network_unavailable" });
       const output = JSON.stringify(records);
@@ -66,7 +66,7 @@ describe("control-plane desktop client", () => {
 
   it.each([9, 129])("rejects a %i-character password before transport", async length => {
     const fetchImpl = vi.fn();
-    const client = createControlPlaneClient({ baseURL: "https://accounts.openmausbot.com", fetchImpl });
+    const client = createControlPlaneClient({ baseURL: "https://accounts.example.test", fetchImpl });
     for (const method of ["signUpWithPassword", "signInWithPassword"]) {
       await expect(client[method]("ada@example.com", "x".repeat(length))).rejects.toMatchObject({ code: "invalid_password" });
     }
@@ -78,7 +78,7 @@ describe("control-plane desktop client", () => {
       expect(JSON.parse(init.body).password).toBe("x".repeat(length));
       return jsonResponse({ user: { id: "user-1", email: "ada@example.com" }, token: null });
     });
-    const client = createControlPlaneClient({ baseURL: "https://accounts.openmausbot.com", fetchImpl });
+    const client = createControlPlaneClient({ baseURL: "https://accounts.example.test", fetchImpl });
     await client.signUpWithPassword("ada@example.com", "x".repeat(length));
     expect(fetchImpl).toHaveBeenCalledOnce();
   });
@@ -92,27 +92,27 @@ describe("control-plane desktop client", () => {
       if (url.endsWith("/v1/installations")) return jsonResponse({ error: "installation_exists" }, { status: 409 });
       return jsonResponse({ credential: INSTALL, credentialExpiresAt: Date.now() + 100_000 }, { status: 201 });
     });
-    const client = createControlPlaneClient({ baseURL: "https://accounts.openmausbot.com", fetchImpl });
+    const client = createControlPlaneClient({ baseURL: "https://accounts.example.test", fetchImpl });
     await expect(client.ensureInstallation({ accountToken: ACCOUNT, clientInstanceId: "client-1", name: "Mac", platform: "darwin" })).resolves.toMatchObject({ credential: INSTALL });
     expect(fetchImpl.mock.calls.filter(([url, init]) => url.endsWith("/v1/installations") && init.method === "POST")).toHaveLength(1);
     expect(fetchImpl.mock.calls.filter(([url]) => url.endsWith("/credentials/rotate"))).toHaveLength(1);
   });
 
   it("accepts exact HTTPS and loopback development origins only", () => {
-    expect(normalizeControlPlaneURL("https://accounts.openmausbot.com/")).toBe(
-      "https://accounts.openmausbot.com",
+    expect(normalizeControlPlaneURL("https://accounts.example.test/")).toBe(
+      "https://accounts.example.test",
     );
     expect(normalizeControlPlaneURL("http://127.0.0.1:8787/")).toBe("http://127.0.0.1:8787");
-    expect(normalizeControlPlaneURL("http://accounts.openmausbot.com")).toBe("");
-    expect(normalizeControlPlaneURL("https://accounts.openmausbot.com/api")).toBe("");
-    expect(normalizeControlPlaneURL("https://user:secret@accounts.openmausbot.com")).toBe("");
+    expect(normalizeControlPlaneURL("http://accounts.example.test")).toBe("");
+    expect(normalizeControlPlaneURL("https://accounts.example.test/api")).toBe("");
+    expect(normalizeControlPlaneURL("https://user:secret@accounts.example.test")).toBe("");
   });
 
   it("normalizes an email without accepting malformed input", () => {
     expect(normalizeAccountEmail(" Ada@Example.COM ")).toBe("ada@example.com");
     expect(normalizeAccountEmail("not-an-email")).toBe("");
     expect(normalizeAccountEmail(new String("ada@example.com"))).toBe("");
-    expect(normalizeControlPlaneURL({ toString: () => "https://accounts.openmausbot.com" })).toBe("");
+    expect(normalizeControlPlaneURL({ toString: () => "https://accounts.example.test" })).toBe("");
   });
 
   it("accepts plain cross-realm response records", async () => {
@@ -120,7 +120,7 @@ describe("control-plane desktop client", () => {
       "({ user: { id: 'user-1', email: 'ada@example.com' } })",
     );
     const client = createControlPlaneClient({
-      baseURL: "https://accounts.openmausbot.com",
+      baseURL: "https://accounts.example.test",
       fetchImpl: vi.fn(async () => ({
         status: 200,
         ok: true,
@@ -142,7 +142,7 @@ describe("control-plane desktop client", () => {
       }
     }
     const client = createControlPlaneClient({
-      baseURL: "https://accounts.openmausbot.com",
+      baseURL: "https://accounts.example.test",
       fetchImpl: vi.fn(async () => ({
         status: 200,
         ok: true,
@@ -160,13 +160,13 @@ describe("control-plane desktop client", () => {
     // A certificate for another host is refused at construction, never used loosely.
     const elsewhere = certificate("DNS:accounts.example", "accounts.example");
     if (elsewhere) {
-      expect(() => createControlPlaneClient({ baseURL: "https://accounts.openmausbot.com", ca: elsewhere.pem })).toThrow(ControlPlaneError);
+      expect(() => createControlPlaneClient({ baseURL: "https://accounts.example.test", ca: elsewhere.pem })).toThrow(ControlPlaneError);
     }
-    expect(() => createControlPlaneClient({ baseURL: "https://accounts.openmausbot.com", ca: "not a certificate" })).toThrow(ControlPlaneError);
+    expect(() => createControlPlaneClient({ baseURL: "https://accounts.example.test", ca: "not a certificate" })).toThrow(ControlPlaneError);
 
     const server = await startTls(fixture, (request, response) => {
       response.writeHead(200, { "content-type": "application/json" });
-      response.end(JSON.stringify({ ok: true, service: "openmausbot-control-plane" }));
+      response.end(JSON.stringify({ ok: true, service: "hezuobot-control-plane" }));
     });
     try {
       // No NODE_EXTRA_CA_CERTS and no global trust change: the bundled
@@ -184,10 +184,11 @@ describe("control-plane desktop client", () => {
     const timeoutSignal = vi.fn(() => new AbortController().signal);
     const fetchImpl = vi
       .fn()
-      .mockResolvedValueOnce(jsonResponse({ ok: true, service: "openmausbot-control-plane" }))
+      .mockResolvedValueOnce(jsonResponse({ ok: true, service: "hezuobot-control-plane" }))
+      .mockResolvedValueOnce(jsonResponse({ ok: true, service: "retired-control-plane" }))
       .mockResolvedValueOnce(jsonResponse({ ok: true, service: "some-other-service" }));
     const client = createControlPlaneClient({
-      baseURL: "https://accounts.openmausbot.com",
+      baseURL: "https://accounts.example.test",
       fetchImpl,
       timeoutSignal,
     });
@@ -196,7 +197,10 @@ describe("control-plane desktop client", () => {
     await expect(client.health()).rejects.toMatchObject({
       code: "control_plane_unavailable",
     });
-    expect(fetchImpl.mock.calls[0][0]).toBe("https://accounts.openmausbot.com/healthz");
+    await expect(client.health()).rejects.toMatchObject({
+      code: "control_plane_unavailable",
+    });
+    expect(fetchImpl.mock.calls[0][0]).toBe("https://accounts.example.test/healthz");
     expect(fetchImpl.mock.calls[0][1].redirect).toBe("error");
     expect(fetchImpl.mock.calls[0][1].headers.get("origin")).toBeNull();
     expect(timeoutSignal).toHaveBeenNthCalledWith(1, 3_000);
@@ -215,7 +219,7 @@ describe("control-plane desktop client", () => {
       );
     });
     const client = createControlPlaneClient({
-      baseURL: "https://accounts.openmausbot.com",
+      baseURL: "https://accounts.example.test",
       fetchImpl,
     });
 
@@ -243,7 +247,7 @@ describe("control-plane desktop client", () => {
       }
       return jsonResponse({ password: { enabled: true, minLength: 10, maxLength: 128 }, emailCode: { enabled: false }, emailVerification: "off" });
     });
-    const client = createControlPlaneClient({ baseURL: "https://accounts.openmausbot.com", fetchImpl });
+    const client = createControlPlaneClient({ baseURL: "https://accounts.example.test", fetchImpl });
 
     await expect(client.signUpWithPassword(" Ada@Example.com ", "correct horse battery")).resolves.toEqual({
       accountToken: null,
@@ -267,7 +271,7 @@ describe("control-plane desktop client", () => {
     // rule); the public discovery read does not need it.
     const mutations = seen.filter((entry) => entry.url.includes("/api/auth/"));
     expect(mutations).toHaveLength(2);
-    expect(mutations.every((entry) => entry.origin === "https://accounts.openmausbot.com")).toBe(true);
+    expect(mutations.every((entry) => entry.origin === "https://accounts.example.test")).toBe(true);
   });
 
   it("refuses a malformed password answer instead of treating it as signed in", async () => {
@@ -278,7 +282,7 @@ describe("control-plane desktop client", () => {
       }
       return jsonResponse({ password: { enabled: true, minLength: 1, maxLength: 4 }, emailCode: { enabled: true }, emailVerification: "irrelevant" });
     });
-    const client = createControlPlaneClient({ baseURL: "https://accounts.openmausbot.com", fetchImpl });
+    const client = createControlPlaneClient({ baseURL: "https://accounts.example.test", fetchImpl });
 
     await expect(client.signInWithPassword("ada@example.com", "correct horse battery")).rejects.toMatchObject({
       code: "invalid_response",
@@ -295,13 +299,13 @@ describe("control-plane desktop client", () => {
       // Undici adds Fetch Metadata after our wrapper; Better Auth 1.7 forbids a browser-shaped request without a trusted Origin.
       const wireHeaders = new Headers(init.headers);
       wireHeaders.set("sec-fetch-mode", "cors");
-      if (wireHeaders.has("sec-fetch-mode") && wireHeaders.get("origin") !== "https://accounts.openmausbot.com") {
+      if (wireHeaders.has("sec-fetch-mode") && wireHeaders.get("origin") !== "https://accounts.example.test") {
         return jsonResponse({ error: "forbidden" }, { status: 403 });
       }
       return jsonResponse({ success: true });
     });
     const client = createControlPlaneClient({
-      baseURL: "https://accounts.openmausbot.com",
+      baseURL: "https://accounts.example.test",
       fetchImpl,
     });
 
@@ -309,14 +313,14 @@ describe("control-plane desktop client", () => {
       email: "ada@example.com",
     });
     expect(fetchImpl.mock.calls[0][1].headers.get("origin")).toBe(
-      "https://accounts.openmausbot.com",
+      "https://accounts.example.test",
     );
   });
 
   it("revokes the account session through the JSON-only sign-out endpoint", async () => {
     let active = true;
     const client = createControlPlaneClient({
-      baseURL: "https://accounts.openmausbot.com",
+      baseURL: "https://accounts.example.test",
       fetchImpl: async (url, init) => {
         if (url.endsWith("/api/auth/sign-out")) {
           if (init.headers.get("content-type") !== "application/json" || init.body !== "{}") {
@@ -337,7 +341,7 @@ describe("control-plane desktop client", () => {
 
   it("keeps a valid installation credential without rotating it", async () => {
     const fetchImpl = vi.fn(async (url) => {
-      expect(url).toBe("https://accounts.openmausbot.com/v1/installations/self");
+      expect(url).toBe("https://accounts.example.test/v1/installations/self");
       return jsonResponse({
         installation: {
           id: INSTALL_ID,
@@ -349,7 +353,7 @@ describe("control-plane desktop client", () => {
         credentialExpiresAt: Date.now() + 10_000,
       });
     });
-    const client = createControlPlaneClient({ baseURL: "https://accounts.openmausbot.com", fetchImpl });
+    const client = createControlPlaneClient({ baseURL: "https://accounts.example.test", fetchImpl });
     const result = await client.ensureInstallation({
       accountToken: ACCOUNT,
       currentCredential: INSTALL,
@@ -363,7 +367,7 @@ describe("control-plane desktop client", () => {
   });
 
   it("recovers a lost installation credential by rotating the matching identity", async () => {
-    const rotated = `omb_install_${"c".repeat(22)}.${"d".repeat(43)}`;
+    const rotated = `hezuo_install_${"c".repeat(22)}.${"d".repeat(43)}`;
     const fetchImpl = vi.fn(async (url, init) => {
       if (url.endsWith("/v1/installations")) {
         return jsonResponse({
@@ -374,7 +378,7 @@ describe("control-plane desktop client", () => {
       expect(init.method).toBe("POST");
       return jsonResponse({ credential: rotated, credentialExpiresAt: Date.now() + 10_000 }, { status: 201 });
     });
-    const client = createControlPlaneClient({ baseURL: "https://accounts.openmausbot.com", fetchImpl });
+    const client = createControlPlaneClient({ baseURL: "https://accounts.example.test", fetchImpl });
     await expect(client.ensureInstallation({
       accountToken: ACCOUNT,
       clientInstanceId: "client-1",
@@ -386,7 +390,7 @@ describe("control-plane desktop client", () => {
 
   it("lists validated active installations for response-loss cleanup", async () => {
     const fetchImpl = vi.fn(async (url, init) => {
-      expect(url).toBe("https://accounts.openmausbot.com/v1/installations");
+      expect(url).toBe("https://accounts.example.test/v1/installations");
       expect(init.headers.get("authorization")).toBe(`Bearer ${ACCOUNT}`);
       return jsonResponse({
         installations: [{
@@ -399,7 +403,7 @@ describe("control-plane desktop client", () => {
       });
     });
     const client = createControlPlaneClient({
-      baseURL: "https://accounts.openmausbot.com",
+      baseURL: "https://accounts.example.test",
       fetchImpl,
     });
 
@@ -414,7 +418,7 @@ describe("control-plane desktop client", () => {
 
   it("rejects malformed installation lists instead of skipping cleanup targets", async () => {
     const client = createControlPlaneClient({
-      baseURL: "https://accounts.openmausbot.com",
+      baseURL: "https://accounts.example.test",
       fetchImpl: vi.fn(async () => jsonResponse({
         installations: [{ id: "not-an-installation", clientInstanceId: "client-1" }],
       })),
@@ -428,14 +432,14 @@ describe("control-plane desktop client", () => {
   it("validates endpoint material without leaking the connector token into the URL", async () => {
     const connectorToken = `eyJ${"x".repeat(80)}`;
     const fetchImpl = vi.fn(async (url, init) => {
-      expect(url).toBe("https://accounts.openmausbot.com/v1/installations/self/endpoint");
+      expect(url).toBe("https://accounts.example.test/v1/installations/self/endpoint");
       expect(init.headers.get("authorization")).toBe(`Bearer ${INSTALL}`);
       expect(url).not.toContain(connectorToken);
-      return jsonResponse({ endpoint: { url: "https://c-opaque.openmausbot.com" }, connectorToken });
+      return jsonResponse({ endpoint: { url: "https://c-opaque.example.test" }, connectorToken });
     });
-    const client = createControlPlaneClient({ baseURL: "https://accounts.openmausbot.com", fetchImpl });
+    const client = createControlPlaneClient({ baseURL: "https://accounts.example.test", fetchImpl });
     await expect(client.ensureEndpoint(INSTALL)).resolves.toEqual({
-      endpoint: { url: "https://c-opaque.openmausbot.com" },
+      endpoint: { url: "https://c-opaque.example.test" },
       connectorToken,
     });
   });
@@ -443,16 +447,16 @@ describe("control-plane desktop client", () => {
   it("reports the app's release with an endpoint request only when it is a printable version", async () => {
     const connectorToken = `eyJ${"x".repeat(80)}`;
     const fetchImpl = vi.fn(async () =>
-      jsonResponse({ endpoint: { url: "https://c-opaque.mausbot.si" }, connectorToken }),
+      jsonResponse({ endpoint: { url: "https://c-opaque.hezuobot.si" }, connectorToken }),
     );
-    const client = createControlPlaneClient({ baseURL: "https://accounts.openmausbot.com", fetchImpl });
+    const client = createControlPlaneClient({ baseURL: "https://accounts.example.test", fetchImpl });
     const sent = () => {
       const [, init] = fetchImpl.mock.lastCall;
       return { body: init.body, contentType: init.headers.get("content-type") };
     };
 
     await expect(client.ensureEndpoint(INSTALL, { appVersion: " 0.1.104 " })).resolves.toEqual({
-      endpoint: { url: "https://c-opaque.mausbot.si" },
+      endpoint: { url: "https://c-opaque.hezuobot.si" },
       connectorToken,
     });
     expect(sent()).toEqual({ body: JSON.stringify({ appVersion: "0.1.104" }), contentType: "application/json" });
@@ -467,7 +471,7 @@ describe("control-plane desktop client", () => {
 
   it("maps bounded server error codes and hides arbitrary response text", async () => {
     const client = createControlPlaneClient({
-      baseURL: "https://accounts.openmausbot.com",
+      baseURL: "https://accounts.example.test",
       fetchImpl: vi.fn(async () => jsonResponse({ error: "rate_limited", detail: "secret detail" }, { status: 429 })),
     });
     await expect(client.requestOTP("ada@example.com")).rejects.toMatchObject({
@@ -480,7 +484,7 @@ describe("control-plane desktop client", () => {
   it("falls back from Better Auth's message-only 429 without exposing its prose", async () => {
     const requestId = "44444444-4444-4444-8444-444444444444";
     const client = createControlPlaneClient({
-      baseURL: "https://accounts.openmausbot.com",
+      baseURL: "https://accounts.example.test",
       fetchImpl: vi.fn(async () => jsonResponse(
         { message: "Too many requests. Please try again later." },
         { status: 429, headers: { "x-request-id": requestId } },
@@ -497,7 +501,7 @@ describe("control-plane desktop client", () => {
 
   it("uses stable status errors when a response has no public error contract", async () => {
     const client = createControlPlaneClient({
-      baseURL: "https://accounts.openmausbot.com",
+      baseURL: "https://accounts.example.test",
       fetchImpl: vi.fn(async () => jsonResponse(
         { code: "INTERNAL_DEPENDENCY_DETAIL", message: "do not expose this" },
         { status: 400, headers: { "x-request-id": "not-a-safe-request-id" } },
@@ -513,7 +517,7 @@ describe("control-plane desktop client", () => {
 
   it("fails closed on redirects and network errors", async () => {
     const client = createControlPlaneClient({
-      baseURL: "https://accounts.openmausbot.com",
+      baseURL: "https://accounts.example.test",
       fetchImpl: vi.fn(async () => {
         throw new TypeError("redirect blocked");
       }),
@@ -531,26 +535,26 @@ describe("control-plane desktop client", () => {
       .fn()
       .mockResolvedValueOnce(jsonResponse({ endpoint: null }))
       .mockResolvedValueOnce(jsonResponse({
-        endpoint: { url: "https://c-opaque.openmausbot.com", hostname: "c-opaque.openmausbot.com", status: "deleting" },
+        endpoint: { url: "https://c-opaque.example.test", hostname: "c-opaque.example.test", status: "deleting" },
       }))
       .mockResolvedValueOnce(jsonResponse({
-        endpoint: { url: "https://c-opaque.openmausbot.com", status: "renamed-by-a-future-server" },
+        endpoint: { url: "https://c-opaque.example.test", status: "renamed-by-a-future-server" },
       }))
-      .mockResolvedValueOnce(jsonResponse({ endpoint: { url: "http://c-opaque.openmausbot.com" } }));
-    const client = createControlPlaneClient({ baseURL: "https://accounts.openmausbot.com", fetchImpl });
+      .mockResolvedValueOnce(jsonResponse({ endpoint: { url: "http://c-opaque.example.test" } }));
+    const client = createControlPlaneClient({ baseURL: "https://accounts.example.test", fetchImpl });
 
     await expect(client.getEndpoint(INSTALL)).resolves.toBeNull();
     await expect(client.getEndpoint(INSTALL)).resolves.toEqual({
-      url: "https://c-opaque.openmausbot.com",
+      url: "https://c-opaque.example.test",
       status: "deleting",
     });
     await expect(client.getEndpoint(INSTALL)).resolves.toEqual({
-      url: "https://c-opaque.openmausbot.com",
+      url: "https://c-opaque.example.test",
       status: "unknown",
     });
     await expect(client.getEndpoint(INSTALL)).rejects.toMatchObject({ code: "invalid_response" });
     const [url, init] = fetchImpl.mock.calls[0];
-    expect(url).toBe("https://accounts.openmausbot.com/v1/installations/self/endpoint");
+    expect(url).toBe("https://accounts.example.test/v1/installations/self/endpoint");
     expect(init.method).toBe("GET");
     expect(init.headers.get("authorization")).toBe(`Bearer ${INSTALL}`);
     await expect(client.getEndpoint(ACCOUNT)).rejects.toMatchObject({ code: "signed_out", status: 401 });
@@ -567,7 +571,7 @@ describe("control-plane desktop client", () => {
         status: 503,
         headers: { "retry-after": "Wed, 21 Oct 2026 07:28:00 GMT" },
       }));
-    const client = createControlPlaneClient({ baseURL: "https://accounts.openmausbot.com", fetchImpl });
+    const client = createControlPlaneClient({ baseURL: "https://accounts.example.test", fetchImpl });
 
     const first = await client.ensureEndpoint(INSTALL).catch((error) => error);
     expect(first).toBeInstanceOf(ControlPlaneError);
@@ -603,11 +607,11 @@ describe("control-plane desktop client", () => {
       }],
     };
     const fetchImpl = vi.fn(async (url, init) => {
-      expect(url).toBe("https://accounts.openmausbot.com/v1/account/ai");
+      expect(url).toBe("https://accounts.example.test/v1/account/ai");
       expect(init.headers.get("authorization")).toBe(`Bearer ${ACCOUNT}`);
       return jsonResponse(status);
     });
-    const client = createControlPlaneClient({ baseURL: "https://accounts.openmausbot.com", fetchImpl });
+    const client = createControlPlaneClient({ baseURL: "https://accounts.example.test", fetchImpl });
     await expect(client.aiStatus(ACCOUNT)).resolves.toEqual(status);
     await expect(client.aiStatus(undefined)).rejects.toMatchObject({ code: "signed_out", status: 401 });
   });
@@ -645,7 +649,7 @@ describe("control-plane desktop client", () => {
     ];
     for (const payload of cases) {
       const client = createControlPlaneClient({
-        baseURL: "https://accounts.openmausbot.com",
+        baseURL: "https://accounts.example.test",
         fetchImpl: vi.fn(async () => jsonResponse(payload)),
       });
       await expect(client.aiStatus(ACCOUNT), JSON.stringify(payload)).rejects.toMatchObject({ code: "invalid_response" });
@@ -653,15 +657,15 @@ describe("control-plane desktop client", () => {
   });
 
   it("issues one short-lived model credential per call for this device", async () => {
-    const credential = `omb_product_ai_${"d".repeat(22)}.${"e".repeat(43)}`;
+    const credential = `hezuo_product_ai_${"d".repeat(22)}.${"e".repeat(43)}`;
     const tokenId = "33333333-3333-4333-8333-333333333333";
     const fetchImpl = vi.fn(async (url, init) => {
-      expect(url).toBe("https://accounts.openmausbot.com/v1/account/ai/tokens");
+      expect(url).toBe("https://accounts.example.test/v1/account/ai/tokens");
       expect(init.method).toBe("POST");
       expect(JSON.parse(init.body)).toEqual({ deviceId: INSTALL_ID });
       return jsonResponse({ id: tokenId, token: credential, expiresAt: 1_800_000_000_000 }, { status: 201 });
     });
-    const client = createControlPlaneClient({ baseURL: "https://accounts.openmausbot.com", fetchImpl });
+    const client = createControlPlaneClient({ baseURL: "https://accounts.example.test", fetchImpl });
     await expect(client.createAiToken(ACCOUNT, INSTALL_ID)).resolves.toEqual({
       id: tokenId,
       token: credential,
@@ -671,16 +675,16 @@ describe("control-plane desktop client", () => {
   });
 
   it("refuses a credential response that is not exactly what was promised", async () => {
-    const valid = { id: "33333333-3333-4333-8333-333333333333", token: `omb_product_ai_${"d".repeat(22)}.${"e".repeat(43)}`, expiresAt: 1 };
+    const valid = { id: "33333333-3333-4333-8333-333333333333", token: `hezuo_product_ai_${"d".repeat(22)}.${"e".repeat(43)}`, expiresAt: 1 };
     for (const [payload, status] of [
-      [{ ...valid, token: "omb_install_aaaaaaaaaaaaaaaaaaaaaa.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" }, 201],
+      [{ ...valid, token: "hezuo_install_aaaaaaaaaaaaaaaaaaaaaa.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" }, 201],
       [{ ...valid, id: "not-a-uuid" }, 201],
       [{ ...valid, expiresAt: 0 }, 201],
       [valid, 200],
       [{ id: valid.id }, 201],
     ]) {
       const client = createControlPlaneClient({
-        baseURL: "https://accounts.openmausbot.com",
+        baseURL: "https://accounts.example.test",
         fetchImpl: vi.fn(async () => jsonResponse(payload, { status })),
       });
       await expect(client.createAiToken(ACCOUNT, INSTALL_ID)).rejects.toMatchObject({ code: "invalid_response" });
@@ -689,7 +693,7 @@ describe("control-plane desktop client", () => {
 
   it("keeps a non-usable account's refusal as the gateway's own code", async () => {
     const client = createControlPlaneClient({
-      baseURL: "https://accounts.openmausbot.com",
+      baseURL: "https://accounts.example.test",
       fetchImpl: vi.fn(async () => jsonResponse({ error: "insufficient_balance" }, { status: 402 })),
     });
     await expect(client.createAiToken(ACCOUNT, INSTALL_ID)).rejects.toMatchObject({
@@ -701,11 +705,11 @@ describe("control-plane desktop client", () => {
   it("revokes a model credential idempotently and never another account's", async () => {
     const tokenId = "33333333-3333-4333-8333-333333333333";
     const fetchImpl = vi.fn(async (url, init) => {
-      expect(url).toBe(`https://accounts.openmausbot.com/v1/account/ai/tokens/${tokenId}`);
+      expect(url).toBe(`https://accounts.example.test/v1/account/ai/tokens/${tokenId}`);
       expect(init.method).toBe("DELETE");
       return new Response(null, { status: 204 });
     });
-    const client = createControlPlaneClient({ baseURL: "https://accounts.openmausbot.com", fetchImpl });
+    const client = createControlPlaneClient({ baseURL: "https://accounts.example.test", fetchImpl });
     await expect(client.revokeAiToken(ACCOUNT, tokenId)).resolves.toBeUndefined();
     await expect(client.revokeAiToken(ACCOUNT, "someone-else")).rejects.toMatchObject({ code: "invalid_request" });
   });
@@ -713,7 +717,7 @@ describe("control-plane desktop client", () => {
   it("uses authenticated operator APIs and never retries a refused grant", async () => {
     const account = { userId: "user-1", email: "ada@example.com", availableMicroPoints: 1, reservedMicroPoints: 2 };
     const calls = [];
-    const client = createControlPlaneClient({ baseURL: "https://accounts.openmausbot.com",
+    const client = createControlPlaneClient({ baseURL: "https://accounts.example.test",
       fetchImpl: async (url, init) => {
         calls.push({ url, init });
         expect(new Headers(init.headers).get("authorization")).toBe(`Bearer ${ACCOUNT}`);
@@ -741,17 +745,17 @@ describe("control-plane desktop client", () => {
       nextCursor: "eyJjcmVhdGVkQXQiOjEwLCJpZCI6Im9wLTEifQ",
     };
     const fetchImpl = vi.fn(async (url, init) => {
-      expect(url).toBe("https://accounts.openmausbot.com/v1/account/ai/ledger?cursor=eyJhIjoxfQ");
+      expect(url).toBe("https://accounts.example.test/v1/account/ai/ledger?cursor=eyJhIjoxfQ");
       expect(init.headers.get("authorization")).toBe(`Bearer ${ACCOUNT}`);
       return jsonResponse(page);
     });
-    const client = createControlPlaneClient({ baseURL: "https://accounts.openmausbot.com", fetchImpl });
+    const client = createControlPlaneClient({ baseURL: "https://accounts.example.test", fetchImpl });
     await expect(client.aiLedger(ACCOUNT, "eyJhIjoxfQ")).resolves.toEqual(page);
 
     const plain = createControlPlaneClient({
-      baseURL: "https://accounts.openmausbot.com",
+      baseURL: "https://accounts.example.test",
       fetchImpl: vi.fn(async (url) => {
-        expect(url).toBe("https://accounts.openmausbot.com/v1/account/ai/ledger");
+        expect(url).toBe("https://accounts.example.test/v1/account/ai/ledger");
         return jsonResponse({ items: [], nextCursor: null });
       }),
     });
@@ -765,7 +769,7 @@ describe("control-plane desktop client", () => {
       { items: "none", nextCursor: null },
     ]) {
       const broken = createControlPlaneClient({
-        baseURL: "https://accounts.openmausbot.com",
+        baseURL: "https://accounts.example.test",
         fetchImpl: vi.fn(async () => jsonResponse(payload)),
       });
       await expect(broken.aiLedger(ACCOUNT), JSON.stringify(payload)).rejects.toMatchObject({ code: "invalid_response" });

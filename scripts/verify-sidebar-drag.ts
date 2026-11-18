@@ -2,7 +2,7 @@
 // and out of a folder, a bot dragged into a chat, a file dropped on a bot, and the row menus a right-click opens now
 // that no row draws ⋯, + or folder buttons.
 // Run: node --experimental-strip-types scripts/verify-sidebar-drag.ts [--shots <dir>]
-// With --shots it drives a headless Chrome in a throwaway profile (OMB_CDP_CHROME, else the installed Google Chrome),
+// With --shots it drives a headless Chrome in a throwaway profile (HEZUO_CDP_CHROME, else the installed Google Chrome),
 // checks each step against the fixture's API, saves a picture of each and exits; without, it prints the preview's
 // address and waits. Drags are the page's own DragEvents with a DataTransfer.
 import { spawn } from "node:child_process";
@@ -10,12 +10,12 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
-import { launchVerificationServer, runControlOmb } from "./control-omb.ts";
+import { launchVerificationServer, runControlHezuo } from "./control-hezuo.ts";
 import { fixtureApi, mountPreview, parkUntilSignal, type MountedPreview } from "./testing/preview-fixture.ts";
 
 const at = process.argv.indexOf("--shots");
 const shots = at === -1 ? null : resolve(process.argv[at + 1] ?? "");
-const CHROME = process.env.OMB_CDP_CHROME ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+const CHROME = process.env.HEZUO_CDP_CHROME ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const [WIDTH, HEIGHT] = [1280, 800];
 
 type Bot = { id: string; name: string; threadId: string; tasks?: Array<{ threadId: string; title: string; projectId?: string | null }>; projects?: Array<{ id: string; name: string }> };
@@ -113,7 +113,7 @@ const fixture = await launchVerificationServer();
 let ui: MountedPreview | undefined;
 try {
   const api = fixtureApi(fixture.info.url, { headers: { origin: fixture.info.url } });
-  for (const name of ["Research", "Writer"]) await runControlOmb(["new-bot", "--name", name, "--url", fixture.info.url]);
+  for (const name of ["Research", "Writer"]) await runControlHezuo(["new-bot", "--name", name, "--url", fixture.info.url]);
   await api("PATCH", "/api/config", { language: "en" });
   const listBots = async () => (await api("GET", "/api/bots?messages=0") as { bots: Bot[] }).bots;
   const byName = async (name: string) => (await listBots()).find((bot) => bot.name === name)!;
@@ -130,7 +130,7 @@ try {
     await parkUntilSignal();
   } else {
     mkdirSync(shots, { recursive: true });
-    const profile = mkdtempSync(join(tmpdir(), "omb-drag-chrome-"));
+    const profile = mkdtempSync(join(tmpdir(), "hezuo-drag-chrome-"));
     const chrome = await openChrome(profile);
     const row = (id: string) => `[data-sidebar-bot-row="${id}"]`;
     try {

@@ -4,10 +4,10 @@ import { connect, type Socket } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, it } from "vitest";
-import { launchVerificationServer, runControlOmb } from "../../scripts/control-omb.ts";
+import { launchVerificationServer, runControlHezuo } from "../../scripts/control-hezuo.ts";
 
 it("keeps a question nobody answered on Today after its turn ends, and a late answer wakes the bot and clears it", async () => {
-  const gates = mkdtempSync(join(tmpdir(), "omb-late-question-today-"));
+  const gates = mkdtempSync(join(tmpdir(), "hezuo-late-question-today-"));
   const release = join(gates, "release");
   const fixture = await launchVerificationServer({ ...process.env, FAKE_CLAUDE_MODE: "hang", FAKE_CLAUDE_RELEASE: release });
   const api = async (method: string, path: string, body?: unknown): Promise<{ status: number; body: any }> => {
@@ -18,7 +18,7 @@ it("keeps a question nobody answered on Today after its turn ends, and a late an
     });
     return { status: response.status, body: await response.json() };
   };
-  const cli = (...args: string[]) => runControlOmb(args, { env: { HEZUO_URL: fixture.info.url } }) as Promise<any>;
+  const cli = (...args: string[]) => runControlHezuo(args, { env: { HEZUO_URL: fixture.info.url } }) as Promise<any>;
   let socket: Socket | undefined;
   console.log(`late-question Today fixture: ${fixture.info.logPath}`);
   try {
@@ -32,10 +32,10 @@ it("keeps a question nobody answered on Today after its turn ends, and a late an
     expect((await api("POST", `/api/bots/${bot.id}/messages`, { text: "Ask me which file to update" })).status).toBeLessThan(300);
     await expect.poll(busy, { timeout: 15_000 }).toBe(true);
     await expect.poll(() => {
-      try { return JSON.parse(readFileSync(fixture.fixtureDumpPath, "utf8")).mcpConfig?.mcpServers?.ogb?.args[1]; }
+      try { return JSON.parse(readFileSync(fixture.fixtureDumpPath, "utf8")).mcpConfig?.mcpServers?.hezuo?.args[1]; }
       catch { return undefined; }
     }, { timeout: 5_000 }).toEqual(expect.any(String));
-    socket = connect(JSON.parse(readFileSync(fixture.fixtureDumpPath, "utf8")).mcpConfig.mcpServers.ogb.args[1]);
+    socket = connect(JSON.parse(readFileSync(fixture.fixtureDumpPath, "utf8")).mcpConfig.mcpServers.hezuo.args[1]);
     socket.on("error", () => {});
     await new Promise<void>((resolve, reject) => {
       socket!.once("connect", resolve);

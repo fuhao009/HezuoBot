@@ -6,8 +6,8 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { openCredentialBroker, type CredentialBroker } from "../bot-box/broker.ts";
-import type { BrokerPath } from "../bot-box/broker-probe.ts";
+import { openCredentialBroker, type CredentialBroker } from "../execution-sandbox/broker.ts";
+import type { BrokerPath } from "../execution-sandbox/broker-probe.ts";
 import { DATA_DIR, type AppConfig } from "../config.ts";
 import { json, readBody } from "../harness/http.ts";
 import type { TeamConnectionsHost } from "../host/team-connections-host.ts";
@@ -39,13 +39,11 @@ async function serve(options: { botsPath?: () => BrokerPath | null; bots?: Bot[]
   const sessions = { isLive: () => true };
   const config = createMcpConfig({
     cfg, sessions, mcpOAuth, teamConnections,
-    cloudHome: null,
     fallbackPublicUrl: null,
     mcpConfigBusy: { get: () => busy, set: (value) => { busy = value; } },
     mcpServerResponse,
     mcpPolicyRefusal: () => undefined,
     persistMcpServers: (next) => { cfg.mcpServers = next; },
-    savedCustomDomain: () => null,
     connectionsChanged: (change) => { changes.push(change); },
     changed: () => {},
     ...(options.botsPath ? { botsPath: options.botsPath } : {}),
@@ -53,10 +51,8 @@ async function serve(options: { botsPath?: () => BrokerPath | null; bots?: Bot[]
   });
   const route = createMcpServerRoutes({
     cfg, bot: (id) => options.bots?.find((bot) => bot.id === id) ?? null, sessions, mcpOAuth, teamConnections,
-    cloudHome: null,
     fallbackPublicUrl: null,
     mcpServerResponse,
-    savedCustomDomain: () => null,
     config,
   });
   const active = createServer(async (req, res) => {
@@ -203,7 +199,7 @@ describe.skipIf(process.platform === "win32")("Test, where bots reach URL server
   });
   /** A broker; `slash` forwards a request for the server's own address with a slash added, as the broker once did. */
   async function brokerPath(slash = false): Promise<BrokerPath> {
-    dir = mkdtempSync(join(tmpdir(), "omb-mcp-test-route-"));
+    dir = mkdtempSync(join(tmpdir(), "hezuo-mcp-test-route-"));
     const request = ((target: RequestOptions, callback: Parameters<typeof httpRequest>[1]) =>
       httpRequest({ ...target, path: slash ? String(target.path).replace(/^\/mcp(?=\?|$)/, "/mcp/") : target.path }, callback as never)) as typeof httpRequest;
     broker = await openCredentialBroker({ socketPath: join(dir, "b.sock"), request });

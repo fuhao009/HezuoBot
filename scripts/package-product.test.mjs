@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { parseArgs, productBuildConfig, productOrigin, UsageError } from "./package-product.mjs";
 
-const origin = (url, options) => productOrigin({ OMB_PRODUCT_SERVICE_URL: url }, options);
+const origin = (url, options) => productOrigin({ HEZUO_PRODUCT_SERVICE_URL: url }, options);
 
 const cleanups = [];
 afterEach(async () => {
@@ -20,6 +20,14 @@ async function scratchDirectory() {
 }
 
 describe("the product package flags", () => {
+  it("uses the canonical signed product identity without a publisher", async () => {
+    const scratch = await scratchDirectory();
+    const { config } = await productBuildConfig({ scratch, platform: "mac" });
+    expect(config).toMatchObject({ appId: "com.hezuobot.app", productName: "HezuoBot", publish: null, dmg: { sign: true } });
+    expect(config.mac.identity).not.toBe(null);
+    expect(config.protocols[0].schemes).toEqual(["hezuobot"]);
+  });
+
   it("enables debug logging only with an explicit build flag", () => {
     expect(parseArgs(["--platform", "mac"]).debug).toBe(false);
     expect(parseArgs(["--platform", "mac", "--debug"]).debug).toBe(true);
@@ -60,9 +68,14 @@ describe("the product package flags", () => {
     expect(() => origin("https://8.8.8.8:18487", { lanOrigin: true })).toThrow(/public DNS host/);
   });
 
-  it("leaves the public-host rules unchanged", () => {
-    expect(origin("https://ai.acme-ai.net")).toBe("https://ai.acme-ai.net");
-    expect(() => origin("https://ai.acme-ai.net:18487")).toThrow(/default HTTPS port/);
+  it("requires explicit approval for public DNS hosts and uses the default HTTPS port", () => {
+    const publicOrigin = (url) => productOrigin({
+      HEZUO_PRODUCT_SERVICE_URL: url,
+      HEZUO_PRODUCT_SERVICE_ALLOWED_HOSTS: "ai.acme-ai.net",
+    });
+    expect(() => origin("https://ai.acme-ai.net")).toThrow(/HEZUO_PRODUCT_SERVICE_ALLOWED_HOSTS/);
+    expect(publicOrigin("https://ai.acme-ai.net")).toBe("https://ai.acme-ai.net");
+    expect(() => publicOrigin("https://ai.acme-ai.net:18487")).toThrow(/default HTTPS port/);
     expect(() => origin("https://127.0.0.1:18487", { lanOrigin: true })).toThrow(/loopback/);
   });
 });

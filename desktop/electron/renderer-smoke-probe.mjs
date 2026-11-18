@@ -6,20 +6,20 @@ const { STAGE_PREFIX: APPIMAGE_CUA_STAGE_PREFIX } = bundle;
 
 /** Installs the opt-in packaged renderer smoke probe without affecting normal windows. */
 export function installRendererSmokeProbe(win, { serverPort, cuaReady, displayMediaRequestCount }) {
-  if (process.env.OMB_SMOKE_TEST === "1") {
+  if (process.env.HEZUO_SMOKE_TEST === "1") {
     win.webContents.once("did-finish-load", async () => {
       try {
         const result = await win.webContents.executeJavaScript(`
           (async () => {
-            if (!window.ogb?.getCapabilities) throw new Error("desktop preload bridge is unavailable");
+            if (!window.hezuo?.getCapabilities) throw new Error("desktop preload bridge is unavailable");
             let crashPromise = null;
-            if (${JSON.stringify(process.env.OMB_SMOKE_CUA === "1")}) {
+            if (${JSON.stringify(process.env.HEZUO_SMOKE_CUA === "1")}) {
               crashPromise = new Promise((resolve, reject) => {
                 const timeout = setTimeout(() => {
                   unsubscribe?.();
                   reject(new Error("timed out waiting for CUA crash invalidation"));
                 }, 10000);
-                const unsubscribe = window.ogb.onCapabilitiesChanged((next) => {
+                const unsubscribe = window.hezuo.onCapabilitiesChanged((next) => {
                   if (next.localComputer.reasonCode !== "daemon-exited") return;
                   clearTimeout(timeout);
                   unsubscribe();
@@ -28,7 +28,7 @@ export function installRendererSmokeProbe(win, { serverPort, cuaReady, displayMe
               });
             }
             const [initialCapabilities, healthResponse, ownerMutationResponse] = await Promise.all([
-              window.ogb.getCapabilities(),
+              window.hezuo.getCapabilities(),
               fetch("/api/health"),
               fetch("/api/auth/stream-ticket", { method: "POST" }),
             ]);
@@ -49,8 +49,8 @@ export function installRendererSmokeProbe(win, { serverPort, cuaReady, displayMe
                 throw new Error("CUA was not ready before the simulated crash");
               }
               cuaCrashReason = await crashPromise;
-              cuaRetryStatus = await window.ogb.localControl.retry();
-              capabilities = await window.ogb.getCapabilities();
+              cuaRetryStatus = await window.hezuo.localControl.retry();
+              capabilities = await window.hezuo.getCapabilities();
             }
             return {
               initialCapabilities,
@@ -69,7 +69,7 @@ export function installRendererSmokeProbe(win, { serverPort, cuaReady, displayMe
             `unexpected packaged renderer URL: ${result.location} (expected ${expectedLocation})`,
           );
         }
-        if (process.env.OMB_SMOKE_BUNDLED_CUA === "1") {
+        if (process.env.HEZUO_SMOKE_BUNDLED_CUA === "1") {
           const connection = await cuaReady();
           const expectedDriver = path.join(
             process.resourcesPath,
@@ -107,7 +107,7 @@ export function installRendererSmokeProbe(win, { serverPort, cuaReady, displayMe
       } catch (error) {
         console.error(`[smoke] renderer-failed ${error?.stack ?? error}`);
       } finally {
-        if (process.env.OMB_SMOKE_KEEP_OPEN !== "1") win.close();
+        if (process.env.HEZUO_SMOKE_KEEP_OPEN !== "1") win.close();
       }
     });
   }

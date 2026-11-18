@@ -45,10 +45,12 @@ export function connectedAppsForSetup(input: {
   host: "server" | "desktop" | "cloud";
 }): SetupConnectedApps {
   const noTools = input.grants !== undefined && Object.keys(input.grants).length === 0;
-  if (input.mounted && !noTools) return { state: "available" };
+  // Mounted connection management can request consent without any business-tool grants.
+  // Those grants are still enforced by the connector service, not by /setup.
+  if (input.mounted && input.enabled) return { state: "available" };
   if (!input.engine) return { state: "unsupported" };
   if (!input.configured) return { state: "not-configured", host: input.host };
-  if (!input.enabled || noTools) return { state: "off", noTools };
+  if (!input.enabled) return { state: "off", noTools };
   return { state: "not-configured", host: input.host };
 }
 

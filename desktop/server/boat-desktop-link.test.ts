@@ -1,11 +1,10 @@
 // The person waits on a desktop link while the bot waits on the person, so a Boat that never answers must not hold either.
-import { createHash } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import { afterAll, afterEach, beforeAll, expect, it, vi } from "vitest";
 
 const botId = "desktop-link-test";
 const boxId = "bx_23456789";
-const machineName = `ogb-${botId.slice(0, 8).toLowerCase().replace(/[^a-z0-9]/g, "")}-${createHash("sha256").update(botId).digest("hex").slice(0, 6)}`;
+let machineName = "";
 const asked: string[] = [];
 let api: Server;
 let boat: typeof import("./boat.ts");
@@ -24,8 +23,9 @@ beforeAll(async () => {
     // The desktop link never comes: neither the VNC path nor the fallback answers.
   });
   await new Promise<void>((resolve) => api.listen(0, "127.0.0.1", resolve));
-  vi.stubEnv("OMB_BOAT_API", `http://127.0.0.1:${(api.address() as { port: number }).port}/api/v1`);
+  vi.stubEnv("HEZUO_BOAT_API", `http://127.0.0.1:${(api.address() as { port: number }).port}/api/v1`);
   boat = await import("./boat.ts");
+  machineName = await boat.boatNameFor(botId);
 });
 
 afterEach(() => vi.restoreAllMocks());

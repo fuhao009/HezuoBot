@@ -77,8 +77,8 @@ describe("product mode helpers", () => {
   });
 
   it("never falls back to a local key, the included relay or the OpenRouter fallback", async () => {
-    vi.stubEnv("OMB_CLOUD_DECIDER_URL", "https://cloud.example.test/api/cloud/services/decider");
-    vi.stubEnv("OMB_CLOUD_DECIDER_TOKEN", "omb_decide_included_token_0123456789");
+    vi.stubEnv("HEZUO_CLOUD_DECIDER_URL", "https://cloud.example.test/api/cloud/services/decider");
+    vi.stubEnv("HEZUO_CLOUD_DECIDER_TOKEN", "hezuo_decide_included_token_0123456789");
     const fetchImpl = vi.fn<typeof fetch>();
     const local: AppConfig = {
       openrouter: { key: "sk-or-v1-shared" },

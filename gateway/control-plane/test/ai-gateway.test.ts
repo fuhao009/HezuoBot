@@ -135,7 +135,7 @@ async function seedAccount(options: {
   ).run();
   const lookup = base64URL(crypto.getRandomValues(new Uint8Array(16)));
   const secret = base64URL(crypto.getRandomValues(new Uint8Array(32)));
-  const raw = `omb_product_ai_${lookup}.${secret}`;
+  const raw = `hezuo_product_ai_${lookup}.${secret}`;
   const tokenId = crypto.randomUUID();
   await env.DB.prepare(
     `INSERT INTO account_ai_tokens

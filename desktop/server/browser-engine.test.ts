@@ -81,7 +81,7 @@ describe("sizing the page of a launched browser", () => {
     queueMicrotask(() => { child.stdout.emit("data", output); child.emit("close", code); });
     return child as ReturnType<typeof spawn>;
   }
-  const env = { AGENT_BROWSER_SESSION: "bot-a", AGENT_BROWSER_HEADLESS: "1", AGENT_BROWSER_RESTORE: "omb-key", PATH: "/bin" };
+  const env = { AGENT_BROWSER_SESSION: "bot-a", AGENT_BROWSER_HEADLESS: "1", AGENT_BROWSER_RESTORE: "hezuo-key", PATH: "/bin" };
 
   it("sets the standard viewport through the session's own launch environment", async () => {
     vi.mocked(spawn).mockImplementation(() => viewportChild(JSON.stringify({ success: true, data: { width: 1280, height: 720 } })));
@@ -97,7 +97,7 @@ describe("sizing the page of a launched browser", () => {
   it.runIf(process.platform === "linux")("starts the engine, and the daemon and Chrome it starts, first in line when memory runs out", async () => {
     const actual = await vi.importActual<typeof import("node:child_process")>("node:child_process");
     vi.mocked(spawn).mockImplementation(actual.spawn);
-    const dir = mkdtempSync(join(tmpdir(), "omb-engine-score-"));
+    const dir = mkdtempSync(join(tmpdir(), "hezuo-engine-score-"));
     scratch.push(dir);
     const engine = join(dir, "agent-browser");
     writeFileSync(engine, `#!/bin/sh\n[ "$(cat /proc/self/oom_score_adj)" = 1000 ] && echo '{"success":true}' || echo '{"success":false}'\n`, { mode: 0o755 });
@@ -121,7 +121,7 @@ describe("sizing the page of a launched browser", () => {
 
 describe("asking a running browser", () => {
   function engine(running: string[][], answer: unknown = { success: true, data: { cdpUrl: "ws://127.0.0.1:9/devtools/browser/x" } }) {
-    const home = mkdtempSync(join(tmpdir(), "omb-browser-running-"));
+    const home = mkdtempSync(join(tmpdir(), "hezuo-browser-running-"));
     scratch.push(home);
     vi.mocked(spawn).mockImplementation((_binary, args) => {
       const child = Object.assign(new EventEmitter(), { stdout: new EventEmitter(), kill: () => true });
@@ -132,7 +132,7 @@ describe("asking a running browser", () => {
       });
       return child as ReturnType<typeof spawn>;
     });
-    return { HOME: home, USERPROFILE: home, PATH: "", AGENT_BROWSER_SESSION: "work", AGENT_BROWSER_RESTORE: "omb-key", AGENT_BROWSER_HEADLESS: "1" };
+    return { HOME: home, USERPROFILE: home, PATH: "", AGENT_BROWSER_SESSION: "work", AGENT_BROWSER_RESTORE: "hezuo-key", AGENT_BROWSER_HEADLESS: "1" };
   }
 
   it("never launches a stopped browser just to ask it something", async () => {
@@ -146,7 +146,7 @@ describe("asking a running browser", () => {
     const env = engine([["work"]]);
     expect(await inRunningBrowser("/engine", env, ["get", "cdp-url"])).toEqual({ cdpUrl: "ws://127.0.0.1:9/devtools/browser/x" });
     expect(vi.mocked(spawn).mock.calls[1]?.[1]).toEqual(["get", "cdp-url", "--json", "--no-webmcp"]);
-    expect(vi.mocked(spawn).mock.calls[1]?.[2]?.env).toMatchObject({ AGENT_BROWSER_SESSION: "work", AGENT_BROWSER_RESTORE: "omb-key", AGENT_BROWSER_HEADLESS: "1" });
+    expect(vi.mocked(spawn).mock.calls[1]?.[2]?.env).toMatchObject({ AGENT_BROWSER_SESSION: "work", AGENT_BROWSER_RESTORE: "hezuo-key", AGENT_BROWSER_HEADLESS: "1" });
   });
 
   it("treats a browser that closed while being asked as stopped, and any other failure as an error", async () => {
@@ -157,7 +157,7 @@ describe("asking a running browser", () => {
 
 describe("deleting one browser session's saved logins", () => {
   function fixture(closeCode = 0) {
-    const home = mkdtempSync(join(tmpdir(), "omb-browser-cleanup-"));
+    const home = mkdtempSync(join(tmpdir(), "hezuo-browser-cleanup-"));
     scratch.push(home);
     const directory = join(home, ".agent-browser", "sessions");
     mkdirSync(join(directory, ".tmp"), { recursive: true });
@@ -217,7 +217,7 @@ describe("deleting one browser session's saved logins", () => {
       expect(env).not.toHaveProperty("AGENT_BROWSER_NO_WEBMCP");
       expect(env).not.toHaveProperty("AGENT_BROWSER_PROFILE");
       expect(env?.AGENT_BROWSER_SOCKET_DIR).toBe("/fixture/sockets");
-      expect(env?.AGENT_BROWSER_CONFIG).toBe(join(home, ".agent-browser", "omb-managed-config.json"));
+      expect(env?.AGENT_BROWSER_CONFIG).toBe(join(home, ".agent-browser", "hezuo-managed-config.json"));
       expect(readFileSync(env!.AGENT_BROWSER_CONFIG!, "utf8")).toBe("{}\n");
     }
   });
@@ -363,7 +363,7 @@ describe("a browser daemon that will not close (#2603)", () => {
     setInterval(() => {}, 1000);`;
   async function engine(options: { close: (pids: { daemon: number; browser: number; helper: number }) => number | Promise<number>; via?: "symlink" | "resolved" | "unreaped"; daemon?: string }) {
     const actual = await vi.importActual<typeof import("node:child_process")>("node:child_process");
-    const home = mkdtempSync(join(tmpdir(), "omb-browser-hung-"));
+    const home = mkdtempSync(join(tmpdir(), "hezuo-browser-hung-"));
     scratch.push(home);
     const binaryPath = join(home, "agent-browser");
     symlinkSync(process.execPath, binaryPath);
@@ -491,7 +491,7 @@ describe("a browser daemon that will not close (#2603)", () => {
 
 describe("restoring exactly one browser profile", () => {
   function fixture() {
-    const home = mkdtempSync(join(tmpdir(), "omb-browser-restore-"));
+    const home = mkdtempSync(join(tmpdir(), "hezuo-browser-restore-"));
     scratch.push(home);
     const directory = join(home, ".agent-browser", "sessions");
     mkdirSync(directory, { recursive: true });
@@ -502,7 +502,7 @@ describe("restoring exactly one browser profile", () => {
   it("uses fixed-length restore identities even for overlapping legacy names", () => {
     const keys = ["work", "work-client", "work-work-client", "WORK", "work_"].map(browserRestoreKey);
     expect(new Set(keys).size).toBe(keys.length);
-    expect(keys.every((key) => /^omb-[a-f0-9]{64}$/.test(key))).toBe(true);
+    expect(keys.every((key) => /^hezuo-[a-f0-9]{64}$/.test(key))).toBe(true);
     for (const a of keys) for (const b of keys) if (a !== b) expect(b.startsWith(a + "-")).toBe(false);
   });
 
@@ -593,7 +593,7 @@ describe("restoring exactly one browser profile", () => {
 
   it("does not overwrite an unexpected managed config or start a browser with it", async () => {
     const { directory, options } = fixture();
-    const path = join(directory, "..", "omb-managed-config.json");
+    const path = join(directory, "..", "hezuo-managed-config.json");
     writeFileSync(path, '{"profile":"/fixture/shared"}');
     await expect(prepareBrowserSessionState("fixture-browser", "work", options)).rejects.toThrow(/configuration was changed/);
     expect(readFileSync(path, "utf8")).toBe('{"profile":"/fixture/shared"}');
@@ -602,16 +602,35 @@ describe("restoring exactly one browser profile", () => {
 });
 
 describe("finding the browser engine", () => {
-  it("pins the native-verified Windows revision in both download and desktop manifests", () => {
-    const asset = resolveAgentBrowserReleaseAsset("win32", "x64")!;
-    expect(asset).toEqual({
-      target: "win32-x64", version: "0.36.0-omb.1",
-      asset: "agent-browser-win32-x64-0.36.0-omb.1.exe",
-      url: "https://github.com/milind-soni/OpenMausBot/releases/download/browser-engine-v0.36.0-omb.1/agent-browser-win32-x64-0.36.0-omb.1.exe",
-      bytes: 13806080, sha256: "33bee834f6a6072ec8688b0914726e0262874d758f69f27e8baf7eaac6b5ed15",
+  const windowsEnv = {
+    PATH: "",
+    HEZUO_BROWSER_ENGINE_WINDOWS_URL: "https://artifacts.example.test/browser-engine/v1/agent-browser.exe",
+    HEZUO_BROWSER_ENGINE_WINDOWS_SHA256: "a".repeat(64),
+    HEZUO_BROWSER_ENGINE_WINDOWS_VERSION: "0.37.0-hezuo.1",
+    HEZUO_BROWSER_ENGINE_WINDOWS_BYTES: "12345",
+  };
+
+  it("reports an actionable missing Windows artifact without downloading", async () => {
+    expect(resolveAgentBrowserReleaseAsset("win32", "x64", false, {})).toBeNull();
+    expect(() => browserBundleSpec("win32-x64", {})).toThrow(/HEZUO_BROWSER_ENGINE_WINDOWS_URL/);
+    expect(browserEngineStatus({ platform: "win32", arch: "x64", env: {}, exists: () => false })).toMatchObject({
+      kind: "unavailable", installable: false, reason: expect.stringContaining("HEZUO_BROWSER_ENGINE_WINDOWS_SHA256"),
     });
-    expect(agentBrowserReleaseVersion(asset)).toBe("0.36.0-omb.1");
-    expect(browserBundleSpec("win32-x64").engine).toEqual({
+    const fetchImpl = vi.fn();
+    await expect(installAgentBrowserBinary({ platform: "win32", arch: "x64", env: {}, fetchImpl })).rejects.toThrow(/HEZUO_BROWSER_ENGINE_WINDOWS_VERSION/);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("uses explicit reviewed Windows artifact configuration in downloads and desktop manifests", () => {
+    const asset = resolveAgentBrowserReleaseAsset("win32", "x64", false, windowsEnv)!;
+    expect(asset).toEqual({
+      target: "win32-x64", version: windowsEnv.HEZUO_BROWSER_ENGINE_WINDOWS_VERSION,
+      asset: `agent-browser-win32-x64-${windowsEnv.HEZUO_BROWSER_ENGINE_WINDOWS_VERSION}.exe`,
+      url: windowsEnv.HEZUO_BROWSER_ENGINE_WINDOWS_URL,
+      bytes: 12345, sha256: windowsEnv.HEZUO_BROWSER_ENGINE_WINDOWS_SHA256,
+    });
+    expect(agentBrowserReleaseVersion(asset)).toBe(windowsEnv.HEZUO_BROWSER_ENGINE_WINDOWS_VERSION);
+    expect(browserBundleSpec("win32-x64", windowsEnv).engine).toEqual({
       version: asset.version, asset: asset.asset, url: asset.url,
       bytes: asset.bytes, sha256: asset.sha256, executable: "agent-browser.exe",
     });
@@ -620,17 +639,40 @@ describe("finding the browser engine", () => {
     }
   });
 
+  it("uses process.env by default for the Windows bundle", () => {
+    for (const [key, value] of Object.entries(windowsEnv)) vi.stubEnv(key, value);
+    try {
+      expect(browserBundleSpec("win32-x64")).toEqual(browserBundleSpec("win32-x64", windowsEnv));
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("rejects incomplete or invalid Windows artifact configuration", () => {
+    for (const env of [
+      { HEZUO_BROWSER_ENGINE_WINDOWS_URL: windowsEnv.HEZUO_BROWSER_ENGINE_WINDOWS_URL },
+      { ...windowsEnv, HEZUO_BROWSER_ENGINE_WINDOWS_SHA256: "not-a-digest" },
+      { ...windowsEnv, HEZUO_BROWSER_ENGINE_WINDOWS_BYTES: "0" },
+      { ...windowsEnv, HEZUO_BROWSER_ENGINE_WINDOWS_VERSION: "../unreviewed" },
+      { ...windowsEnv, HEZUO_BROWSER_ENGINE_WINDOWS_URL: "http://artifacts.example.test/engine.exe" },
+      { ...windowsEnv, HEZUO_BROWSER_ENGINE_WINDOWS_URL: "https://user:password@artifacts.example.test/engine.exe" },
+    ]) {
+      expect(() => resolveAgentBrowserReleaseAsset("win32", "x64", false, env)).toThrow();
+      expect(() => browserBundleSpec("win32-x64", env)).toThrow();
+    }
+  });
+
   it("does not reuse a pre-fix Windows managed install for a revised release", () => {
-    const dataDir = join(tmpdir(), "omb-versioned-browser-fixture");
+    const dataDir = join(tmpdir(), "hezuo-versioned-browser-fixture");
     const old = join(dataDir, "tools", "agent-browser", "0.36.0", "agent-browser.exe");
-    const revised = pinnedBinaryPath(dataDir, "win32", "x64");
-    expect(revised).toBe(join(dataDir, "tools", "agent-browser", "0.36.0-omb.1", "agent-browser.exe"));
+    const revised = pinnedBinaryPath(dataDir, "win32", "x64", windowsEnv);
+    expect(revised).toBe(join(dataDir, "tools", "agent-browser", windowsEnv.HEZUO_BROWSER_ENGINE_WINDOWS_VERSION, "agent-browser.exe"));
     const files = new Set([old]);
-    const options = { dataDir, platform: "win32" as const, arch: "x64", env: { PATH: "" }, exists: (file: string) => files.has(file) };
+    const options = { dataDir, platform: "win32" as const, arch: "x64", env: windowsEnv, exists: (file: string) => files.has(file) };
     expect(resolveAgentBrowserBinary(options)).toBeNull();
     files.add(revised);
-    expect(browserEngineStatus(options)).toMatchObject({ kind: "ready", binaryPath: revised, version: "0.36.0-omb.1" });
-    expect(resolveAgentBrowserBinary({ ...options, env: { PATH: "", OMB_AGENT_BROWSER_PATH: old } })).toBe(old);
+    expect(browserEngineStatus(options)).toMatchObject({ kind: "ready", binaryPath: revised, version: windowsEnv.HEZUO_BROWSER_ENGINE_WINDOWS_VERSION });
+    expect(resolveAgentBrowserBinary({ ...options, env: { ...windowsEnv, HEZUO_AGENT_BROWSER_PATH: old } })).toBe(old);
   });
 
   it("retains default upstream versions and permits a pinned platform-specific asset URL", () => {
@@ -643,8 +685,8 @@ describe("finding the browser engine", () => {
 
   it.each(SUPPORTED_BROWSER_TARGETS)("uses the complete %s desktop bundle before old downloaded engines", (target) => {
     const [platform, arch] = target.split("-");
-    const env = { OMB_RESOURCES_PATH: join(tmpdir(), "OMB resources"), PATH: "" };
-    const bundle = browserBundlePaths(join(env.OMB_RESOURCES_PATH, "browser-engine"), target);
+    const env = { ...windowsEnv, HEZUO_RESOURCES_PATH: join(tmpdir(), "Hezuo resources"), PATH: "" };
+    const bundle = browserBundlePaths(join(env.HEZUO_RESOURCES_PATH, "browser-engine"), target, env);
     const files = new Set([bundle.directory, bundle.engine, bundle.chrome, bundle.manifest, bundle.licenses]);
     const options = { env, platform: platform as NodeJS.Platform, arch, exists: (p: string) => files.has(p) };
     expect(resolveAgentBrowserBinary(options)).toBe(bundle.engine);
@@ -660,14 +702,14 @@ describe("finding the browser engine", () => {
     expect(resolveAgentBrowserBinary(options)).toBeNull();
     const external = join(tmpdir(), "external-engine");
     files.add(external);
-    expect(resolveAgentBrowserBinary({ ...options, env: { ...env, OMB_AGENT_BROWSER_PATH: external } })).toBe(external);
+    expect(resolveAgentBrowserBinary({ ...options, env: { ...env, HEZUO_AGENT_BROWSER_PATH: external } })).toBe(external);
   });
 
   it("mounts the bundled browser with no download and keeps explicit Chrome overrides", async () => {
-    const resources = mkdtempSync(join(tmpdir(), "omb-browser-resources-"));
+    const resources = mkdtempSync(join(tmpdir(), "hezuo-browser-resources-"));
     scratch.push(resources);
     const host = { platform: "linux" as const, arch: "x64" };
-    const env = { OMB_RESOURCES_PATH: resources, PATH: "" };
+    const env = { HEZUO_RESOURCES_PATH: resources, PATH: "" };
     const bundle = browserBundlePaths(join(resources, "browser-engine"), "linux-x64");
     mkdirSync(bundle.licenses, { recursive: true });
     for (const file of [bundle.engine, bundle.chrome, bundle.manifest]) {
@@ -679,7 +721,7 @@ describe("finding the browser engine", () => {
     expect(spec.env.AGENT_BROWSER_EXECUTABLE_PATH).toBe(bundle.chrome);
     expect(spec.env.AGENT_BROWSER_SESSION).toBe("isolated");
     expect(spec.env.AGENT_BROWSER_NO_WEBMCP).toBe("1");
-    expect(spec.env).not.toHaveProperty("OMB_RESOURCES_PATH");
+    expect(spec.env).not.toHaveProperty("HEZUO_RESOURCES_PATH");
     const override = agentBrowserIntegration({ binaryPath: bundle.engine, session: "isolated", encryptionKey: "key", env: { ...env, AGENT_BROWSER_EXECUTABLE_PATH: "/explicit/chrome" }, ...host });
     expect(override.env.AGENT_BROWSER_EXECUTABLE_PATH).toBe("/explicit/chrome");
     // A spawn would fail because the fixture engine is not executable.
@@ -687,7 +729,7 @@ describe("finding the browser engine", () => {
   });
 
   it("prefers the explicit path, then the pinned download, then PATH, and reports why when nothing is there", () => {
-    const dataDir = mkdtempSync(join(tmpdir(), "omb-engine-"));
+    const dataDir = mkdtempSync(join(tmpdir(), "hezuo-engine-"));
     scratch.push(dataDir);
     const pinned = pinnedBinaryPath(dataDir);
     const name = process.platform === "win32" ? "agent-browser.exe" : "agent-browser";
@@ -706,19 +748,19 @@ describe("finding the browser engine", () => {
     files.add(pinned);
     expect(resolveAgentBrowserBinary({ dataDir, env, exists })).toBe(pinned);
     files.add(override);
-    expect(resolveAgentBrowserBinary({ dataDir, env: { ...env, OMB_AGENT_BROWSER_PATH: override }, exists })).toBe(override);
-    expect(resolveAgentBrowserBinary({ dataDir, env: { ...env, OMB_AGENT_BROWSER_PATH: join(dataDir, "missing", name) }, exists })).toBeNull();
+    expect(resolveAgentBrowserBinary({ dataDir, env: { ...env, HEZUO_AGENT_BROWSER_PATH: override }, exists })).toBe(override);
+    expect(resolveAgentBrowserBinary({ dataDir, env: { ...env, HEZUO_AGENT_BROWSER_PATH: join(dataDir, "missing", name) }, exists })).toBeNull();
     expect(browserEngineStatus({ dataDir, env, exists })).toMatchObject({ kind: "ready", binaryPath: pinned, version: agentBrowserReleaseVersion(resolveAgentBrowserReleaseAsset()), managed: true });
-    expect(browserEngineStatus({ dataDir, env: { ...env, OMB_AGENT_BROWSER_PATH: override }, exists, versionOf: () => AGENT_BROWSER_VERSION })).toMatchObject({ kind: "ready", binaryPath: override, managed: false });
+    expect(browserEngineStatus({ dataDir, env: { ...env, HEZUO_AGENT_BROWSER_PATH: override }, exists, versionOf: () => AGENT_BROWSER_VERSION })).toMatchObject({ kind: "ready", binaryPath: override, managed: false });
     files.delete(pinned);
     expect(browserEngineStatus({ dataDir, env, exists, versionOf: () => AGENT_BROWSER_VERSION })).toMatchObject({ kind: "ready", binaryPath: pathBinary, managed: false });
   });
 
   it("hands agent-browser the Chrome OMB prepared instead of the bundled shell, never when it attaches to the person's Chrome", () => {
-    const resources = mkdtempSync(join(tmpdir(), "omb-browser-resources-"));
+    const resources = mkdtempSync(join(tmpdir(), "hezuo-browser-resources-"));
     scratch.push(resources);
     const host = { platform: "darwin" as const, arch: "arm64" };
-    const env = { OMB_RESOURCES_PATH: resources, PATH: "" };
+    const env = { HEZUO_RESOURCES_PATH: resources, PATH: "" };
     const bundle = browserBundlePaths(join(resources, "browser-engine"), "darwin-arm64");
     mkdirSync(bundle.licenses, { recursive: true });
     for (const file of [bundle.engine, bundle.chrome, bundle.manifest]) {
@@ -742,7 +784,7 @@ describe("finding the browser engine", () => {
   });
 
   it("reports an unmanaged agent-browser's real version and warns when it is not the pin", () => {
-    const dataDir = mkdtempSync(join(tmpdir(), "omb-engine-unmanaged-"));
+    const dataDir = mkdtempSync(join(tmpdir(), "hezuo-engine-unmanaged-"));
     scratch.push(dataDir);
     const name = process.platform === "win32" ? "agent-browser.exe" : "agent-browser";
     const binary = resolve(join(dataDir, "bin"), name);
@@ -776,7 +818,7 @@ describe("finding the browser engine", () => {
   });
 
   it("probes an unmanaged binary's version in the background, once per mtime, without blocking on a stalled binary", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "omb-engine-probe-"));
+    const dir = mkdtempSync(join(tmpdir(), "hezuo-engine-probe-"));
     scratch.push(dir);
     const binary = join(dir, "agent-browser");
     writeFileSync(binary, "fixture");
@@ -809,9 +851,9 @@ describe("finding the browser engine", () => {
     }
   });
 
-  it("knows every target Vercel publishes, and picks the musl build on Alpine", () => {
+  it("knows every upstream target plus configured Windows artifacts, and picks musl on Alpine", () => {
     for (const [platform, arch] of [["darwin", "arm64"], ["darwin", "x64"], ["linux", "x64"], ["linux", "arm64"], ["win32", "x64"]] as const) {
-      const asset = resolveAgentBrowserReleaseAsset(platform, arch);
+      const asset = resolveAgentBrowserReleaseAsset(platform, arch, false, windowsEnv);
       expect(asset, `${platform}-${arch}`).not.toBeNull();
       expect(asset?.sha256).toMatch(/^[0-9a-f]{64}$/u);
       if (asset?.url) expect(agentBrowserReleaseUrl(asset)).toBe(asset.url);
@@ -827,7 +869,7 @@ describe("finding the browser engine", () => {
 
 describe("installing the browser engine", () => {
   it("downloads the pinned asset, verifies size and digest, and only then names the file", async () => {
-    const dataDir = mkdtempSync(join(tmpdir(), "omb-engine-install-"));
+    const dataDir = mkdtempSync(join(tmpdir(), "hezuo-engine-install-"));
     scratch.push(dataDir);
     const body = Buffer.from("#!/bin/sh\necho agent-browser\n");
     const asset = { target: "linux-x64", asset: "agent-browser-linux-x64", sha256: createHash("sha256").update(body).digest("hex"), bytes: body.length };
@@ -848,7 +890,7 @@ describe("installing the browser engine", () => {
   });
 
   it("refuses a download whose bytes do not match the pin, and leaves nothing behind", async () => {
-    const dataDir = mkdtempSync(join(tmpdir(), "omb-engine-bad-"));
+    const dataDir = mkdtempSync(join(tmpdir(), "hezuo-engine-bad-"));
     scratch.push(dataDir);
     const asset = { target: "linux-x64", asset: "agent-browser-linux-x64", sha256: "a".repeat(64), bytes: 5 };
     await expect(installAgentBrowserBinary({ dataDir, platform: "linux", asset, fetchImpl: async () => new Response(Buffer.from("hello")) })).rejects.toThrow(/SHA-256/u);
@@ -868,7 +910,7 @@ describe("what a bot gets", () => {
   });
 
   it("gives each saved session a profile of its own that outlives Chrome, and a temporary or My Chrome browser none", () => {
-    const dataDir = join(tmpdir(), "omb-profile-fixture");
+    const dataDir = join(tmpdir(), "hezuo-profile-fixture");
     const kept = (session: string, extra: Partial<Parameters<typeof agentBrowserIntegration>[0]> = {}) =>
       agentBrowserIntegration({ binaryPath: "/x", session, encryptionKey: "k", env: {}, dataDir, ...extra }).env;
     const work = kept("bot-1").AGENT_BROWSER_PROFILE!;
@@ -885,13 +927,13 @@ describe("what a bot gets", () => {
   });
 
   it("keeps a saved session's profile out of the new engine's folder, whose sweep stops every Chrome there it did not start", () => {
-    const dataDir = join(tmpdir(), "omb-profile-fixture");
+    const dataDir = join(tmpdir(), "hezuo-profile-fixture");
     const chrome = { pid: 4242, ppid: 4241, startTime: null, args: `/opt/chrome --remote-debugging-port=0 --user-data-dir=${browserProfileDirectory("bot-1", dataDir)} about:blank` };
     expect(strays({ processes: [chrome], registered: [], root: browserRoot(dataDir), alive: () => true })).toEqual([]);
   });
 
   it("counts a saved session's own Chrome among the DevTools ports no page may reach", () => {
-    const temp = mkdtempSync(join(tmpdir(), "omb-devtools-"));
+    const temp = mkdtempSync(join(tmpdir(), "hezuo-devtools-"));
     scratch.push(temp);
     const profiles = join(temp, "profiles");
     mkdirSync(join(temp, "agent-browser-chrome-1"), { recursive: true });
@@ -939,7 +981,7 @@ describe("what a bot gets", () => {
     expect(spec.env).toEqual({
       AGENT_BROWSER_SESSION: "bot-1", AGENT_BROWSER_NO_WEBMCP: "1", AGENT_BROWSER_RESTORE: browserRestoreKey("bot-1"),
       AGENT_BROWSER_RESTORE_SAVE: "auto", AGENT_BROWSER_ENCRYPTION_KEY: "session-key",
-      AGENT_BROWSER_CONFIG: expect.stringContaining("omb-managed-config.json"),
+      AGENT_BROWSER_CONFIG: expect.stringContaining("hezuo-managed-config.json"),
       AGENT_BROWSER_HEADLESS: "1", AGENT_BROWSER_HEADED: "0", PATH: "/usr/bin",
       AGENT_BROWSER_EXECUTABLE_PATH: "/opt/trusted chrome/chrome", ...keptNoGate("bot-1"),
     });
@@ -953,7 +995,7 @@ describe("what a bot gets", () => {
     expect(spec.env).toEqual({
       AGENT_BROWSER_SESSION: "bot-1", AGENT_BROWSER_NO_WEBMCP: "1", AGENT_BROWSER_RESTORE: browserRestoreKey("bot-1"),
       AGENT_BROWSER_RESTORE_SAVE: "auto", AGENT_BROWSER_ENCRYPTION_KEY: "session-key",
-      AGENT_BROWSER_CONFIG: expect.stringContaining("omb-managed-config.json"),
+      AGENT_BROWSER_CONFIG: expect.stringContaining("hezuo-managed-config.json"),
       AGENT_BROWSER_HEADLESS: "1", AGENT_BROWSER_HEADED: "0", PATH: "/usr/bin",
       AGENT_BROWSER_EXECUTABLE_PATH: "/opt/process-chrome/chrome", ...keptNoGate("bot-1"),
     });
@@ -1036,7 +1078,7 @@ describe("what a bot gets", () => {
   });
 
   it("makes one encryption key per data dir, private, and reuses it", () => {
-    const dataDir = mkdtempSync(join(tmpdir(), "omb-engine-key-"));
+    const dataDir = mkdtempSync(join(tmpdir(), "hezuo-engine-key-"));
     scratch.push(dataDir);
     const key = browserEngineEncryptionKey(dataDir);
     expect(key).toMatch(/^[0-9a-f]{64}$/u);

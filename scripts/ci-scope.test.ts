@@ -20,14 +20,14 @@ const ALL = ["macos-latest", "ubuntu-latest", "windows-latest"];
 const PR = ["ubuntu-latest", "windows-latest"];
 const LINUX = ["ubuntu-latest"];
 const MAIN = ["ubuntu-latest", "windows-latest"];
-const SERVER_JOBS = ["vitest", "behavior-evals", "packaged-server", "electron-smokes", "foss", "ui-smoke", "browser-identity", "package-linux", "browser-driver"];
+const SERVER_JOBS = ["vitest", "packaged-server", "electron-smokes", "ui-smoke", "browser-identity", "package-linux", "browser-driver"];
 const temporaryDirectories: string[] = [];
 afterEach(() => {
   for (const directory of temporaryDirectories.splice(0)) rmSync(directory, { recursive: true, force: true });
 });
 
 function fixture(source = "desktop/src/page.ts") {
-  const directory = mkdtempSync(join(tmpdir(), "omb-ci-scope-"));
+  const directory = mkdtempSync(join(tmpdir(), "hezuo-ci-scope-"));
   temporaryDirectories.push(directory);
   const git = (...args: string[]) => execFileSync("git", args, { cwd: directory, encoding: "utf8" }).trim();
   git("init", "--quiet");
@@ -69,7 +69,7 @@ const packaged = (oses: string[]) => oses.filter((os) => os !== "macos-latest");
 const everything = (oses: string[]) => ({ build: true, jobs: SELECTABLE_JOBS, vitest_os: oses, packaged_server_os: packaged(oses), vitest_matrix: vitestMatrix(oses) });
 const staticOnly = (oses: string[], build: boolean) => ({ build, jobs: [], vitest_os: oses, packaged_server_os: packaged(oses), vitest_matrix: vitestMatrix(oses) });
 /** What a push to main and a merge group run: Linux's and Windows' shards, the macOS smokes and the short Linux checks. */
-const MAIN_JOBS = ["vitest", "behavior-evals", "packaged-server", "electron-smokes", "foss", "control-plane", "ui-smoke", "browser-identity"];
+const MAIN_JOBS = ["vitest", "packaged-server", "electron-smokes", "control-plane", "ui-smoke", "browser-identity"];
 const mainLane = () => ({ build: true, jobs: MAIN_JOBS, vitest_os: MAIN, packaged_server_os: MAIN, vitest_matrix: vitestMatrix(MAIN) });
 
 describe("vitest matrix", () => {
@@ -94,13 +94,13 @@ const checks = (...areas: string[]) => [...new Set(areas.flatMap((area) => AREA_
 describe("CI path scope", () => {
   it("runs only the docs tests, without the build, for documentation, its evidence and the docs site", () => {
     expect(selectCiScope([
-      "README.md", "AGENTS.md", "docs/guide.md", "docs/nested/guide.md", ".github/FUNDING.yml", "apps/docs/content/index.mdx",
+      "README.md", "AGENTS.md", "docs/guide.md", "docs/nested/guide.md", ".github/FUNDING.yml",
       "docs/verification/evidence/mentions/rtl-dom.json", "docs/screenshots/home.png",
     ])).toEqual({ areas: ["docs"], checks: ["docs-tests"] });
   });
 
   it("runs a test under scripts/ wherever the suite runs, without the build", () => {
-    expect(selectCiScope(["scripts/generate-locale.test.mjs", "scripts/testing/control-omb-ui.e2e.test.ts"]))
+    expect(selectCiScope(["scripts/generate-locale.test.mjs", "scripts/testing/control-hezuo-ui.e2e.test.ts"]))
       .toEqual({ areas: ["script-tests"], checks: ["browser-identity", "host-tests", "linux-tests", "ui-smoke"] });
   });
 
@@ -116,8 +116,8 @@ describe("CI path scope", () => {
   });
 
   it.each([
-    ["desktop/server/index.ts"], ["packages/shared/types.ts"], ["desktop/companion/src/index.ts"], ["enterprise/license.ts"], ["evals/runners/run-evals.ts"],
-    ["skills/pdf/SKILL.md"], ["gateway/composio-broker/src/index.ts"], ["Dockerfile"], ["deploy/podman/run.sh"],
+    ["desktop/server/index.ts"], ["packages/shared/types.ts"], ["desktop/companion/src/index.ts"],
+    ["skills/pdf/SKILL.md"],
     ...SRC_OUTSIDE_RENDERER.map((file) => [file]),
   ])("runs every check that runs the server for %j", (file) => {
     expect(selectCiScope([file])).toEqual({ areas: ["server"], checks: checks("server") });
@@ -213,7 +213,7 @@ describe("CI outputs", () => {
     expect(out).toEqual(mainLane());
     expect(out.vitest_matrix.include.map((entry: { os: string }) => entry.os)).toEqual([...Array(8).fill("ubuntu-latest"), ...Array(8).fill("windows-latest")]);
     expect(out.packaged_server_os).toEqual(MAIN);
-    for (const job of ["windows-cua", "package-linux", "browser-driver", "cloudflared-linux-arm64"]) expect(out.jobs, job).not.toContain(job);
+    for (const job of ["windows-cua", "package-linux", "browser-driver"]) expect(out.jobs, job).not.toContain(job);
     expect(MAIN_SCOPE.checks.every((check) => FULL_SCOPE.checks.includes(check))).toBe(true);
   });
 
@@ -245,29 +245,29 @@ describe("CI outputs", () => {
 describe("the Linux work in the static job, on a Boat VM", () => {
   const linuxShards = vitestMatrix(LINUX).include;
 
-  it("runs a server change's Linux shards, behavior evals and packaged server there, and no Linux job", () => {
+  it("runs a server change's Linux shards and packaged server there, and no Linux job", () => {
     const out = moveLinuxIntoStatic(ciOutputs(selectCiScope(["desktop/server/index.ts"]), LINUX));
-    expect(out.jobs).toEqual(SERVER_JOBS.filter((job) => !["vitest", "behavior-evals", "packaged-server"].includes(job)));
-    expect(out.linux_lanes).toEqual({ vitest: linuxShards, evals: true, packaged_server: true });
+    expect(out.jobs).toEqual(SERVER_JOBS.filter((job) => !["vitest", "packaged-server"].includes(job)));
+    expect(out.linux_lanes).toEqual({ vitest: linuxShards, packaged_server: true });
     expect(out.vitest_matrix).toEqual(vitestMatrix(LINUX));
     expect(out.vitest_os).toEqual(LINUX);
   });
 
   it("keeps the Windows shards and packaged server as jobs", () => {
     const out = moveLinuxIntoStatic(ciOutputs(FULL_SCOPE, PR));
-    expect(out.jobs).toEqual(SELECTABLE_JOBS.filter((job) => job !== "behavior-evals"));
+    expect(out.jobs).toEqual(SELECTABLE_JOBS);
     expect(out.vitest_matrix).toEqual(vitestMatrix(["windows-latest"]));
     expect(out.packaged_server_os).toEqual(["windows-latest"]);
-    expect(out.linux_lanes).toEqual({ vitest: linuxShards, evals: true, packaged_server: true });
-    expect(moveLinuxIntoStatic(ciOutputs(MAIN_SCOPE, MAIN)).jobs).toEqual(MAIN_JOBS.filter((job) => job !== "behavior-evals"));
+    expect(out.linux_lanes).toEqual({ vitest: linuxShards, packaged_server: true });
+    expect(moveLinuxIntoStatic(ciOutputs(MAIN_SCOPE, MAIN)).jobs).toEqual(MAIN_JOBS);
   });
 
   it("runs a docs or translation change's subset there, and nothing when nothing is selected", () => {
     const docs = moveLinuxIntoStatic(ciOutputs({ checks: ["docs-tests"] }, LINUX));
     expect(docs.jobs).toEqual([]);
-    expect(docs.linux_lanes).toEqual({ vitest: ciOutputs({ checks: ["docs-tests"] }, LINUX).vitest_matrix.include, evals: false, packaged_server: false });
+    expect(docs.linux_lanes).toEqual({ vitest: ciOutputs({ checks: ["docs-tests"] }, LINUX).vitest_matrix.include, packaged_server: false });
     expect(moveLinuxIntoStatic(ciOutputs({ checks: [] }, LINUX))).toEqual({
-      ...staticOnly(LINUX, false), linux_lanes: { vitest: [], evals: false, packaged_server: false },
+      ...staticOnly(LINUX, false), linux_lanes: { vitest: [], packaged_server: false },
     });
   });
 
@@ -280,7 +280,7 @@ describe("the Linux work in the static job, on a Boat VM", () => {
     writeFileSync(eventPath, JSON.stringify({ pull_request: { base: { sha: base }, head: { sha: git("rev-parse", "HEAD") } } }));
     const result = spawnSync(process.execPath, [script], {
       cwd: directory, encoding: "utf8", timeout: 5_000,
-      env: { ...process.env, GITHUB_EVENT_NAME: "pull_request", GITHUB_EVENT_PATH: eventPath, GITHUB_OUTPUT: outputPath, OMB_CI_LINUX_IN_STATIC: "true" },
+      env: { ...process.env, GITHUB_EVENT_NAME: "pull_request", GITHUB_EVENT_PATH: eventPath, GITHUB_OUTPUT: outputPath, HEZUO_CI_LINUX_IN_STATIC: "true" },
     });
     expect(result.status, result.stderr).toBe(0);
     expect(outputs(readFileSync(outputPath, "utf8"))).toEqual(moveLinuxIntoStatic(ciOutputs(selectCiScope(["desktop/src/App.tsx"]), LINUX)));
@@ -304,14 +304,14 @@ describe("Windows on a pull request", () => {
     ".github/workflows/package-win.yml", "package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".gitattributes", "desktop/vite.config.ts",
     "third_party/browser/agent-browser-windows-stdio.patch", ".github/workflows/ci.yml", "scripts/ci-scope.mjs",
     "scripts/testing/host-e2e.ts", "scripts/testing/vitest-shard-weights.json", "desktop/server/testing/host-timeout.ts",
-    "scripts/prepare-cloudflared.mjs", "scripts/after-pack.mjs", ...Object.keys(HOST_E2E),
+    "scripts/after-pack.mjs", ...Object.keys(HOST_E2E),
   ])("runs for %s", (file) => {
     expect(reason(["desktop/src/App.tsx", file])).toBe(file);
   });
 
   it.each([
     "desktop/server/index.ts", "desktop/src/components/WindowFrame.tsx", "desktop/server/darwin.ts", "desktop/server/twin.ts", "scripts/verify-sidebar.ts",
-    "scripts/testing/rail-preview.tsx", "scripts/control-omb.ts", ".github/workflows/boat.yml", "desktop/tsconfig.json", "desktop/server/delta-context.e2e.test.ts",
+    "scripts/testing/rail-preview.tsx", "scripts/control-hezuo.ts", ".github/workflows/boat.yml", "desktop/tsconfig.json", "desktop/server/delta-context.e2e.test.ts",
   ])("waits for main for %s alone", (file) => {
     expect(reason([file])).toBeNull();
   });
@@ -384,22 +384,22 @@ function importClosure(entries: string[]) {
 }
 
 describe("the repository's import graph", () => {
-  it("lists every renderer file the server, Electron, the companion, evals, the workers or the macOS frame smoke load", () => {
+  it("lists every renderer file the server, shared packages, Electron, the companion, the gateway or the macOS frame smoke load", () => {
     const frameSmoke = readFileSync(join(ROOT, "scripts/smoke-app-frames.mjs"), "utf8");
     expect(frameSmoke).toContain('resolveDir: join(ROOT, "desktop/src/components/app")');
     expect(frameSmoke).toContain("from \\\"./app-frame-host.ts\\\"");
-    const runtime = ["server", "shared", "electron", "companion", "enterprise", "evals", "cloudflare"]
+    const runtime = ["desktop/server", "packages/shared", "desktop/electron", "desktop/companion", "gateway"]
       .flatMap((directory) => codeFiles(join(ROOT, directory)))
       .filter((file) => !TEST_FILE.test(relative(ROOT, file).split("\\").join("/")));
     expect(runtime.length).toBeGreaterThan(500);
     // The language packs the server reads its lines from stay locale changes (SRC_OUTSIDE_RENDERER says why).
     const loaded = importClosure([...runtime, join(ROOT, "desktop/src/components/app/app-frame-host.ts")])
-      .filter((file) => file.startsWith("desktop/src/") && !/^src\/locales\/[^/]+\.json$/.test(file));
+      .filter((file) => file.startsWith("desktop/src/") && !/^desktop\/src\/locales\/[^/]+\.json$/.test(file));
     expect(loaded.sort()).toEqual([...SRC_OUTSIDE_RENDERER].sort());
   });
 
   it("runs every test outside the renderer that reads a translation other than English with the locale tests", () => {
-    const files = ["server", "shared", "electron", "companion", "enterprise", "evals", "scripts", "cloudflare"]
+    const files = ["desktop/server", "packages/shared", "desktop/electron", "desktop/companion", "scripts", "gateway"]
       .flatMap((directory) => codeFiles(join(ROOT, directory)))
       // The selection names the catalogs without reading them.
       .filter((file) => !/[/\\]ci-scope\.(?:mjs|test\.ts)$/.test(file));
@@ -410,7 +410,7 @@ describe("the repository's import graph", () => {
     const readers = new Set(files.filter(mentionsTranslations));
     const affected = files
       .filter((file) => /\.test\.[cm]?[jt]s$/.test(file))
-      .filter((file) => importClosure([file]).some((loaded) => /^src\/locales\/(?!en\.json$)/.test(loaded) || readers.has(join(ROOT, loaded))))
+      .filter((file) => importClosure([file]).some((loaded) => /^desktop\/src\/locales\/(?!en\.json$)/.test(loaded) || readers.has(join(ROOT, loaded))))
       .map((file) => relative(ROOT, file).split("\\").join("/"));
     expect(affected).toContain("scripts/generate-locale.test.mjs");
     // The Electron node tests, which compare their own copy of some strings with every catalog, run on the locale tests' first shard.
@@ -422,19 +422,19 @@ describe("the repository's import graph", () => {
     const inStatic = (ci.jobs.static.steps as { run?: string }[]).flatMap((step) => step.run?.startsWith("pnpm exec vitest run ") ? step.run.split(" ").slice(4) : []);
     expect(inStatic).toContain("scripts/testing/verification-docs.test.ts");
     // A docs path a test reads from the repository root: join(ROOT, "docs", ...), new URL("docs/...", ROOT) or read("docs/...").
+    // Missing pages still count: deleting documentation must not silently drop its tests from CI.
     const DOCS_READ = /(?:(?:join|resolve)\(\s*ROOT\s*,\s*|new URL\(\s*|\bread\w*\(\s*)["'`]((?:apps\/docs|docs)\b[^"'`]*|[A-Z][A-Z_]+\.md)["'`]/g;
-    const readers = ["server", "shared", "electron", "companion", "enterprise", "evals", "scripts", "src", "cloudflare"]
+    const readers = ["desktop/server", "packages/shared", "desktop/electron", "desktop/companion", "scripts", "desktop/src", "gateway"]
       .flatMap((directory) => codeFiles(join(ROOT, directory)))
       .filter((file) => /\.(?:test|node-test)\.[cm]?[jt]sx?$/.test(file) && !file.endsWith("ci-scope.test.ts"))
-      .filter((file) => [...readFileSync(file, "utf8").replace(/(["'`])\s*,\s*(["'`])/g, "/").matchAll(DOCS_READ)]
-        .some((match) => existsSync(join(ROOT, match[1]))))
+      .filter((file) => [...readFileSync(file, "utf8").replace(/(["'`])\s*,\s*(["'`])/g, "/").matchAll(DOCS_READ)].length > 0)
       .map((file) => relative(ROOT, file).split("\\").join("/"))
       .sort();
     expect(readers).toEqual([...VITEST_SUBSETS["docs-tests"].files, ...inStatic.filter((file) => file === "scripts/testing/verification-docs.test.ts")].sort());
   });
 
   it("never loads a test file from other code, so a test under scripts/ affects only the jobs that run it", () => {
-    const code = ["server", "shared", "electron", "companion", "enterprise", "evals", "scripts", "src", "cloudflare"]
+    const code = ["desktop/server", "packages/shared", "desktop/electron", "desktop/companion", "scripts", "desktop/src", "gateway"]
       .flatMap((directory) => codeFiles(join(ROOT, directory)));
     const loaders = code.filter((file) => imports(file).some((target) => /\.test\.[cm]?[jt]sx?$/.test(target)));
     expect(loaders.map((file) => relative(ROOT, file))).toEqual([]);
@@ -569,7 +569,7 @@ describe("version-only package.json", () => {
 
   it("never narrows a push the way it narrows a pull request", () => {
     const show = () => pkg("0.1.100");
-    for (const file of ["apps/docs/content/index.mdx", "desktop/src/locales/de.json", "desktop/src/App.tsx", "gateway/control-plane/src/index.ts", "desktop/server/index.ts"]) {
+    for (const file of ["desktop/src/locales/de.json", "desktop/src/App.tsx", "gateway/control-plane/src/index.ts", "desktop/server/index.ts"]) {
       expect(selectPushScope([file], show), file).toEqual({ runtime: true });
     }
     expect(selectPushScope([], show)).toEqual({ runtime: true });

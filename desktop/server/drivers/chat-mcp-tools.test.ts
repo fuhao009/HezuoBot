@@ -39,7 +39,7 @@ const controllers: AbortController[] = [];
 const schema = { type: "object", properties: { value: { type: "string" } }, required: ["value"], additionalProperties: false };
 
 function fixture(body = "", toolSchema: Record<string, unknown> = schema) {
-  const dir = mkdtempSync(join(tmpdir(), "omb-chat-mcp-"));
+  const dir = mkdtempSync(join(tmpdir(), "hezuo-chat-mcp-"));
   dirs.push(dir);
   const script = join(dir, "fake-mcp.mjs");
   const receipt = join(dir, "receipt.json");
@@ -60,7 +60,7 @@ function fixture(body = "", toolSchema: Record<string, unknown> = schema) {
         const line = buffer.slice(0, newline); buffer = buffer.slice(newline + 1);
         const message = JSON.parse(line);
         calls.push(message);
-        writeFileSync(receipt, JSON.stringify({pid:process.pid,path:process.env.PATH,omb:Object.fromEntries(Object.entries(process.env).filter(([name]) => name.startsWith("OMB_"))),calls}));
+        writeFileSync(receipt, JSON.stringify({pid:process.pid,path:process.env.PATH,omb:Object.fromEntries(Object.entries(process.env).filter(([name]) => name.startsWith("HEZUO_"))),calls}));
         ${body}
         if (message.method === "initialize") reply(message, {protocolVersion:"2024-11-05",capabilities:{tools:{}}});
         else if (message.method === "tools/list") reply(message, {tools:[{name:"write",description:"Fixture write",inputSchema:schema}]});
@@ -185,6 +185,32 @@ describe("Chat MCP session", () => {
     await expect(session.execute("audit_write", { value: "again" }, f.controller.signal)).rejects.toThrow("closed");
   });
 
+  it.each(["browser", "custom"] as const)("exposes origin-only approval evidence only for the registered built-in browser (%s)", async (mountAs) => {
+    const openSchema = { type: "object", properties: { url: { type: "string" } }, required: ["url"], additionalProperties: false };
+    const f = fixture(`if (message.method === "tools/list") { reply(message, {tools:[{name:"agent_browser_open",description:"Open page",inputSchema:schema}]}); continue; }`, openSchema);
+    const session = await mountChatTools(mountAs === "browser" ? { browser: f.server } : { custom: { browser: f.server } }, f.controller.signal, true);
+    sessions.push(session);
+    const name = session.definitions[0]!.function.name;
+    const args = { url: "http://127.0.0.1:43127/private?token=secret#password" };
+    session.validate(name, args);
+    const shown = session.view(name, args);
+    expect(shown.ask).toBe(true);
+    expect(shown.input).toBe(args);
+    if (mountAs === "browser") {
+      expect(shown.browserTarget).toEqual({ operation: "open", origin: "http://127.0.0.1:43127" });
+      expect(shown.approvalSummary).toBe(JSON.stringify(shown.browserTarget));
+      expect(shown.approvalSummary).not.toMatch(/private|token|secret|password/);
+      const credentials = session.view(name, { url: "https://user:password@example.com/private?token=secret" });
+      expect(credentials.browserTarget).toBeUndefined();
+      expect(credentials.approvalSummary).toBe('{"operation":"open"}');
+    } else {
+      expect(shown.browserTarget).toBeUndefined();
+      expect(shown.approvalSummary).toBeUndefined();
+    }
+    expect(f.read().calls.map((call) => call.method)).not.toContain("tools/call");
+  });
+
+
   it.each([
     ["browser", true],
     ["custom", false],
@@ -236,14 +262,14 @@ describe("Chat MCP session", () => {
   });
 
   it("keeps the operator's control-plane secrets from a chat bot's tool servers, but not what the descriptor grants", async () => {
-    const secrets = ["OMB_CLOUD_READY_TOKEN", "OMB_CLOUD_BOOTSTRAP", "OMB_LICENSE_KEY", "OMB_INSTALLATION_CREDENTIAL"];
+    const secrets = ["HEZUO_CLOUD_READY_TOKEN", "HEZUO_CLOUD_BOOTSTRAP", "HEZUO_LICENSE_KEY", "HEZUO_INSTALLATION_CREDENTIAL"];
     for (const name of secrets) vi.stubEnv(name, "should-not-leak");
-    vi.stubEnv("OMB_CLOUDFLARED_PATH", "/usr/local/bin/cloudflared");
+    vi.stubEnv("HEZUO_CLOUDFLARED_PATH", "/usr/local/bin/cloudflared");
     const f = fixture();
-    f.server.env = { ...f.server.env, OMB_COMMS_TOKEN: "turn-capability" };
+    f.server.env = { ...f.server.env, HEZUO_COMMS_TOKEN: "turn-capability" };
     await f.mount();
     const seen = f.read().omb;
-    expect(seen).toMatchObject({ OMB_CLOUDFLARED_PATH: "/usr/local/bin/cloudflared", OMB_COMMS_TOKEN: "turn-capability" });
+    expect(seen).toMatchObject({ HEZUO_CLOUDFLARED_PATH: "/usr/local/bin/cloudflared", HEZUO_COMMS_TOKEN: "turn-capability" });
     for (const name of secrets) expect(seen).not.toHaveProperty(name);
   });
 
@@ -258,10 +284,10 @@ describe("Chat MCP session", () => {
     expect(of(agents.receipt).opts.box).toBeUndefined();
   });
 
-  it("mounts only supported descriptors and preserves conversations with no tools", async () => {
+  it("preserves conversations with no tools", async () => {
     const controller = new AbortController();
     controllers.push(controller);
-    const session = await mountChatTools({ phone: { command: "must-not-launch", args: [], env: {} } }, controller.signal);
+    const session = await mountChatTools({}, controller.signal);
     sessions.push(session);
     expect(session.definitions).toEqual([]);
     await session.close();
@@ -747,8 +773,8 @@ describe("Chat MCP tool limit", () => {
     try {
       const { session, names } = await mount(windowsTurn(51, {
         composio: catalog(syntheticToolNames("router", 14)),
-        highlevel: catalog(syntheticToolNames("crm", 20)),
-        device: catalog(syntheticToolNames("phone", 23)),
+        data: catalog(syntheticToolNames("table", 25)),
+        device: catalog(syntheticToolNames("sensor", 23)),
       }));
       expect(names).toHaveLength(127);
       expect(names).toEqual(expect.arrayContaining(syntheticToolNames("agents_agent", 51)));

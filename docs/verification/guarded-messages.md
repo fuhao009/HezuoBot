@@ -38,9 +38,9 @@ Run the permanent isolated HTTP checks:
 pnpm exec vitest run desktop/server/guarded-messages-api.test.ts
 ```
 
-Each case launches the prescribed `control-omb` verification server in a fresh
+Each case launches the prescribed `control-hezuo` verification server in a fresh
 home and uses only its gated fake provider. The test records the exact HTTP
-requests, `control:omb` commands, bounded transcripts and wait results next to
+requests, `control:hezuo` commands, bounded transcripts and wait results next to
 the server log in a `.log.guarded-messages.json` receipt. Temporary homes and
 their child processes are closed by each fixture.
 
@@ -124,11 +124,11 @@ isolated fakes.
 ## Dedicated shared-workspace operator policy
 
 An operator who explicitly authorizes Full access in a dedicated company
-workspace can provision `OMB_SHARED_WORKSPACE_FULL_ACCESS=1` at server startup.
-It is active only with a fully validated HTTPS `OMB_ADMIN_URL`,
-`OMB_PUBLIC_URL`, workspace slug `OMB_ADMIN_WORKSPACE`,
-`OMB_ADMIN_MEMBERSHIP=portal`, a loaded hosted-access hook and a live `admin`
-entitlement. `OMB_DESKTOP_PARENT=1` disallows it. HTTP settings cannot toggle it.
+workspace can provision `HEZUO_SHARED_WORKSPACE_FULL_ACCESS=1` at server startup.
+It is active only with a fully validated HTTPS `HEZUO_ADMIN_URL`,
+`HEZUO_PUBLIC_URL`, workspace slug `HEZUO_ADMIN_WORKSPACE`,
+`HEZUO_ADMIN_MEMBERSHIP=portal`, a loaded hosted-access hook and a live `admin`
+entitlement. `HEZUO_DESKTOP_PARENT=1` disallows it. HTTP settings cannot toggle it.
 
 Only while that policy is active does authenticated health advertise
 `capabilities.sharedWorkspaceFullAccess: 1`. A trusted loopback caller may then
@@ -147,16 +147,16 @@ already-authorized tasks. Use a new thread when changing an external request's
 permission policy, never upgrade an old queued request or silently patch a
 shared task.
 
-Run the operator-policy and Full/Ask workflow checks:
+Run the retained Full/Ask workflow and store checks:
 
 ```sh
-pnpm exec vitest run desktop/server/enterprise.test.ts desktop/server/hosted-access.test.ts desktop/server/full-access-workflows.e2e.test.ts desktop/server/store.test.ts
+pnpm exec vitest run desktop/server/full-access-workflows.e2e.test.ts desktop/server/store.test.ts
 ```
 
-The hosted-access tests exercise the real hosted authorization route with an
-isolated portal/license fixture. The Full workflow exercises exact Full/Ask
-guarded sends, bot creation, delegated continuations, and restart while awaiting
-a teammate, using only fake providers. Neither contacts a real portal or model.
+The enterprise operator-policy and hosted-access authorization fixtures are
+retired and are not current checks. The retained Full workflow exercises exact
+Full/Ask guarded sends, bot creation, delegated continuations, and restart while
+awaiting a teammate, using only fake providers; it does not contact a real model.
 
 The request and operator-policy fixtures were developed against public `main`
 at `12ee67e7` on 2026-09-21 and verified with real isolated runtime processes.

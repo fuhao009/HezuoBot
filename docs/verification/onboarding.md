@@ -13,7 +13,7 @@ still missing. The app tour starts only from Settings → Replay app tour.
 Launch the isolated full-app fixture following [Chat UI](chat-ui.md):
 
 ```sh
-node --experimental-strip-types scripts/control-omb.ts ui launch
+node --experimental-strip-types scripts/control-hezuo.ts ui launch
 ```
 
 In a second terminal, pass its exact printed handle:
@@ -37,7 +37,7 @@ starter-model selection and a successful first composer message without opening
 the model picker; every app tour step from Settings, persistence after reload,
 Settings replay, skipping while Next is saving, closing a welcome replay while
 its save is pending, and replay on legacy installs with a failed-save retry.
-Screenshots are retained in `.omb-scratch/verify-evidence/onboarding/` with a
+Screenshots are retained in `.omb-scratch/verify-evidence/onboarding/` (historical original path) with a
 PASS line for each workflow. Actual provider authentication and native Electron
 permissions remain covered by their separate platform recipes, not this browser
 fixture.
@@ -86,9 +86,9 @@ What each first-run surface depends on, and how it was checked:
 | Browser, hosted member (no admin scope) | No welcome flow; one dismissible note kept in browser storage; no first-conversation spotlights | `desktop/src/components/onboarding/WelcomeGate.test.ts`, `desktop/src/components/onboarding/FirstConversationTour.test.ts` |
 | Browser, client-scope session on a server that is not hosted | Nothing new: the flow does not open itself (it could not be saved); Settings replay and spotlights as before | `desktop/src/components/onboarding/WelcomeGate.test.ts`, `desktop/src/lib/onboarding.test.ts` |
 
-`GET /api/auth/session` adds `hosted: true` for a session on a hosted
-workspace and is otherwise unchanged (`desktop/server/hosted-access.test.ts`,
-`desktop/server/email-signin.test.ts`).
+Historically, hosted sessions added a hosted flag to the auth-session response.
+The hosted-access and email-signin fixtures are retired; this is not a current
+hosted authorization check. The retained UI tests above cover their fixture states only.
 
 On a fresh `ui launch` fixture, the recipe above still passed end to end
 through the new session check. In the same fixture browser, a client-scope
@@ -97,9 +97,9 @@ That run also showed the member note, which review then limited to hosted
 workspaces (the fixture is not hosted). The hosted-only rule is covered by the
 tests above, not by a rerun. In that run, "Got it" made no `/api/config`
 write, and the note stayed away after a reload. Connect an AI was mounted from the Vite preview with a fake
-`window.ogb.organization` injected before mount; it showed the row signed out,
+`window.hezuo.organization` injected before mount; it showed the row signed out,
 then connecting with the code, then connected. `begin` ran once, with the
-default Admin. Screenshots are in `.omb-scratch/verify-evidence/onboarding/`.
+default Admin. Screenshots are in `.omb-scratch/verify-evidence/onboarding/` (historical original path).
 
 Not covered here: the real Electron preload bridge and a real Admin enrolment
 (see [organization connection](organization-settings.md), not rerun for this
@@ -108,16 +108,13 @@ from a temporary preview entry, not reached through a hosted sign-in. The
 organization row now sits under Other ways on the first screen; its states are
 covered by the tests in the table.
 
-## A new Cloud's welcome
+## A new Cloud's welcome (retired)
 
-```sh
-node --experimental-strip-types scripts/verify-cloud-welcome.ts
-```
-
-It launches the isolated fake-engine fixture and mounts the whole app
-(`scripts/testing/cloud-welcome-preview.tsx`) in a Vite preview whose
-session and config answer as a Cloud home's owner, with Claude signed out and
-the trial's Claude credit in the engine list. Open the printed `previewUrl`:
+Historical evidence only: the Cloud welcome verifier and preview entry have
+been removed. The following records the former preview, not an executable recipe.
+It used an isolated fake-engine fixture whose session and config answered as a
+Cloud home's owner, with Claude signed out and trial credit in the engine list.
+The former preview accepted these options:
 
 - `?desktop=1` adds the reduced bridge a Cloud's page gets in the desktop app;
   `?move=copy` or `?move=done` shows the one-time move on its way or landed
@@ -130,12 +127,10 @@ the trial's Claude credit in the engine list. Open the printed `previewUrl`:
 What was checked this way (Oct 16 2026): every step and the done state in
 Midnight and Daylight at 1280×860, 1024×760 and 390×844, the bring and engine
 steps in the other seven skins, and
-the setup card in short beside Routines. Steps finished there are written to
-the fixture's onboarding record; the record can be cleared with
-`PUT /api/config` (`{"onboarding":{"hintsSeen":[]}}`). The real move and the
-desktop's preload bridge are not exercised here; they are covered by
-`desktop/server/one-home.e2e.test.ts` and
-`desktop/src/components/cloud-welcome/CloudWelcome.test.ts`.
+the setup card in short beside Routines. Finished steps were written to the
+fixture's onboarding record. The real move and desktop preload bridge were
+outside this preview; their former one-home and Cloud welcome tests are also
+retired, so none of this establishes current coverage.
 
 ## Bring what you already use (Oct 16 2026)
 
@@ -155,7 +150,7 @@ touches, and checks that none of them was listed or opened and that the
 sentinel reaches no answer, saved server or copied skill. The route test
 refuses a paired device, a service loopback and a hosted or Cloud server; the
 end-to-end test runs the real server from `launchVerificationServer` against a
-planted home, as the desktop app runs it (`OMB_TEST_DESKTOP_OWNER_TOKEN`), checks
+planted home, as the desktop app runs it (`HEZUO_TEST_DESKTOP_OWNER_TOKEN`), checks
 that a headless server (`hezuo serve`) refuses the step, and checks that the starter bot and a bot made afterwards both
 get the skills in their turn's index, task folder links and `/name`, that a
 Claude turn with "Also use my Claude Code skills" on sees a Claude Code skill

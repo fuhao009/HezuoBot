@@ -6,7 +6,7 @@ import type { Action, AppState } from "@/state/store";
 export function useExternalChatLinks(state: AppState, dispatch: (action: Action) => void): void {
   const [link, setLink] = useState<string | null>(null);
   const showThreads = useShowThreads();
-  useEffect(() => window.ogb?.onChatLink?.(setLink), []);
+  useEffect(() => window.hezuo?.onChatLink?.(setLink), []);
   useEffect(() => {
     if (!link || !state.hydrated) return;
     setLink(null);

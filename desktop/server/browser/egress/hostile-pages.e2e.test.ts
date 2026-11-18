@@ -22,7 +22,7 @@ import { BrowserEgress, OwnListeners } from "./registry.ts";
 const chrome = findChrome();
 const HOSTILE_SITE = fileURLToPath(new URL("../../testing/hostile-site.mjs", import.meta.url));
 
-if (!chrome) console.log("skipping the hostile-page suite: no Chrome found (set OMB_TEST_CHROME)");
+if (!chrome) console.log("skipping the hostile-page suite: no Chrome found (set HEZUO_TEST_CHROME)");
 
 describe("the hostile-page suite runs where CI promises it", () => {
   it.skipIf(!process.env.CI || process.platform === "win32")("finds Chrome on this CI runner", () => {
@@ -139,14 +139,14 @@ describe.skipIf(!chrome)("S6: a hostile page in a bot's browser", () => {
 
   it("cannot reach Hezuo on the desktop, in any spelling of this machine or through any request", async () => {
     const own = [
-      [`http://127.0.0.1:${ombPort}/`, "127.0.0.1", "omb"],
-      [`http://localhost.:${ombPort}/`, "localhost.", "omb"],
-      [`http://[::1]:${ombPort}/`, "::1", "omb"],
-      [`http://[::ffff:127.0.0.1]:${ombPort}/`, "::ffff:7f00:1", "omb"],
+      [`http://127.0.0.1:${ombPort}/`, "127.0.0.1", "hezuo"],
+      [`http://localhost.:${ombPort}/`, "localhost.", "hezuo"],
+      [`http://[::1]:${ombPort}/`, "::1", "hezuo"],
+      [`http://[::ffff:127.0.0.1]:${ombPort}/`, "::ffff:7f00:1", "hezuo"],
       [`http://0.0.0.0:${ombPort}/`, "0.0.0.0", "reserved"],
-      [`http://2130706433:${ombPort}/`, "127.0.0.1", "omb"],
-      [`http://0177.0.0.1:${ombPort}/`, "127.0.0.1", "omb"],
-      [`http://rebind.test:${ombPort}/`, "rebind.test", "omb"],
+      [`http://2130706433:${ombPort}/`, "127.0.0.1", "hezuo"],
+      [`http://0177.0.0.1:${ombPort}/`, "127.0.0.1", "hezuo"],
+      [`http://rebind.test:${ombPort}/`, "rebind.test", "hezuo"],
       // The same name pointed at a dev server: a public name never reaches this machine.
       [`http://rebind.test:${sitePort}/`, "rebind.test", "rebinding"],
       ["http://169.254.169.254/", "169.254.169.254", "metadata"],
@@ -185,7 +185,7 @@ describe.skipIf(!chrome)("S6: a hostile page in a bot's browser", () => {
     expect(hits).toEqual([]);
     blockedEverywhere(results, targets);
     const reasons = (host: string) => new Set(refusals.filter((refusal) => refusal.host === host).map((refusal) => refusal.reason));
-    expect(reasons("127.0.0.1")).toEqual(new Set(["omb"]));
+    expect(reasons("127.0.0.1")).toEqual(new Set(["hezuo"]));
     expect(reasons("fdaa::3")).toEqual(new Set(["local-network"]));
     expect(reasons("10.0.0.1")).toEqual(new Set(["local-network"]));
     expect(reasons("169.254.169.254")).toEqual(new Set(["metadata"]));

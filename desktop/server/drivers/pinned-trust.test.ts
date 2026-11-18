@@ -22,7 +22,7 @@ interface Certificates { key: string; pem: string; otherPem: string }
 
 /** A throwaway leaf for 127.0.0.1, or null where openssl is unavailable. */
 function certificates(): Certificates | null {
-  const directory = mkdtempSync(join(tmpdir(), "omb-pinned-trust-"));
+  const directory = mkdtempSync(join(tmpdir(), "hezuo-pinned-trust-"));
   cleanups.push(() => rmSync(directory, { recursive: true, force: true }));
   const make = (name: string, extra: string[]) => {
     const made = spawnSync("openssl", ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "2",
@@ -69,7 +69,7 @@ async function managed(url: string, trust: { origin: string; ca: string }) {
     instanceId: "product-ai", displayName: "Product", enabled: true,
     environment: {},
     config: OpenAICompatDriver.decodeConfig({ url, apiKeyEnv: "HEZUO_PRODUCT_AI_TOKEN", provider: "", model: "product-model" }),
-    requestCredential: () => ({ apiKey: `omb_product_ai_${"a".repeat(22)}.${"b".repeat(43)}`, expiresAt: Date.now() + 60_000 }),
+    requestCredential: () => ({ apiKey: `hezuo_product_ai_${"a".repeat(22)}.${"b".repeat(43)}`, expiresAt: Date.now() + 60_000 }),
     requestTrust: trust,
   });
   cleanups.push(async () => { await instance.dispose(); });

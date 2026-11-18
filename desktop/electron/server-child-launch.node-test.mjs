@@ -13,7 +13,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 test("the packaged server forks the bootstrap with a compile cache under userData", () => {
   const resourcesPath = path.join("/Applications", "Hezuo.app", "Contents", "Resources");
-  const userData = path.join("/Users", "someone", "Library", "Application Support", "Hezuo");
+  const userData = path.join("/Users", "someone", "Library", "Application Support", "HezuoBot");
   assert.deepEqual(serverChildLaunch({ resourcesPath, userData, env: {}, exists: () => true }), {
     entry: path.join(resourcesPath, "server", "desktop-entry.mjs"),
     compileCacheDir: path.join(userData, "server-compile-cache"),
@@ -21,8 +21,8 @@ test("the packaged server forks the bootstrap with a compile cache under userDat
 });
 
 test("a server tree without the bootstrap forks index.js with no cache, as before", () => {
-  const resourcesPath = path.join("/opt", "Hezuo", "resources");
-  assert.deepEqual(serverChildLaunch({ resourcesPath, userData: "/home/someone/.config/Hezuo", env: {}, exists: () => false }), {
+  const resourcesPath = path.join("/opt", "HezuoBot", "resources");
+  assert.deepEqual(serverChildLaunch({ resourcesPath, userData: "/home/someone/.config/HezuoBot", env: {}, exists: () => false }), {
     entry: path.join(resourcesPath, "server", "index.js"),
     compileCacheDir: null,
   });
@@ -32,15 +32,15 @@ test("no cache where the app's path changes every launch: AppImage and App Trans
   // Node keys cache entries by full path, so these would never hit and would add an entry every launch.
   const appImage = serverChildLaunch({
     resourcesPath: "/tmp/.mount_OpenMaXk3f9a/resources",
-    userData: "/home/someone/.config/Hezuo",
-    env: { APPIMAGE: "/home/someone/Hezuo.AppImage" },
+    userData: "/home/someone/.config/HezuoBot",
+    env: { APPIMAGE: "/home/someone/HezuoBot.AppImage" },
     exists: () => true,
   });
   assert.equal(appImage.entry, path.join("/tmp/.mount_OpenMaXk3f9a/resources", "server", "desktop-entry.mjs"));
   assert.equal(appImage.compileCacheDir, null);
   const translocated = serverChildLaunch({
     resourcesPath: "/private/var/folders/xy/T/AppTranslocation/2F1C/d/Hezuo.app/Contents/Resources",
-    userData: "/Users/someone/Library/Application Support/Hezuo",
+    userData: "/Users/someone/Library/Application Support/HezuoBot",
     env: {},
     exists: () => true,
   });
@@ -50,7 +50,7 @@ test("no cache where the app's path changes every launch: AppImage and App Trans
 
 // A staged copy of the bootstrap beside a stand-in index.js that reports what the server would see.
 function stage(t, indexSource = REPORTING_INDEX) {
-  const dir = mkdtempSync(path.join(tmpdir(), "omb-server-entry-"));
+  const dir = mkdtempSync(path.join(tmpdir(), "hezuo-server-entry-"));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   mkdirSync(path.join(dir, "server"));
   copyFileSync(bootstrapSource, path.join(dir, "server", "desktop-entry.mjs"));
@@ -65,12 +65,12 @@ import { execFileSync } from "node:child_process";
 const later = globalThis.setTimeout;
 globalThis.setTimeout = (callback, _delay, ...args) => later(callback, 0, ...args);
 const child = JSON.parse(execFileSync(process.execPath, ["-e",
-  "process.stdout.write(JSON.stringify([process.env.OMB_SERVER_COMPILE_CACHE ?? null, process.env.NODE_COMPILE_CACHE ?? null]))"],
+  "process.stdout.write(JSON.stringify([process.env.HEZUO_SERVER_COMPILE_CACHE ?? null, process.env.NODE_COMPILE_CACHE ?? null]))"],
   { encoding: "utf8" }));
 later(() => console.log(JSON.stringify({
   started: true,
   cacheDir: module.getCompileCacheDir() ?? null,
-  env: [process.env.OMB_SERVER_COMPILE_CACHE ?? null, process.env.NODE_COMPILE_CACHE ?? null],
+  env: [process.env.HEZUO_SERVER_COMPILE_CACHE ?? null, process.env.NODE_COMPILE_CACHE ?? null],
   child,
 })), 300);
 `;
@@ -79,8 +79,8 @@ function runEntry(dir, cacheRoot, extraEnv = {}) {
   const env = { ...process.env };
   delete env.NODE_COMPILE_CACHE;
   delete env.NODE_DISABLE_COMPILE_CACHE;
-  if (cacheRoot !== undefined) env.OMB_SERVER_COMPILE_CACHE = cacheRoot;
-  else delete env.OMB_SERVER_COMPILE_CACHE;
+  if (cacheRoot !== undefined) env.HEZUO_SERVER_COMPILE_CACHE = cacheRoot;
+  else delete env.HEZUO_SERVER_COMPILE_CACHE;
   Object.assign(env, extraEnv);
   const result = spawnSync(process.execPath, [path.join(dir, "server", "desktop-entry.mjs")], { encoding: "utf8", env, timeout: 20_000 });
   const line = result.stdout.trim().split("\n").filter(Boolean).at(-1);

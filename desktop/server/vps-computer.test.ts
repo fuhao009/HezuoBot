@@ -673,7 +673,7 @@ describe("VPS computer", () => {
     const transfer = fake.calls.find(({ args }) => args.includes("hezuo-preview"))!.args;
     // The exact in-container script with only the local Pillow interpreter and a disposable image swapped in; no Docker or SSH.
     const script = transfer[transfer.indexOf("-c") + 1].replace("/opt/venv/bin/python", "python3");
-    const scratch = mkdtempSync(join(tmpdir(), "omb-vps-preview-image-"));
+    const scratch = mkdtempSync(join(tmpdir(), "hezuo-vps-preview-image-"));
     try {
       for (const [width, height, expected] of [[2560, 1600, [1280, 800]], [1600, 2560, [800, 1280]], [320, 200, [320, 200]]] as const) {
         const original = execFileSync("python3", ["-I", "-c", `from PIL import Image; import sys; Image.effect_noise((${width}, ${height}), 64).convert("RGBA").save(sys.stdout.buffer, format="PNG")`], { maxBuffer: 32 * 1024 * 1024 });
@@ -706,7 +706,7 @@ describe("VPS computer", () => {
     await vpsComputerScreenshot(CONFIG, BOT_ID, fake.runner);
     const transfer = fake.calls.find(({ args }) => args.includes("hezuo-preview"))!.args;
     const originalScript = transfer[transfer.indexOf("-c") + 1];
-    const scratch = mkdtempSync(join(tmpdir(), "omb-vps-preview-fallback-"));
+    const scratch = mkdtempSync(join(tmpdir(), "hezuo-vps-preview-fallback-"));
     try {
       const path = join(scratch, "preview.png");
       writeFileSync(path, screenshot);

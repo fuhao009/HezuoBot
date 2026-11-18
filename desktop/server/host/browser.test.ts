@@ -8,7 +8,6 @@ import { BUILT_IN_BROWSER_SYSTEM_PROMPT, browserEngineStatus, clearBrowserSessio
 import { CHROME_BROWSER_SYSTEM_PROMPT } from "../browser/prompt.ts";
 import { TOOL_LIST } from "../browser/tools.ts";
 import { browserEgress } from "../browser/egress/registry.ts";
-import { REDDIT_REFUSAL } from "../browser/egress/reddit.ts";
 import type { Audience } from "../audience.ts";
 import { DATA_DIR, type AppConfig } from "../config.ts";
 import type { Store } from "../store.ts";
@@ -43,8 +42,8 @@ afterEach(async () => { await Promise.all(hosts.splice(0).map((host) => host.bro
 
 const turn = { threadId: "thread-1", generation: "gen-1" };
 
-function setup(engine: "chrome" | "agent-browser" | undefined, { cloudHome = false, device, lendRefusal, holder, audienceOf, bots: botIds = ["scout"], browserBox, lentChrome, turnResources }: {
-  cloudHome?: boolean; device?: BrowserHostDeps["device"]; lendRefusal?: BrowserHostDeps["lendRefusal"]; holder?: (resource: string) => TurnOwner | undefined;
+function setup(engine: "chrome" | "agent-browser" | undefined, { headless = false, device, lendRefusal, holder, audienceOf, bots: botIds = ["scout"], browserBox, lentChrome, turnResources }: {
+  headless?: boolean; device?: BrowserHostDeps["device"]; lendRefusal?: BrowserHostDeps["lendRefusal"]; holder?: (resource: string) => TurnOwner | undefined;
   audienceOf?: BrowserHostDeps["audienceOf"]; bots?: string[]; browserBox?: BrowserHostDeps["browserBox"];
   lentChrome?: BrowserHostDeps["lentChrome"]; turnResources?: BrowserHostDeps["turnResources"];
 } = {}) {
@@ -64,8 +63,7 @@ function setup(engine: "chrome" | "agent-browser" | undefined, { cloudHome = fal
     turnResources: turnResources ?? { free: () => true, holder: holder ?? (() => undefined), onClaim: () => () => {} },
     activeInternalGenerationByThread: new Map([[turn.threadId, turn.generation]]),
     mintInternalCapability: (capability) => { minted.push(capability); return "capability-token"; },
-    DESKTOP_MANAGED: !cloudHome,
-    CLOUD_HOME: cloudHome ? { machineId: "m-1" } : null,
+    DESKTOP_MANAGED: !headless,
     PORT: 4100,
     device,
     lendRefusal,
@@ -87,7 +85,6 @@ describe("the bots' browser host and the engine memory guard", () => {
       activeInternalGenerationByThread: new Map(),
       mintInternalCapability: () => "capability-token",
       DESKTOP_MANAGED: false,
-      CLOUD_HOME: { machineId: "m-1" },
       PORT: 4100,
       engineMemory: { useBrowsers: (browsers) => { told.push(browsers); } },
     });
@@ -100,8 +97,8 @@ describe("the bots' browser host with browserEngine.engine set to chrome", () =>
   it("gives a bot's turn the browser MCP server over its own profile on the new engine", async () => {
     const { host, minted } = setup("chrome");
     const browser = await host.browserIntegration("scout", undefined, turn);
-    expect(browser?.spec).toEqual({ command: "omb-cdp", args: ["bot:scout"], env: {} });
-    expect(browser?.integration).toMatchObject({ command: process.execPath, env: { OMB_HARNESS_URL: "http://127.0.0.1:4100" } });
+    expect(browser?.spec).toEqual({ command: "hezuo-cdp", args: ["bot:scout"], env: {} });
+    expect(browser?.integration).toMatchObject({ command: process.execPath, env: { HEZUO_HARNESS_URL: "http://127.0.0.1:4100" } });
     expect(minted).toEqual([expect.objectContaining({ botId: "scout", browserSession: browser?.session, kind: "browser", ...turn })]);
     expect(host.usedBrowserSessions.get(browser!.session)).toEqual(browser?.spec);
   });
@@ -148,7 +145,7 @@ describe("the bots' browser host with browserEngine.engine set to chrome", () =>
 
 describe("what the memory guard sees of a bot's browser", () => {
   it("counts a browser a bot's turn may start, but not one it can't use or the person's own Chrome", () => {
-    const { host, bots } = setup(undefined, { cloudHome: true });
+    const { host, bots } = setup(undefined, { headless: true });
     const bot = bots[0] as { browser: boolean; browserProfile?: string };
     expect(host.engineBrowsers.starts("thread-1")).toBe(true);
     bot.browser = false;
@@ -159,14 +156,14 @@ describe("what the memory guard sees of a bot's browser", () => {
   });
 
   it("counts a temporary browser before its first call without making its session", () => {
-    const { host, bots } = setup(undefined, { cloudHome: true });
+    const { host, bots } = setup(undefined, { headless: true });
     (bots[0] as { browserProfile?: string }).browserProfile = "guest";
     expect(host.engineBrowsers.starts("thread-1")).toBe(true);
     expect(host.temporaryBrowserSessions.size).toBe(0);
   });
 
   it("closes nothing for a stopped turn whose bot's browser is not running", async () => {
-    const { host } = setup(undefined, { cloudHome: true });
+    const { host } = setup(undefined, { headless: true });
     await host.browserIntegration("scout", undefined, turn);
     vi.mocked(closeBrowserSession).mockClear();
     host.engineBrowsers.stopped("thread-1");
@@ -180,7 +177,7 @@ describe("the person's lent computer's connection, for a bot's browser on My Clo
     const configure = vi.spyOn(browserEgress, "configure");
     const holders = new Map<string, TurnOwner>();
     const upstream = { open: async () => ({ refused: "port" as const }) };
-    setup(undefined, { cloudHome: true, device: () => upstream, lendRefusal: (turn) => (turn.threadId === "owner-thread" ? null : "someone-else"), holder: (resource) => holders.get(resource) });
+    setup(undefined, { headless: true, device: () => upstream, lendRefusal: (turn) => (turn.threadId === "owner-thread" ? null : "someone-else"), holder: (resource) => holders.get(resource) });
     const device = configure.mock.lastCall![0].device!;
     configure.mockRestore();
     expect(device("bot-1"), "a browser no turn has held is the person's own").toBe(upstream);
@@ -198,7 +195,7 @@ describe("the person's lent computer's connection, for a bot's browser on My Clo
   it("is never offered to a browser a turn holds when the host can't tell who may use the lent computer", () => {
     const configure = vi.spyOn(browserEgress, "configure");
     const upstream = { open: async () => ({ refused: "port" as const }) };
-    setup(undefined, { cloudHome: true, device: () => upstream, holder: () => ({ threadId: "t", generation: "g" }) });
+    setup(undefined, { headless: true, device: () => upstream, holder: () => ({ threadId: "t", generation: "g" }) });
     const device = configure.mock.lastCall![0].device!;
     configure.mockRestore();
     expect(device("bot-1")).toBeNull();
@@ -233,7 +230,7 @@ describe("My Chrome on My Cloud, through the person's lent Chrome", () => {
     let current = found;
     const resources = new TurnResources();
     const route = vi.fn(() => null);
-    const made = setup(undefined, { cloudHome: true, lendRefusal, turnResources: resources, lentChrome: { route, lender: () => current } });
+    const made = setup(undefined, { headless: true, lendRefusal, turnResources: resources, lentChrome: { route, lender: () => current } });
     made.cfg.browserProfiles = [{ id: "mine", name: "Mine", browser: "chrome" }] as AppConfig["browserProfiles"];
     (made.bots[0] as { browserProfile?: string }).browserProfile = "mine";
     /** A tool call as the browser route makes it: beforeDispatch claims the browser for the calling turn. */
@@ -372,14 +369,15 @@ describe("My Chrome on My Cloud, through the person's lent Chrome", () => {
     const { cfg, host, engine, call } = onMyCloud(null);
     const browser = (await host.browserIntegration("scout", "mine", turn))!;
     expect(await knock(browser.spec.env.AGENT_BROWSER_CDP!), "the door has a problem to tell").toBe("HTTP/1.1 503 Service Unavailable");
-    cfg.browserProfiles = [{ id: "mine", name: "Mine" }] as AppConfig["browserProfiles"];
+    cfg.browserProfiles = cfg.browserProfiles!.map((profile) => ({ ...profile, browser: undefined }));
     expect(host.currentBrowserSession("scout", "mine")).toBe(browser.session);
     const builtIn = { session: browser.session, spec: host.browserSessionSpec("/usr/local/bin/agent-browser", browser.session, "mine") };
     expect(builtIn.spec.env).not.toHaveProperty("AGENT_BROWSER_CDP");
+    expect(builtIn.spec.env).not.toHaveProperty("AGENT_BROWSER_AUTO_CONNECT");
+    expect(builtIn.session).not.toBe(host.currentBrowserSession("scout", undefined));
     const failed = { isError: true, content: [{ type: "text", text: "Element not found" }] };
     engine.mockResolvedValue(failed);
     expect(await call(builtIn, GUEST), "neither the someone-else nor the not-lent answer, and no guidance after").toEqual(failed);
-    expect(await call(builtIn, GUEST, { name: "agent_browser_open", arguments: { url: "https://www.reddit.com/" } }), "the Cloud's egress rule still applies").toEqual({ isError: true, content: [{ type: "text", text: REDDIT_REFUSAL }] });
     expect(engine).toHaveBeenCalledOnce();
   });
 
@@ -390,7 +388,7 @@ describe("My Chrome on My Cloud, through the person's lent Chrome", () => {
       for (const folder of folders.splice(0)) rmSync(folder, { recursive: true, force: true });
     });
     function leftover(session: string | null) {
-      const folder = mkdtempSync(join(tmpdir(), "omb-host-leftover-"));
+      const folder = mkdtempSync(join(tmpdir(), "hezuo-host-leftover-"));
       folders.push(folder);
       mkdirSync(join(folder, "agent-browser"));
       if (session) writeFileSync(join(folder, "agent-browser", `${session}.pid`), "0");
@@ -437,11 +435,11 @@ describe("My Chrome on My Cloud, through the person's lent Chrome", () => {
 });
 
 describe("how long an unused browser stays open", () => {
-  it("is three minutes on a Cloud home and ten on a desktop, unless config.json sets it", () => {
-    const cloud = setup(undefined, { cloudHome: true });
-    expect(cloud.host.browserIdleMs()).toBe(3 * 60_000);
-    cloud.cfg.browserEngine = { idleTimeoutMinutes: 20 };
-    expect(cloud.host.browserIdleMs()).toBe(20 * 60_000);
+  it("is ten minutes unless config.json sets it", () => {
+    const server = setup(undefined, { headless: true });
+    expect(server.host.browserIdleMs()).toBe(10 * 60_000);
+    server.cfg.browserEngine = { idleTimeoutMinutes: 20 };
+    expect(server.host.browserIdleMs()).toBe(20 * 60_000);
     expect(setup(undefined).host.browserIdleMs()).toBe(10 * 60_000);
   });
 });
@@ -472,7 +470,7 @@ describe("a deleted bot's browser", () => {
     vi.mocked(closeBrowserSession).mockClear().mockResolvedValue(true);
   }
   function daemons(sessions: string[]) {
-    const folder = mkdtempSync(join(tmpdir(), "omb-host-sweep-"));
+    const folder = mkdtempSync(join(tmpdir(), "hezuo-host-sweep-"));
     folders.push(folder);
     mkdirSync(join(folder, "agent-browser"));
     for (const session of sessions) writeFileSync(join(folder, "agent-browser", `${session}.pid`), "0");
@@ -482,14 +480,6 @@ describe("a deleted bot's browser", () => {
   const deleted = { type: "hezuo:browser-bot-deleted" as const, requestId: "00000000-0000-4000-8000-000000000000", botId: "gone" };
   const closed = () => vi.mocked(closeBrowserSession).mock.calls.map(([binary, env]) => `${binary} ${env.AGENT_BROWSER_SESSION}`);
 
-  it("on a Cloud home, is closed and its sign-ins erased with the image's agent-browser", async () => {
-    engines();
-    const { host } = setup(undefined, { cloudHome: true });
-    expect(await host.eraseDeletedBrowser(deleted)).toBe(true);
-    expect(vi.mocked(clearBrowserSessionState).mock.calls.map(([binary, session]) => `${binary} ${session}`)).toEqual([`${PATH_ENGINE} bot-gone`]);
-    vi.mocked(clearBrowserSessionState).mockResolvedValue(false);
-    expect(await host.eraseDeletedBrowser(deleted)).toBe(false);
-  });
 
   it("elsewhere, is erased only with the agent-browser Hezuo installed, and otherwise just closed", async () => {
     engines();
@@ -502,42 +492,32 @@ describe("a deleted bot's browser", () => {
     expect(vi.mocked(clearBrowserSessionState).mock.calls.map(([binary, session]) => `${binary} ${session}`)).toEqual([`${MANAGED_ENGINE} bot-gone`]);
   });
 
-  it("on a Cloud home, is closed by the minute's sweep even after this run used it, and nobody else's browser is", async () => {
-    engines();
-    daemons(["bot-gone", "default", "work-own"]);
-    const { host } = setup(undefined, { cloudHome: true });
-    host.usedBrowserSessions.set("bot-gone", { command: PATH_ENGINE, env: {} });
-    host.browserSweep.start();
-    await vi.waitFor(() => expect(closed()).toContain(`${PATH_ENGINE} bot-gone`));
-    expect(closed()).toEqual([`${PATH_ENGINE} bot-gone`]);
-    await host.browserSweep.closeAll();
-  });
 
   it("on a Team Cloud, is erased for every audience it had: each member's, each group chat's and the team's", async () => {
-    engines();
+    engines({ managed: true });
     forgetAudiences();
-    const { host } = setup(undefined, { cloudHome: true, audienceOf: teamAudiences });
+    const { host } = setup(undefined, { headless: true, audienceOf: teamAudiences });
     host.currentBrowserSession("gone", undefined, "member:p_ada");
     host.currentBrowserSession("gone", undefined, "room:launch");
     expect(await host.eraseDeletedBrowser(deleted)).toBe(true);
     expect(vi.mocked(clearBrowserSessionState).mock.calls.map(([, session]) => session)).toEqual(["bot-gone", `bot-gone${ADA}`, `bot-gone${ROOM}`]);
     vi.mocked(clearBrowserSessionState).mockClear();
     // After a restart too: which audiences had browsers is kept on disk.
-    const again = setup(undefined, { cloudHome: true, audienceOf: teamAudiences });
+    const again = setup(undefined, { headless: true, audienceOf: teamAudiences });
     expect(await again.host.eraseDeletedBrowser({ ...deleted, type: "hezuo:browser-profile-deleted", botId: undefined, partitionId: "p-work" })).toBe(true);
     expect(vi.mocked(clearBrowserSessionState).mock.calls.map(([, session]) => session)).toEqual(["p-work", `p-work${ADA}`, `p-work${ROOM}`]);
   });
 
-  it("on a Team Cloud, keeps each member's browser of a live bot open between turns, and closes a deleted bot's", async () => {
+  it("keeps each member's browser of a live bot open and leaves unknown sessions alone", async () => {
     engines();
     forgetAudiences();
     daemons([`bot-scout${ADA}`, `bot-gone${ADA}`]);
-    const { host } = setup(undefined, { cloudHome: true, audienceOf: teamAudiences });
+    const { host } = setup(undefined, { headless: true, audienceOf: teamAudiences });
     host.currentBrowserSession("scout", undefined, "member:p_ada");
     for (const session of [`bot-scout${ADA}`, `bot-gone${ADA}`]) host.usedBrowserSessions.set(session, { command: PATH_ENGINE, env: {} });
     host.browserSweep.start();
-    await vi.waitFor(() => expect(closed()).toContain(`${PATH_ENGINE} bot-gone${ADA}`));
-    expect(closed()).toEqual([`${PATH_ENGINE} bot-gone${ADA}`]);
+    await vi.waitFor(() => expect(runningBrowserSessionNames).toHaveBeenCalled());
+    expect(closed()).toEqual([]);
     await host.browserSweep.closeAll();
   });
 
@@ -619,13 +599,13 @@ describe("a Team Cloud's boxed browsers and the files a turn uploads", () => {
   afterEach(() => chromeLauncher.boxWith(() => null));
 
   it.each([null, "report.txt", "Report.txt"])("gives Chrome on Windows a private copy of a workspace file (name: %s)", async (name) => {
-    const work = realpathSync(mkdtempSync(join(tmpdir(), "omb-host-upload-windows-")));
+    const work = realpathSync(mkdtempSync(join(tmpdir(), "hezuo-host-upload-windows-")));
     try {
       const file = join(work, "report.txt");
       writeFileSync(file, "report");
       const { host } = setup("chrome");
       vi.stubGlobal("process", { ...process, platform: "win32" });
-      const [staged] = await host.uploadPaths([{ file, name }], "bot-scout", { command: "omb-cdp", args: ["bot:scout"], env: {} });
+      const [staged] = await host.uploadPaths([{ file, name }], "bot-scout", { command: "hezuo-cdp", args: ["bot:scout"], env: {} });
       vi.unstubAllGlobals();
       expect(staged!.startsWith(join(DATA_DIR, "browser-uploads"))).toBe(true);
       expect(readFileSync(staged!, "utf8")).toBe("report");
@@ -636,7 +616,7 @@ describe("a Team Cloud's boxed browsers and the files a turn uploads", () => {
   });
 
   it.skipIf(process.platform === "win32").each([false, true])("keeps workspace bytes through a symlink swap while Chrome waits for a picker (boxed: %s)", async (boxed) => {
-    const work = realpathSync(mkdtempSync(join(tmpdir(), "omb-host-upload-")));
+    const work = realpathSync(mkdtempSync(join(tmpdir(), "hezuo-host-upload-")));
     try {
       const secret = join(work, "secret.txt");
       const workspace = join(work, "workspace");
@@ -647,8 +627,8 @@ describe("a Team Cloud's boxed browsers and the files a turn uploads", () => {
       const checked = uploadableFiles([source], [workspace]);
       if ("error" in checked) throw new Error(checked.error);
       const box = { bwrap: "/usr/bin/bwrap", options: ["--unshare-pid"], seccomp: null };
-      const { host } = setup("chrome", { cloudHome: true, ...(boxed ? { browserBox: () => box } : {}) });
-      const paths = await host.uploadPaths(checked.files.map((file) => ({ file, name: null })), "bot-scout", { command: "omb-cdp", args: ["bot:scout"], env: {} });
+      const { host } = setup("chrome", { headless: true, ...(boxed ? { browserBox: () => box } : {}) });
+      const paths = await host.uploadPaths(checked.files.map((file) => ({ file, name: null })), "bot-scout", { command: "hezuo-cdp", args: ["bot:scout"], env: {} });
       const choosers = new FileChoosers();
       let opened!: (params: Params) => void;
       const uploaded: Array<{ method: string; files: unknown; bytes: string[] }> = [];
@@ -671,16 +651,16 @@ describe("a Team Cloud's boxed browsers and the files a turn uploads", () => {
   });
 
   it("are copied into that browser's own profile, the one folder of the disk its box shows Chrome", async () => {
-    const work = realpathSync(mkdtempSync(join(tmpdir(), "omb-host-upload-")));
+    const work = realpathSync(mkdtempSync(join(tmpdir(), "hezuo-host-upload-")));
     const file = join(work, "report.txt");
     writeFileSync(file, "report");
     const box = { bwrap: "/usr/bin/bwrap", options: ["--unshare-pid"], seccomp: null };
-    const boxed = setup(undefined, { cloudHome: true, browserBox: () => box }).host;
+    const boxed = setup(undefined, { headless: true, browserBox: () => box }).host;
     const session = `bot-scout${ADA}`;
     const [linked] = await boxed.uploadPaths([{ file, name: null }], session, { command: "agent-browser", env: {} });
     expect(linked!.startsWith(join(DATA_DIR, "agent-browser-profiles"))).toBe(true);
     expect(readFileSync(linked!, "utf8")).toBe("report");
-    const plain = setup(undefined, { cloudHome: true }).host;
+    const plain = setup(undefined, { headless: true }).host;
     expect(await plain.uploadPaths([{ file, name: null }], session, { command: "agent-browser", env: {} }), "unboxed, the file is given as it is").toEqual([file]);
     rmSync(work, { recursive: true, force: true });
   });

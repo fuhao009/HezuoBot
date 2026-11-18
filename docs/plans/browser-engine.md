@@ -33,17 +33,17 @@ Stagehand, browser-use, browserless, Lightpanda) is summarised at the end.
 - An MCP stdio server (`agent-browser mcp --tools core`) whose verbs match our
   17 `browser_*` tools almost one to one.
 - A stream server: JPEG frames, the active URL, tabs, and viewport metadata.
-  Upstream does **not** enforce human priority. OMB owns that gate.
+  Upstream does **not** enforce human priority. Hezuo owns that gate.
 
 ## Shape
 
 ```
-bot turn → scoped OMB MCP proxy → profile control gate → agent-browser MCP → Chrome
-owner UI ← authenticated SSE ← OMB ← loopback WebSocket frames ← agent-browser
+bot turn → scoped Hezuo MCP proxy → profile control gate → agent-browser MCP → Chrome
+owner UI ← authenticated SSE ← Hezuo ← loopback WebSocket frames ← agent-browser
 owner UI → authenticated POST → control gate → acknowledged native input → Chrome
 ```
 
-`browserIntegration()` in `desktop/server/index.ts` mounts a turn-scoped OMB proxy,
+`browserIntegration()` in `desktop/server/index.ts` mounts a turn-scoped Hezuo proxy,
 guarded by the workspace flag, bot switch, and provider's `browserMcp`
 capability. Native session identity and encryption keys stay in the server.
 
@@ -52,7 +52,7 @@ capability. Native session identity and encryption keys stay in the server.
 ### 1. Headless engine (servers, and the fallback everywhere) — shipped
 
 - `desktop/server/browser-engine.ts`: resolve the pinned agent-browser binary
-  (`OMB_AGENT_BROWSER_PATH` → `$OMB_DATA_DIR/tools/agent-browser/<version>/` →
+  (`HEZUO_AGENT_BROWSER_PATH` → `$HEZUO_DATA_DIR/tools/agent-browser/<version>/` →
   PATH); download from the GitHub release with per-platform SHA-256 pinned in
   `desktop/server/browser-engine-release.ts` (same pattern as `antigravity-release.ts`
   and `prepare-cloudflared.mjs`); ensure Chrome with `agent-browser install`;
@@ -62,11 +62,11 @@ capability. Native session identity and encryption keys stay in the server.
   "--no-webmcp"], env: {AGENT_BROWSER_SESSION, AGENT_BROWSER_RESTORE: <stable-key>,
   AGENT_BROWSER_ENCRYPTION_KEY, AGENT_BROWSER_HEADLESS: "1"}}`. Session id =
   the bot's browser profile partition, or the bot id (own session).
-- Encryption key: generated once into `$OMB_DATA_DIR/browser-engine-key`
+- Encryption key: generated once into `$HEZUO_DATA_DIR/browser-engine-key`
   (0600), like the tunnel credentials.
 - Capability: the environment descriptor gains `capabilities.browser:
   "desktop" | "headless" | "unavailable"` (+ reason), and the Settings toggle
-  and the per-bot switch key off it instead of `window.ogb.browser`.
+  and the per-bot switch key off it instead of `window.hezuo.browser`.
 - Docker: `npm install -g agent-browser@<pinned>` and `agent-browser install
   --with-deps` at build time, as root, before `USER hezuo`.
 - Tests: resolver and download pinning (stub server), the integration spec
@@ -110,7 +110,7 @@ capability. Native session identity and encryption keys stay in the server.
   last for one server run, are not saved, and close on deletion/profile exit.
   Profile edits include a stale-list check; deletion removes only that exact
   profile's saved state. Do not use upstream `state clear --all` for this.
-- These controls gate OMB's browser tools, not arbitrary host shell access.
+- These controls gate Hezuo's browser tools, not arbitrary host shell access.
   Browser profiles are login separation, **not** OS security sandboxes.
 
 See [the native verification recipe](../verification/browser-live.md).
@@ -142,7 +142,7 @@ system prompt teaches them. No adapter.
   Chrome attaches agent-browser to the person's own running Chrome
   (`AGENT_BROWSER_AUTO_CONNECT`: Chrome's `DevToolsActivePort`, then ports
   9222/9229), so the bots act inside their real, signed-in browser. It never
-  restores OMB's saved state into that Chrome or saves its cookies out, never
+  restores Hezuo's saved state into that Chrome or saves its cookies out, never
   closes it at shutdown, and has no signed-in sites list: its sign-ins are
   Chrome's own. The person turns on remote debugging at
   `chrome://inspect/#remote-debugging` (Chrome 144+); Chrome asks before it
@@ -170,7 +170,7 @@ system prompt teaches them. No adapter.
   is now where My Chrome is when it cannot be found by itself (another port or
   machine); setting it also makes My Chrome available on a server. It no
   longer attaches every bot. Details of the lent Chrome:
-  [Hezuo Cloud](../cloud-pro.md#your-chrome).
+  Hezuo Cloud (retired guide; historical only).
 - **Why My Chrome and not a headed built-in browser.** Measured Oct 12 with
   agent-browser 0.37.0 and Chrome 154 on macOS, entering an account that
   does not exist at accounts.google.com: the headless built-in browser and a
@@ -183,15 +183,6 @@ system prompt teaches them. No adapter.
   avoids Google's refusal, not every site's bot detection.
 
 ### 6. Process hygiene — implemented
-
-A close waits until the daemon and its Chrome have exited, and stops their
-process groups past its deadline; a browser that is not running is never
-sent `close`. A browser nobody has used for `browserEngine.idleTimeoutMinutes`
-(10 by default) closes and keeps its saved sign-ins; a sweep at boot, every
-minute and at shutdown closes this data dir's browsers that nothing here uses,
-such as those a crash left, and stops any Chrome whose daemon was killed. The
-Docker and Podman compose files run an init and give Chrome 512 MB of shared
-memory. Details: [Process hygiene](../browser-packaging.md#process-hygiene).
 
 ### 7. Page health and recorded browser steps — implemented
 

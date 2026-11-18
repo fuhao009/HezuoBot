@@ -13,7 +13,7 @@ afterEach(() => { for (const dir of dirs.splice(0)) rmSync(dir, { recursive: tru
 const ACME = { id: "team-acme", name: "Acme" };
 
 function waitsFor(settled: string[][]) {
-  const dir = mkdtempSync(join(tmpdir(), "omb-bot-moves-"));
+  const dir = mkdtempSync(join(tmpdir(), "hezuo-bot-moves-"));
   dirs.push(dir);
   return new WaitManager({
     file: join(dir, "waits.json"), probes: { stamp: async () => null }, sourceAlive: () => true, botBusy: () => false,

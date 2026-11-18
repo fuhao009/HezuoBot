@@ -60,8 +60,6 @@ with the normal approval cards, model picker and reasoning-effort control.
   cleanly when a runtime does not advertise image input).
 - "Full access" / "Auto-accept edits" approval levels (dsh has no modes; it
   stays ask/auto like Kimi and Hermes).
-- Phone apps: engines come from the server, phones only need a provider mark;
-  that is a separate mausbot-mobile change and is noted in the hand-over.
 - Managed download of dsh; npm is the install route.
 
 ## Anti-goals

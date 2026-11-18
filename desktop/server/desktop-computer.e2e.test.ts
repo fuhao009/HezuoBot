@@ -11,7 +11,7 @@ import { writeFileAtomic } from "./atomic.ts";
 import { freePortBlock } from "./testing/ports.ts";
 import { removeTempDir, waitForExit } from "./testing/cleanup.ts";
 
-const ROOT = fileURLToPath(new URL("../..", import.meta.url));
+const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const NOT_THE_APP = "Only the Hezuo app on this computer can let a bot use it.";
 
 describe("this computer belongs to the desktop app's own server", () => {
@@ -74,13 +74,13 @@ describe("this computer belongs to the desktop app's own server", () => {
     const proc = spawn(process.execPath, [...hooks, join(ROOT, "server/index.ts")], {
       cwd: ROOT, env: {
         PATH: dirname(process.execPath), ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}),
-        HOME: home, USERPROFILE: home, OMB_DATA_DIR: data,
+        HOME: home, USERPROFILE: home, HEZUO_DATA_DIR: data,
         APPDATA: join(home, "appdata"), LOCALAPPDATA: join(home, "localappdata"),
         TEMP: home, TMP: home, TMPDIR: home,
-        OMB_PORT: String(port), OMB_WEBHOOK_PORT: String(port + 1), OMB_STATIC_DIR: ui, OMB_TEST_VM_STATE: stateFile,
+        HEZUO_PORT: String(port), HEZUO_WEBHOOK_PORT: String(port + 1), HEZUO_STATIC_DIR: ui, HEZUO_TEST_VM_STATE: stateFile,
         // The app's record, where the app keeps it and where this server is pointed: neither lets it in.
-        OMB_USER_DATA: join(home, "user-data"),
-        ...(desktop ? { OMB_TEST_DESKTOP_CUA_CONNECTION: join(home, "user-data", "cua-connection.json") } : {}),
+        HEZUO_USER_DATA: join(home, "user-data"),
+        ...(desktop ? { HEZUO_TEST_DESKTOP_CUA_CONNECTION: join(home, "user-data", "cua-connection.json") } : {}),
         ...env,
       }, stdio: ["ignore", "pipe", "pipe"],
     });
@@ -102,7 +102,7 @@ describe("this computer belongs to the desktop app's own server", () => {
   const itHost = process.platform === "linux" ? it.skip : it;
 
   beforeAll(() => {
-    home = mkdtempSync(join(tmpdir(), "omb-desktop-computer-"));
+    home = mkdtempSync(join(tmpdir(), "hezuo-desktop-computer-"));
     data = join(home, "data");
     ui = join(home, "static");
     stateFile = join(home, "vm.json");
@@ -162,7 +162,7 @@ describe("this computer belongs to the desktop app's own server", () => {
     resetTurn();
     await apiOk("POST", `/api/bots/${bot.id}/messages`, { text: "Open Chrome on this computer.", threadId: task.threadId });
     const sent = await dump();
-    expect(sent.mcpConfig.mcpServers.computer.env.OMB_CUA_COMMAND).toBe("/fixture/cua-driver");
+    expect(sent.mcpConfig.mcpServers.computer.env.HEZUO_CUA_COMMAND).toBe("/fixture/cua-driver");
     writeFileSync(finishFile, "finish");
     await idle(bot.id, task.threadId);
   });

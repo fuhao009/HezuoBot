@@ -523,7 +523,7 @@ export function ModelPicker({
       {t("model.lookingLocal")}
     </div>
   );
-  const remote = window.ogb?.remoteClient?.active === true;
+  const remote = window.hezuo?.remoteClient?.active === true;
 
   const levels = active?.capabilities?.effortLevels ?? [];
   const writeEffort = (effort: EffortLevel | undefined) => {

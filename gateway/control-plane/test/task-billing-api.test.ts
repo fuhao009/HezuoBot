@@ -26,7 +26,7 @@ async function call(worker: typeof defaultWorker, target: Env, path: string, tok
   return response;
 }
 async function setup(fetcher: typeof fetch) {
-  const worker = createWorker(undefined, undefined, undefined, fetcher), target = deployment();
+  const worker = createWorker(undefined, fetcher), target = deployment();
   async function register(name: string) {
     const response = await call(worker, target, "/api/auth/sign-up/email", undefined, { email: `${name}@example.test`, name, password: "test-billing-password" });
     expect(response.status).toBe(200);

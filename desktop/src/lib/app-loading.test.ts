@@ -20,13 +20,12 @@ it("says Updating My Cloud… while the page the window reloaded for its newer v
   expect(line(true, true, { updating: true }).text, "loaded: the update is over").toBe("app.loading.noBots");
 });
 
-it("learns from the desktop app that the window reloaded My Cloud's page for its newer version", () => {
-  vi.stubGlobal("window", { ogb: { home: { updating: true } } });
-  expect(loadingLine({ connected: false, hydrated: false, developer: false }).text).toBe("app.loading.updating");
-  vi.stubGlobal("window", { ogb: { home: { updating: false } } });
-  expect(loadingLine({ connected: false, hydrated: false, developer: false }).text).toBe("app.loading.connecting");
+it("uses the explicit update state rather than a legacy desktop bridge", () => {
+  vi.stubGlobal("window", { hezuo: { home: { updating: true } } });
+  expect(loadingLine({ connected: false, hydrated: false, developer: false })).toEqual({ text: "app.loading.connecting", busy: true, command: false });
+  expect(loadingLine({ connected: false, hydrated: false, updating: false, developer: false })).toEqual({ text: "app.loading.connecting", busy: true, command: false });
   vi.stubGlobal("window", {});
-  expect(loadingLine({ connected: false, hydrated: false, developer: false }).text, "a browser").toBe("app.loading.connecting");
+  expect(loadingLine({ connected: false, hydrated: false, updating: true, developer: false })).toEqual({ text: "app.loading.updating", busy: true, command: false });
 });
 
 it("names the command that starts a server only in a developer's build, while nothing answers", () => {

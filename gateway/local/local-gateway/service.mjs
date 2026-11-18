@@ -20,9 +20,8 @@ import { homedir } from "node:os";
 import path from "node:path";
 
 import { prepareLogFile } from "./log-bounding.mjs";
-import { GATEWAY_LABEL, LEGACY_RUNTIME_DIRECTORY, assertLegacyGatewayRetired } from "./identity-migration.mjs";
 
-export const SERVICE_LABEL = GATEWAY_LABEL;
+export const SERVICE_LABEL = "com.hezuo.gateway";
 export const SERVICE_LOG_NAME = "gateway.log";
 /** Node must be recent enough for the gateway's `node:sqlite` and ESM use. */
 export const SERVICE_NODE_MAJOR = 24;
@@ -93,7 +92,7 @@ export function gatewayPlist({
     `\t\t<string>${xml(home)}</string>`,
     "\t\t<key>PATH</key>",
     "\t\t<string>/usr/bin:/bin:/usr/sbin:/sbin</string>",
-    "\t\t<key>OMB_LOCAL_LOG_FILE</key>",
+    "\t\t<key>HEZUO_LOCAL_LOG_FILE</key>",
     `\t\t<string>${xml(logPath)}</string>`,
     "\t</dict>",
     "\t<key>WorkingDirectory</key>",
@@ -176,7 +175,6 @@ export function nodeCandidates({ requested, execPath = process.execPath, home = 
   if (requested) candidates.push(requested);
   candidates.push(
     path.join(home, ".local", "share", "hezuo-runtime", "node_modules", "node", "bin", "node"),
-    path.join(home, ".local", "share", LEGACY_RUNTIME_DIRECTORY, "node_modules", "node", "bin", "node"),
     "/opt/homebrew/bin/node",
     "/usr/local/bin/node",
   );
@@ -272,7 +270,6 @@ export function readRuntimeState(dataDir) {
  */
 export function installService({ configPath, dataDir, node, script, home = homedir(), label = SERVICE_LABEL }) {
   if (process.platform !== "darwin") fail("the login service is written for macOS (launchd)");
-  assertLegacyGatewayRetired({ home });
   if (!existsSync(script)) fail(`${script} does not exist`);
   const paths = servicePaths({ dataDir, home, label });
   const stagedNode = stageNode({ source: node, target: paths.node });

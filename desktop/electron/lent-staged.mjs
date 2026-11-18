@@ -7,8 +7,8 @@
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { clashPath, validWirePath, windowsProblem } from "./cloud-sync-rules.mjs";
-import { sha256File } from "./cloud-sync-scan.mjs";
+import { clashPath, validWirePath, windowsProblem } from "./file-transfer-rules.mjs";
+import { sha256File } from "./sha256-file.mjs";
 import { assertOutsideProtected, insideGitInternals, protectedIdentities, sharedPath } from "./shared-computer-access.mjs";
 
 export const BESIDE_LABEL = "new from My Cloud";
@@ -71,7 +71,7 @@ async function applyOne({ client, folderId, folder, change, protectedRoots, now,
   fs.mkdirSync(path.dirname(target), { recursive: true });
   // Named like Files' own half-downloaded files, so a crash leaves nothing a scan would carry.
   const tag = createHash("sha256").update(`${folderId}\n${change.id}`).digest("hex").slice(0, 8);
-  const temporary = path.join(path.dirname(target), `.${path.basename(target).slice(0, 180)}.omb-sync-${tag}`);
+  const temporary = path.join(path.dirname(target), `.${path.basename(target).slice(0, 180)}.hezuo-sync-${tag}`);
   try {
     await client.stagedFile(folderId, change.id, temporary);
     if (await sha256File(temporary) !== change.sha256) throw new Error("The change was damaged on its way; it will be fetched again.");

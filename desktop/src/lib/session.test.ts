@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   BROWSER_SIGN_IN_FAILED, cloudOwnerOf, isConnected, isOwnerOrAdmin, previewBrowserSignIn, profileForSession, readSessionState, reasonWorthShowing, SERVICE_TRUST_REASON, signInWithBrowserGrant,
-  takeBrowserSignInFromLocation, takeInvitedEmailFromLocation, takePairingCodeFromLocation,
+  takeBrowserSignInFromLocation, takePairingCodeFromLocation,
   type SessionState,
 } from "./session";
 
@@ -16,23 +16,8 @@ describe("what the pair page says about why it was shown", () => {
   });
 });
 
-describe("the invited address on a pair link", () => {
-  it("prefills a valid address, drops it from the address bar, and ignores junk", () => {
-    const replaceState = vi.fn();
-    vi.stubGlobal("location", { search: "?email=Ada%40Example.test&x=1", pathname: "/pair", hash: "#code=ABCD" });
-    vi.stubGlobal("history", { replaceState });
-    expect(takeInvitedEmailFromLocation()).toBe("ada@example.test");
-    expect(replaceState).toHaveBeenCalledWith(null, "", "/pair?x=1#code=ABCD");
-    vi.stubGlobal("location", { search: "?email=not-an-address", pathname: "/pair", hash: "" });
-    expect(takeInvitedEmailFromLocation()).toBeNull();
-    vi.stubGlobal("location", { search: "", pathname: "/pair", hash: "" });
-    expect(takeInvitedEmailFromLocation()).toBeNull();
-    vi.unstubAllGlobals();
-  });
-});
-
 describe("the OMB Cloud page's \"Use in your browser\" link", () => {
-  const credential = `omb_pair_${"b".repeat(43)}`;
+  const credential = `hezuo_pair_${"b".repeat(43)}`;
   it("is taken off the address bar and out of history before anything renders, whatever it carries", () => {
     const replaceState = vi.fn();
     vi.stubGlobal("history", { replaceState });

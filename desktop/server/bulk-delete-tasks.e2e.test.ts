@@ -47,7 +47,7 @@ posixOnly("bulk delete tasks e2e", () => {
 
   beforeAll(async () => {
     chmodSync(FAKE_CLAUDE, 0o755);
-    home = mkdtempSync(join(tmpdir(), "omb-bulk-delete-"));
+    home = mkdtempSync(join(tmpdir(), "hezuo-bulk-delete-"));
     mkdirSync(join(home, ".hezuo"), { recursive: true });
     finishGate = join(home, "finish-turn.gate");
     writeFileSync(
@@ -64,7 +64,7 @@ posixOnly("bulk delete tasks e2e", () => {
     );
     child = spawn(process.execPath, [join(SERVER_DIR, "index.ts")], {
       cwd: join(SERVER_DIR, "..", ".."),
-      env: { ...(process.env.PATH ? { PATH: process.env.PATH } : {}), HOME: home, USERPROFILE: home, OMB_PORT: String(PORT) },
+      env: { ...(process.env.PATH ? { PATH: process.env.PATH } : {}), HOME: home, USERPROFILE: home, HEZUO_PORT: String(PORT) },
       stdio: ["ignore", "pipe", "pipe"],
     });
     child.stderr!.on("data", (c) => (stderr += c));

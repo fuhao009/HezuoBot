@@ -3,7 +3,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { expect, it } from "vitest";
-import { launchVerificationServer, runControlOmb } from "../../scripts/control-omb.ts";
+import { launchVerificationServer, runControlHezuo } from "../../scripts/control-hezuo.ts";
 import { openSse } from "./testing/sse.ts";
 
 async function launch() {
@@ -19,7 +19,7 @@ async function launch() {
     expect(response.status, `${method} ${path}: ${JSON.stringify(value)}`).toBe(expectedStatus);
     return value;
   };
-  const control = (args: string[]) => runControlOmb([...args, "--url", url]) as Promise<any>;
+  const control = (args: string[]) => runControlHezuo([...args, "--url", url]) as Promise<any>;
   const file = (threadId: string, extension: string) => join(dataDir, `${threadId}.${extension}`);
   const dump = async (threadId: string) => {
     await expect.poll(() => existsSync(file(threadId, "json")), { timeout: 20_000 }).toBe(true);
@@ -40,7 +40,7 @@ async function launch() {
       'import { existsSync, readFileSync } from "node:fs";',
       'import { join } from "node:path";',
       'const at = process.argv.indexOf("--mcp-config");',
-      'const thread = at < 0 ? "probe" : JSON.parse(readFileSync(process.argv[at + 1], "utf8")).mcpServers?.agents?.env?.OMB_THREAD_ID ?? "probe";',
+      'const thread = at < 0 ? "probe" : JSON.parse(readFileSync(process.argv[at + 1], "utf8")).mcpServers?.agents?.env?.HEZUO_THREAD_ID ?? "probe";',
       `const own = existsSync(${JSON.stringify(planFile)}) ? JSON.parse(readFileSync(${JSON.stringify(planFile)}, "utf8"))[thread] : undefined;`,
       "if (own?.replies) process.env.FAKE_CLAUDE_REPLIES = JSON.stringify(own.replies);",
       "if (own?.tools) process.env.FAKE_CLAUDE_TOOL_CALLS = JSON.stringify(own.tools);",

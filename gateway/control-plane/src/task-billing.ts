@@ -78,7 +78,7 @@ export async function loadBillingPolicy(env: Env): Promise<BillingPolicyView> {
   return { revision: row.revision, policy: policySchema.parse(JSON.parse(row.policy_json)), controller: { multiplierBps: row.multiplier_bps, lastAdjustedAt: row.last_adjusted_at, reason: row.adjustment_reason } };
 }
 export async function saveBillingPolicy(env: Env, actorId: string, input: unknown): Promise<BillingPolicyView> {
-  const schema = z.strictObject({ revision: integer.max(Number.MAX_SAFE_INTEGER - 1), reason: z.string().trim().min(1).max(500).regex(/^[^\x00-\x1f\x7f]+$/), policy: policySchema });
+  const schema = z.strictObject({ revision: integer.max(Number.MAX_SAFE_INTEGER - 1), reason: z.string().trim().min(1).max(500).refine(value => Array.from(value).every(char => char.charCodeAt(0) >= 0x20 && char.charCodeAt(0) !== 0x7f)), policy: policySchema });
   const parsed = schema.safeParse(input);
   if (!parsed.success || !actorId || actorId.length > 128) throw new HTTPError(400, "invalid_billing_policy");
   const { revision, reason, policy } = parsed.data;

@@ -1,6 +1,6 @@
-# Bot instructions, setup by chat, and settings
+# Bot instructions, setup by chat, and settings — Hezuo
 
-Feature/design contributed by Omkar Satpute in PR #833. This document records
+Feature/design contributed by maintainer Satpute in PR #833. This document records
 the product contract; tests and implementation define API details.
 
 ## What users get
@@ -14,7 +14,6 @@ the product contract; tests and implementation define API details.
 - Profile confirmation cards, change history, and guarded undo for instructions.
 - GitHub skill import, including up to 30 skills, with total request/size/time
   limits. Oversized imports should use specific subfolders.
-- A read-only Overview on iOS and Android using the same endpoint as desktop.
 
 ## One source of truth
 
@@ -113,9 +112,6 @@ Follow docs/verification/README.md: use a temporary fake-engine app, never live
 user data. Tests cover real /setup dispatch, canonical instructions despite
 edited mirrors, authorization and stale approvals, history/undo/recovery,
 bounded diffs/imports, and companion routing/decoding.
-
-Renderer interaction needs actual browser/Electron checks as well as unit
-tests; phone builds do not prove a physical-device workflow.
 
 Deferred: bundled setup-plan cards, undo beyond soul, per-bot MCP grants, and
 live prompt receipts. Each needs its own product and safety decision.

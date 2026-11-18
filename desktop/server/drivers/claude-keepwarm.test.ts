@@ -27,13 +27,13 @@ describe("keep-warm ping shape", () => {
       "-p", "--output-format", "stream-json", "--input-format", "stream-json", "--verbose", "--include-partial-messages",
       "--permission-mode", "acceptEdits", "--replay-user-messages", "--strict-mcp-config", "--setting-sources", "project",
       "--system-prompt-snapshot", "off", "--model", "claude-opus-5-5", "--effort", "high",
-      "--permission-prompt-tool", "mcp__ogb__approve", "--mcp-config", "/tmp/old/mcp.json", "--allowedTools", "mcp__ogb,mcp__agents",
+      "--permission-prompt-tool", "mcp__hezuo__approve", "--mcp-config", "/tmp/old/mcp.json", "--allowedTools", "mcp__hezuo,mcp__agents",
       "--settings", "/tmp/old/auth-settings.json", "--append-system-prompt-file", "/tmp/old/prompt.txt", "--resume", "live-session",
     ];
     expect(keepWarmArgs(launch, { sessionId: "live-session", mcpConfigPath: "/k/mcp.json", settingsPath: "/k/settings.json", systemPromptPath: "/k/prompt.txt" })).toEqual([
       "-p", "--permission-mode", "acceptEdits", "--strict-mcp-config", "--setting-sources", "project",
       "--system-prompt-snapshot", "off", "--model", "claude-opus-5-5", "--effort", "high",
-      "--permission-prompt-tool", "mcp__ogb__approve", "--allowedTools", "mcp__ogb,mcp__agents",
+      "--permission-prompt-tool", "mcp__hezuo__approve", "--allowedTools", "mcp__hezuo,mcp__agents",
       "--output-format", "json", "--append-system-prompt-file", "/k/prompt.txt", "--mcp-config", "/k/mcp.json", "--settings", "/k/settings.json",
       "--resume", "live-session", "--fork-session", "--no-session-persistence",
     ]);
@@ -42,12 +42,12 @@ describe("keep-warm ping shape", () => {
   });
 
   it("points the permission proxy nowhere and leaves every other server alone", () => {
-    const servers = { ogb: { command: "node", args: ["/proxy.js", "/live.sock"], alwaysLoad: true }, agents: { command: "node", args: ["/a.js"] } };
+    const servers = { hezuo: { command: "node", args: ["/proxy.js", "/live.sock"], alwaysLoad: true }, agents: { command: "node", args: ["/a.js"] } };
     expect(keepWarmMcpServers(servers, "/dead.sock")).toEqual({
-      ogb: { command: "node", args: ["/proxy.js", "/dead.sock"], alwaysLoad: true },
+      hezuo: { command: "node", args: ["/proxy.js", "/dead.sock"], alwaysLoad: true },
       agents: { command: "node", args: ["/a.js"] },
     });
-    expect(servers.ogb.args[1]).toBe("/live.sock");
+    expect(servers.hezuo.args[1]).toBe("/live.sock");
   });
 
   it("drops the harness's hooks and denies every tool", () => {
@@ -83,7 +83,7 @@ describe("ClaudeDriver keep-warm (fake CLI)", () => {
   beforeEach(async () => {
     ensureDirs();
     chmodSync(FAKE_CLI, 0o755);
-    scratch = mkdtempSync(join(tmpdir(), "omb-keepwarm-test-"));
+    scratch = mkdtempSync(join(tmpdir(), "hezuo-keepwarm-test-"));
     process.env.FAKE_CLAUDE_PING_DUMP = join(scratch, "ping.json");
     instance = await ClaudeDriver.create({
       instanceId: "claude-keepwarm",
@@ -121,9 +121,9 @@ describe("ClaudeDriver keep-warm (fake CLI)", () => {
     expect(argv).not.toContain("stream-json");
     expect(argv[argv.indexOf("--model") + 1]).toBe("claude-sonnet-5");
     expect(dump.systemPrompt).toBe("You are Editor.");
-    expect(dump.mcpConfig.mcpServers.ogb.args.at(-1)).toMatch(/no-broker\.sock$/);
+    expect(dump.mcpConfig.mcpServers.hezuo.args.at(-1)).toMatch(/no-broker\.sock$/);
     expect(dump.settings.hooks).toEqual({ PreToolUse: [expect.objectContaining({ matcher: "*" })] });
-    expect(Object.keys(dump.env).filter((key) => key.startsWith("OMB_HOOK_"))).toEqual([]);
+    expect(Object.keys(dump.env).filter((key) => key.startsWith("HEZUO_HOOK_"))).toEqual([]);
   });
 
   it("refuses without a live session, and while a turn runs", async () => {

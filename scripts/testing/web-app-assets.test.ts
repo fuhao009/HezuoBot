@@ -12,7 +12,7 @@ describe("phone web app installation assets", () => {
   it("links a standalone manifest whose start URL never includes pairing credentials", () => {
     const href = head.querySelector('link[rel="manifest"]')?.getAttribute("href");
     expect(href).toBeDefined();
-    const manifest = JSON.parse(readFileSync(fileURLToPath(new URL(`public${href}`, root)), "utf8"));
+    const manifest = JSON.parse(readFileSync(fileURLToPath(new URL(`desktop/public${href}`, root)), "utf8"));
     expect(manifest.name).toEqual(expect.any(String));
     expect(manifest.name.trim()).not.toBe("");
     expect(manifest.display).toBe("standalone");
@@ -27,7 +27,7 @@ describe("phone web app installation assets", () => {
     for (const size of [192, 512]) {
       const icon = manifest.icons.find((icon: { sizes: string }) => icon.sizes === `${size}x${size}`);
       expect(icon).toBeDefined();
-      const png = readFileSync(new URL(`public${icon.src}`, root));
+      const png = readFileSync(new URL(`desktop/public${icon.src}`, root));
       expect(png.subarray(0, 8)).toEqual(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
       expect([png.readUInt32BE(16), png.readUInt32BE(20)]).toEqual([size, size]);
     }
@@ -36,7 +36,7 @@ describe("phone web app installation assets", () => {
   it("offers Safari a correctly sized touch icon and a safe-area viewport", () => {
     const href = head.querySelector('link[rel="apple-touch-icon"]')?.getAttribute("href");
     expect(href).toBeDefined();
-    const png = readFileSync(new URL(`public${href}`, root));
+    const png = readFileSync(new URL(`desktop/public${href}`, root));
     expect([png.readUInt32BE(16), png.readUInt32BE(20)]).toEqual([180, 180]);
     const viewport = head.querySelector('meta[name="viewport"]')?.getAttribute("content");
     expect(viewport).toContain("viewport-fit=cover");

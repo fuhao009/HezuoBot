@@ -28,7 +28,7 @@ let registry: SessionRegistry;
 const file = () => join(dir, "sessions.json");
 
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), "omb-sessions-"));
+  dir = mkdtempSync(join(tmpdir(), "hezuo-sessions-"));
   clock = 1_700_000_000_000;
   registry = new SessionRegistry({ file: file(), now: () => clock });
 });
@@ -37,10 +37,10 @@ afterEach(() => { vi.restoreAllMocks(); rmSync(dir, { recursive: true, force: tr
 describe("the native-app encoding of a pairing window", () => {
   it("redeems the same window as the typed code, and consumes it", () => {
     const { code, credential } = registry.openPairing({ label: "Pixel" });
-    // The Android companion's parser demands the 9-character prefix plus exactly 43 base64url characters (Connection.kt).
-    expect(credential.startsWith("omb_pair_")).toBe(true);
-    expect(credential.length).toBe(52);
-    expect(credential.slice("omb_pair_".length)).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    // The Android companion's parser demands the 11-character prefix plus exactly 43 base64url characters (Connection.kt).
+    expect(credential.startsWith("hezuo_pair_")).toBe(true);
+    expect(credential.length).toBe(54);
+    expect(credential.slice("hezuo_pair_".length)).toMatch(/^[A-Za-z0-9_-]{43}$/);
 
     const paired = registry.exchange({ code: credential, label: "Pixel", source: "10.0.0.9" });
     expect(paired.ok).toBe(true);
@@ -48,10 +48,14 @@ describe("the native-app encoding of a pairing window", () => {
     expect(registry.openPairings()).toEqual([]);
   });
 
+  it("does not recognize a malformed credential prefix", () => {
+    expect(isPairingCredential(`invalid_pair_${"a".repeat(43)}`)).toBe(false);
+  });
+
   it("never normalizes a credential", () => {
     // A credential containing every symbol normalizePairingCode folds (0, 1, _ and -): it must be hashed exactly as presented.
-    const trap = "omb_pair_0123456789-_abcdefghijklmnopqrstuvwxyzABCDE";
-    expect(trap.length).toBe(52);
+    const trap = "hezuo_pair_0123456789-_abcdefghijklmnopqrstuvwxyzABCDE";
+    expect(trap.length).toBe(54);
     expect(normalizePairingCode(trap)).not.toBe(trap);
     expect(isPairingCredential(trap)).toBe(true);
 
@@ -89,7 +93,7 @@ describe("the native-app encoding of a pairing window", () => {
   });
 });
 
-describe("a browser sign-in window (an OMB Cloud page's \"Use in your browser\")", () => {
+describe("a browser sign-in window (an HezuoBot Cloud page's \"Use in your browser\")", () => {
   it("is redeemed only by a browser sign-in, only by its credential, and only once", () => {
     const { code, credential } = registry.openPairing({ scopes: ["admin", "client"], label: "Web browser", browser: true });
     expect(registry.exchange({ code: credential, label: "", source: "10.0.0.5" }).ok).toBe(false);
@@ -219,10 +223,10 @@ describe("pairing codes", () => {
   });
 
   it("names the device from the client, else the code's label, else the user agent", () => {
-    const a = registry.openPairing({ label: "Milind's MacBook" });
+    const a = registry.openPairing({ label: "Alex's MacBook" });
     const named = registry.exchange({ code: a.code, label: "", source: "s1", fallbackLabel: "Safari on Mac" });
     if (!named.ok) throw new Error(named.error);
-    expect(named.session.label).toBe("Milind's MacBook");
+    expect(named.session.label).toBe("Alex's MacBook");
     const b = registry.openPairing();
     const ua = registry.exchange({ code: b.code, label: "  ", source: "s2", fallbackLabel: "Safari on Mac" });
     if (!ua.ok) throw new Error(ua.error);
@@ -481,7 +485,7 @@ describe("sessions", () => {
     if (process.platform !== "win32") expect(statSync(file()).mode & 0o777).toBe(0o600); // Windows has no POSIX modes
     const reloaded = new SessionRegistry({ file: file(), now: () => clock });
     expect(reloaded.authenticate(token)?.id).toBe(session.id);
-    expect(reloaded.authenticate("omb_sess_nope")).toBeNull();
+    expect(reloaded.authenticate("hezuo_sess_nope")).toBeNull();
   });
 
   it("expires after 30 days and can be revoked", () => {
@@ -594,7 +598,7 @@ describe("stream tickets", () => {
   });
 });
 
-describe("admin scope only (an OMB Cloud home is personal: server/cloud-owner.ts)", () => {
+describe("admin scope only (an HezuoBot Cloud home is personal: server/cloud-owner.ts)", () => {
   const PERSONAL = "My Cloud is personal: only your own devices can connect.";
   it("opens, redeems, issues and accepts nothing without admin scope; the owner's devices are unaffected", () => {
     // Made before the rule applies (as a stored session is at boot).

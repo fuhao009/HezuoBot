@@ -126,6 +126,9 @@ test("credential recognition preserves token usage, identifiers and pricing in e
   const credentials = Object.fromEntries(["token", "access_token", "refreshToken", "id_token", "sessionToken", "account_token",
     "modelToken", "apiToken", "api_key", "apiKey", "x-api-key", "password", "passwd", "passphrase", "clientSecret",
     "private_key", "credentials", "Authorization", "Proxy-Authorization", "Cookie", "Set-Cookie"]
+    .concat(["companionToken", "fishKey", "openrouterKey", "companion_token", "fish_key", "openrouter_key",
+      "companion-token", "fish-key", "openrouter-key", "servicePassword", "service_password", "service-password",
+      "serviceSecret", "service_secret", "service-secret", "APIKey", "apiKEY", "accesstoken"])
     .map((key, index) => [key, `sensitive-value-${index}-end`]));
   const fields = { ...ordinary, ...credentials };
   const records = [];
@@ -151,7 +154,7 @@ test("credential recognition preserves token usage, identifiers and pricing in e
       assert.deepEqual(record.error[key], value, key);
       if (typeof value === "object") continue;
       assert.equal(url.searchParams.get(key), String(value), key);
-      assert.equal(record.headers[key.toLowerCase()], String(value), key);
+      assert.equal(record.headers[key.toLowerCase()], key === "monkey" ? "***" : String(value), key);
       assert.ok(record.multipart.includes(`name="${key}"\r\n\r\n${value}\r\n`), key);
       assert.ok(record.assignment.includes(`${key}='${value}'`), key);
       assert.ok(record.error.message.includes(`${key}=${value}`), key);
@@ -159,6 +162,51 @@ test("credential recognition preserves token usage, identifiers and pricing in e
     const text = JSON.stringify(record);
     for (const secret of Object.values(credentials)) assert.ok(!text.includes(secret), secret);
   } finally { setDebugLogSink(null); }
+});
+
+test("case-folded credential headers stay private in native and plain header records", () => {
+  const original = { companionToken: "companion-header-private", fishKey: "fish-header-private", openrouterKey: "router-header-private",
+    servicePassword: "password-header-private", serviceSecret: "secret-header-private", inputTokens: "120", tokenId: "diagnostic-token-id",
+    cacheKey: "diagnostic-cache-id", perToken: "0.25", "content-type": "application/json", monkey: "ordinary-header" };
+  const folded = Object.fromEntries(Object.entries(original).map(([key, value]) => [key.toLowerCase(), value]));
+  const safe = sanitizeDebugLogRecord({ native: new Headers(original), headers: folded, requestHeaders: original, responseHeaders: folded, ordinary: original });
+  for (const headers of [safe.native, safe.headers, safe.requestHeaders, safe.responseHeaders]) {
+    for (const key of ["companionToken", "fishKey", "openrouterKey", "servicePassword", "serviceSecret", "monkey"]) {
+      assert.equal(headers[key] ?? headers[key.toLowerCase()], "***", key);
+    }
+    for (const key of ["inputTokens", "tokenId", "cacheKey", "perToken", "content-type"]) {
+      assert.equal(headers[key] ?? headers[key.toLowerCase()], original[key], key);
+    }
+  }
+  assert.equal(safe.ordinary.monkey, "ordinary-header");
+  for (const key of ["companionToken", "fishKey", "openrouterKey", "servicePassword", "serviceSecret"]) {
+    assert.ok(!JSON.stringify(safe).includes(original[key]), key);
+  }
+});
+
+test("credential suffixes distinguish word boundaries from counters and identifiers", () => {
+  for (const name of ["companionToken", "fishKey", "openrouterKey", "COMPANION_TOKEN", "fish-key", "service.password", "serviceSecret",
+    "apiKey", "apikey", "accesstoken", "clientsecret", "privatekey", "APIKey", "apiKEY"]) {
+    assert.equal(isDebugSecretKey(name), true, name);
+  }
+  for (const name of ["inputTokens", "output_tokens", "cachedInputTokens", "max_output_tokens", "tokenId", "token_id",
+    "token-id", "keyId", "secretId", "passwordLength", "monkey", "hockey", "cache_key", "cacheKey", "per_token", "perToken"]) {
+    assert.equal(isDebugSecretKey(name), false, name);
+  }
+  const fields = { companionToken: "companion-private", fishKey: "fish-private", openrouterKey: "router-private",
+    inputTokens: 120, tokenId: "diagnostic-token-id", cacheKey: "diagnostic-cache-id" };
+  const safe = sanitizeDebugLogRecord({ json: JSON.stringify(fields), text: Object.entries(fields).map(([key, value]) => `${key}=${value}`).join(" "),
+    query: `https://example.test/?${new URLSearchParams(Object.entries(fields).map(([key, value]) => [key, String(value)]))}` });
+  assert.deepEqual(JSON.parse(safe.json), { ...fields, companionToken: "***", fishKey: "***", openrouterKey: "***" });
+  const url = new URL(safe.query);
+  for (const key of ["companionToken", "fishKey", "openrouterKey"]) {
+    assert.equal(url.searchParams.get(key), "***", key);
+    assert.ok(safe.text.includes(`${key}=***`), key);
+  }
+  for (const key of ["inputTokens", "tokenId", "cacheKey"]) {
+    assert.equal(url.searchParams.get(key), String(fields[key]), key);
+    assert.ok(safe.text.includes(`${key}=${fields[key]}`), key);
+  }
 });
 
 test("embedded JSON, escaped credentials, URL keys and private keys retain adjacent nonsecrets", () => {
@@ -212,8 +260,19 @@ test("long ordinary tokens, incomplete quotes and repeated PEM starts remain bou
   assert.equal(safe.content, ordinary);
   assert.equal(safe.quote, '"' + ordinary);
   assert.equal(safe.pem, "keep ***");
-  for (const key of ["input_tokens", "output_tokens", "tokenId", "cache_key", "monkey", "foo..password", "-password"]) assert.equal(isDebugSecretKey(key), false, key);
+  for (const key of ["input_tokens", "output_tokens", "tokenId", "cache_key", "monkey"]) assert.equal(isDebugSecretKey(key), false, key);
   for (const key of ["x-api-key", "provider_access_token", "foo.bar.clientSecret", "__password"]) assert.equal(isDebugSecretKey(key), true, key);
+});
+
+test("malformed prefixes do not expose final credential words", () => {
+  const fields = { "foo..password": "double-dot-private", "-password": "leading-dash-private", "__secret": "leading-underscore-private" };
+  for (const key of Object.keys(fields)) assert.equal(isDebugSecretKey(key), true, key);
+  const safe = sanitizeDebugLogRecord({ fields, json: JSON.stringify(fields),
+    text: Object.entries(fields).map(([key, value]) => `${key}=${value}`).join(" "),
+    url: `https://example.test/?${new URLSearchParams(fields)}` });
+  assert.deepEqual(safe.fields, Object.fromEntries(Object.keys(fields).map(key => [key, "***"])));
+  assert.deepEqual(JSON.parse(safe.json), safe.fields);
+  for (const value of Object.values(fields)) assert.ok(!JSON.stringify(safe).includes(value), value);
 });
 
 test("trusted private sink bypass is explicit and resets to default redaction", () => {

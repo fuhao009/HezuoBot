@@ -8,7 +8,7 @@ import { randomUUID } from "node:crypto";
 export const MANAGED_COMPANION_ORIGIN_HOST = "127.0.0.1";
 export const MANAGED_COMPANION_ORIGIN_PORT = 8812;
 
-const RUNTIME_PREFIX = "omb-companion-origin-";
+const RUNTIME_PREFIX = "hezuo-companion-origin-";
 const SOCKET_NAME = "origin.sock";
 
 const currentUserId = () => {

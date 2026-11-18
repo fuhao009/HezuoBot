@@ -25,7 +25,7 @@ it("does not reconnect when the gateway replaces the installation with close 400
   const tunnel = createGatewayCompanionTunnel({
     origin: "https://gateway.example", ca: "fixture-ca",
     installationId: "11111111-1111-4111-8111-111111111111", credential: "fixture",
-    originTarget: { pid: 1234, socketPath: "/tmp/omb-companion-origin-fixture/origin.sock" }, WebSocketImpl: Socket,
+    originTarget: { pid: 1234, socketPath: "/tmp/hezuo-companion-origin-fixture/origin.sock" }, WebSocketImpl: Socket,
   });
   const starting = tunnel.start();
   await Promise.resolve();

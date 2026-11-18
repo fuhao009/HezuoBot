@@ -1,4 +1,4 @@
-// The one `openmausbot://pair` link builder, read by the Android and iOS
+// The one `hezuobot://pair` link builder, read by the Android and iOS
 // scanners (`PairingInvite.parse`). Every value is written with
 // encodeURIComponent, so a space is `%20`.
 
@@ -25,9 +25,6 @@ export interface PhonePairingLinkOptions {
   /** Complete base URLs, encoded apart from `address`/`hosts` so HTTPS and
    * port 443 stay unambiguous. */
   endpoints?: CompanionEndpoint[];
-  /** P-256 HPKE recipient key pinned by the camera scan. Its private half
-   * remains in the desktop's OS-encrypted credential store. */
-  secretPublicKey?: string;
 }
 
 /** How many fallback routes a link will carry. The list is tiny in practice;
@@ -94,21 +91,6 @@ function encodeEndpoints(endpoints: CompanionEndpoint[]): string {
   return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
 }
 
-function validSecretPublicKey(value: string | undefined): string | null {
-  if (!value || !/^[A-Za-z0-9_-]{87}$/.test(value)) return null;
-  try {
-    const base64 = value.replaceAll("-", "+").replaceAll("_", "/") + "=";
-    const decoded = atob(base64);
-    if (decoded.length !== 65 || decoded.charCodeAt(0) !== 4) return null;
-    let binary = "";
-    for (let index = 0; index < decoded.length; index += 1) binary += decoded[index];
-    return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "") === value
-      ? value
-      : null;
-  } catch {
-    return null;
-  }
-}
 
 /** The `address` value: `host:port` (IPv6 bracketed) or a bare http(s)
  * origin, or null when it is neither. Both phones refuse an address with
@@ -144,10 +126,9 @@ export function phonePairingLink({
   name,
   hosts,
   endpoints,
-  secretPublicKey,
 }: PhonePairingLinkOptions): string | null {
   const dial = linkAddress(address, port);
-  if (!dial || !/^omb_pair_[A-Za-z0-9_-]{43}$/.test(token)) return null;
+  if (!dial || !/^hezuo_pair_[A-Za-z0-9_-]{43}$/.test(token)) return null;
   if (code !== undefined && !/^\d{6}$/.test(code)) return null;
 
   const fields: Array<[string, string]> = [["address", dial], ["token", token]];
@@ -162,8 +143,6 @@ export function phonePairingLink({
   if (candidates.length) fields.push(["hosts", candidates.join(",")]);
   const routes = qrEndpoints(endpoints);
   if (routes.length) fields.push(["endpoints", encodeEndpoints(routes)]);
-  const secretKey = validSecretPublicKey(secretPublicKey);
-  if (secretKey) fields.push(["secretKey", secretKey]);
 
-  return `openmausbot://pair?${fields.map(([key, value]) => `${key}=${encodeURIComponent(value)}`).join("&")}`;
+  return `hezuobot://pair?${fields.map(([key, value]) => `${key}=${encodeURIComponent(value)}`).join("&")}`;
 }

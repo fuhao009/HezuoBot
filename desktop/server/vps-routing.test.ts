@@ -1,4 +1,4 @@
-// A fake `docker` on OMB_EXTRA_PATH stands in for the VPS (the server runs in its own process): argv in, canned inspect JSON out, every call logged.
+// A fake `docker` on HEZUO_EXTRA_PATH stands in for the VPS (the server runs in its own process): argv in, canned inspect JSON out, every call logged.
 import { spawn, type ChildProcess } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -187,7 +187,7 @@ posixOnly("VPS turn routing e2e (fake ACP fleet + fake docker over SSH)", () => 
 
   beforeAll(async () => {
     chmodSync(FAKE_CLI, 0o755);
-    home = mkdtempSync(join(tmpdir(), "omb-vps-routing-"));
+    home = mkdtempSync(join(tmpdir(), "hezuo-vps-routing-"));
     mkdirSync(join(home, ".hezuo"), { recursive: true });
     const fakeBin = join(home, "fakebin");
     mkdirSync(fakeBin, { recursive: true });
@@ -238,11 +238,11 @@ createServer(socket => socket.end()).listen(port, '127.0.0.1');
     const env: NodeJS.ProcessEnv = {
       HOME: home,
       USERPROFILE: home,
-      OMB_PORT: String(PORT),
-      OMB_EXTRA_PATH: fakeBin,
+      HEZUO_PORT: String(PORT),
+      HEZUO_EXTRA_PATH: fakeBin,
       FAKE_DOCKER_DIR: fakeBin,
       FAKE_DOCKER_LOG: dockerLog,
-      OMB_COMPUTER_CALL_WAIT_MS: String(CALL_WAIT_MS),
+      HEZUO_COMPUTER_CALL_WAIT_MS: String(CALL_WAIT_MS),
     };
     if (process.env.PATH) env.PATH = process.env.PATH;
     if (process.env.SystemRoot) env.SystemRoot = process.env.SystemRoot;
@@ -460,7 +460,7 @@ createServer(socket => socket.end()).listen(port, '127.0.0.1');
           writeFileSync(template, original.replace('"Running":true', '"Running":false'));
         } else expect(first.find((tool: { name: string }) => tool.name === "computer")).toBeUndefined();
         const agents = first.find((tool: { name: string }) => tool.name === "agents");
-        const token = agents.env.find((entry: { name: string }) => entry.name === "OMB_COMMS_TOKEN").value;
+        const token = agents.env.find((entry: { name: string }) => entry.name === "HEZUO_COMMS_TOKEN").value;
         const availability = await (await fetch(`${BASE}/api/internal/computer/select`, { headers: { authorization: `Bearer ${token}` } })).json() as any;
         expect(availability.options.find((option: any) => option.surface === "cloud")).toMatchObject({ available: true, ready: false,
           canStart: state !== "missing", canCreate: state === "missing" });
@@ -649,7 +649,7 @@ createServer(socket => socket.end()).listen(port, '127.0.0.1');
         const computer = servers.find((server) => server.name === "computer");
         expect(computer, "no computer MCP server reached the agent").toBeTruthy();
         const env = (name: string) => computer!.env?.find((entry) => entry.name === name)?.value ?? "";
-        return { args: computer!.args ?? [], url: env("OMB_CONTROL_URL"), token: env("OMB_CONTROL_TOKEN") };
+        return { args: computer!.args ?? [], url: env("HEZUO_CONTROL_URL"), token: env("HEZUO_CONTROL_TOKEN") };
       };
       // A computer call's check, exactly as the mounted bridge makes it: the real control client, with its own timeout.
       const gate = (mount: { url: string; token: string }) => createControlClient({ url: mount.url, token: mount.token }).state(true);
@@ -722,7 +722,7 @@ createServer(socket => socket.end()).listen(port, '127.0.0.1');
       await until(async () => existsSync(`${askerDump}.mcp.json`), "the asker's turn");
       const agents = (JSON.parse(readFileSync(`${askerDump}.mcp.json`, "utf8")) as Array<{ name: string; env?: Array<{ name: string; value: string }> }>)
         .find((server) => server.name === "agents");
-      const token = agents?.env?.find((entry) => entry.name === "OMB_COMMS_TOKEN")?.value ?? "";
+      const token = agents?.env?.find((entry) => entry.name === "HEZUO_COMMS_TOKEN")?.value ?? "";
       const sent = await fetch(`${BASE}/api/internal/coordinate-bots`, {
         method: "POST",
         headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },

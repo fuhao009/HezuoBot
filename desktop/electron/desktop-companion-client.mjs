@@ -8,7 +8,7 @@ import { isIP } from "node:net";
 import path from "node:path";
 
 export const DESKTOP_COMPANION_FIELD = "desktopCompanionRemote";
-const DEVICE_TOKEN = /^omb_[A-Za-z0-9_-]{43}$/;
+const DEVICE_TOKEN = /^hezuo_[A-Za-z0-9_-]{43}$/;
 const DEVICE_ID = /^[0-9a-f-]{36}$/i;
 const PAIRING_CODE = /^\d{6}$/;
 const MAX_ERROR_BYTES = 64 * 1024;
@@ -16,7 +16,7 @@ const MAX_ERROR_BYTES = 64 * 1024;
 /** Losing either argument makes the renderer unsafe or makes a live relay look local. */
 export function desktopCompanionRendererArguments(localOrigin, remoteAccess) {
   return [
-    `--omb-local-origin=${localOrigin}`,
+    `--hezuo-local-origin=${localOrigin}`,
     ...(remoteAccess ? ["--hezuo-remote-client"] : []),
   ];
 }
@@ -41,8 +41,16 @@ const cleanLabel = (value, fallback) => {
   return label || fallback;
 };
 
-/** Only the control plane's `c-<32 hex>` names: any other name in those zones never receives a pairing code. Ship a new domain here first. */
-const MANAGED_COMPANION_HOSTNAME = /^c-[0-9a-f]{32}\.(?:openmausbot\.com|mausbot\.si)$/;
+const MANAGED_COMPANION_LABEL = /^c-[0-9a-f]{32}$/;
+const HTTPS_DNS_ORIGIN = /^https:\/\/((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?)\/?$/i;
+
+function isManagedCompanionHost(hostname) {
+  const origin = process.env.HEZUO_MANAGED_COMPANION_ORIGIN;
+  const domain = origin && origin === origin.trim() ? HTTPS_DNS_ORIGIN.exec(origin)?.[1]?.toLowerCase() : undefined;
+  if (!domain) return false;
+  const suffix = `.${domain}`;
+  return hostname.endsWith(suffix) && MANAGED_COMPANION_LABEL.test(hostname.slice(0, -suffix.length));
+}
 
 /** HTTPS, or a Tailscale MagicDNS name (WireGuard protects its HTTP); a LAN IP would put the long-lived bearer on Wi-Fi in plaintext. */
 export function normalizeDesktopCompanionEndpoint(value) {
@@ -51,6 +59,7 @@ export function normalizeDesktopCompanionEndpoint(value) {
   if (!/^https?:\/\//i.test(raw)) {
     raw = /\.ts\.net(?::\d+)?\/?$/i.test(raw) ? `http://${raw}` : `https://${raw}`;
   }
+  if (!/^https?:\/\/[a-z0-9.-]+(?::[0-9]+)?\/?$/i.test(raw)) return "";
   let parsed;
   try {
     parsed = new URL(raw);
@@ -60,7 +69,7 @@ export function normalizeDesktopCompanionEndpoint(value) {
   const hostname = parsed.hostname.toLowerCase();
   const tailscaleHttp = parsed.protocol === "http:" && hostname.endsWith(".ts.net");
   const managedHttps =
-    parsed.protocol === "https:" && MANAGED_COMPANION_HOSTNAME.test(hostname);
+    parsed.protocol === "https:" && !parsed.port && isManagedCompanionHost(hostname);
   if (
     (!tailscaleHttp && !managedHttps) ||
     parsed.username ||
@@ -123,12 +132,13 @@ export async function pairDesktopCompanion({
 }) {
   const endpoint = normalizeDesktopCompanionEndpoint(rawEndpoint);
   if (!endpoint) {
-    throw new Error("Enter the Hezuo HTTPS companion address or full Tailscale name ending in .ts.net");
+    throw new Error("Enter the HezuoBot HTTPS companion address or full Tailscale name ending in .ts.net");
   }
   const code = String(rawCode ?? "").trim();
   if (!PAIRING_CODE.test(code)) throw new Error("Enter the six-digit code shown on the other computer");
   const response = await fetchImpl(`${endpoint}/api/pair`, {
     method: "POST",
+    redirect: "error",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       code,

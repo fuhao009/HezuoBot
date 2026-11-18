@@ -11,26 +11,35 @@ The desktop application ships two separate components:
   is no root-level NOTICE in that tag. All six official macOS/Linux binaries
   were downloaded and their SHA-256 digests checked against GitHub's release
   metadata on 2026-09-08.
-- **Windows exception: agent-browser 0.36.0-omb.1** is an OpenMausBot vendor
-  build, not an official or unmodified Vercel executable. It starts from exact
-  v0.36.0 commit `eb05921bad874cd2a1b4fa5d1149f1ed26576cae` and carries
-  the Windows handle-inheritance fix contributed by `holny` in upstream
-  [PR1781](https://github.com/vercel-labs/agent-browser/pull/1781), commit
-  `81a98c349d04195396ffae6898bd375ad64280de`, plus OpenMausBot's Windows-only
-  `CREATE_NO_WINDOW` flag for Chrome children and a native console regression test
-  in candidate revision `0.36.0-omb.2`. The release resolver retains `0.36.0-omb.1`
-  until the candidate passes native checks and its published digest is reviewed.
-  The separate MCP output-reader
-  rewrite is deliberately excluded. `agent-browser-windows-stdio.patch`
-  includes the exact changes and modification notices, plus package-version
+- **Windows: explicitly configured reviewed artifact, with no default executable.**
+  For `win32-x64`, `desktop/server/browser-engine-release.ts` requires all four
+  settings when building or installing the browser bundle:
+  `HEZUO_BROWSER_ENGINE_WINDOWS_URL` (HTTPS, without credentials),
+  `HEZUO_BROWSER_ENGINE_WINDOWS_SHA256` (the executable's 64-digit SHA-256),
+  `HEZUO_BROWSER_ENGINE_WINDOWS_VERSION` (the reviewed artifact's version), and
+  `HEZUO_BROWSER_ENGINE_WINDOWS_BYTES` (its positive integer byte size).
+  Without these settings no Windows engine artifact is configured; partial or
+  invalid configuration is rejected. Rebuild or reinstall Hezuo after configuring
+  the artifact. The resolver does not retain a legacy vendor release or
+  automatically approve a candidate build.
+  The candidate produced by `scripts/build-windows-browser-vendor.mjs` is
+  **agent-browser 0.36.0-hezuo.2**, not an official or unmodified Vercel executable.
+  It starts from exact v0.36.0 commit `eb05921bad874cd2a1b4fa5d1149f1ed26576cae`
+  and carries the Windows handle-inheritance fix contributed by `holny` in
+  upstream [PR1781](https://github.com/vercel-labs/agent-browser/pull/1781), commit
+  `81a98c349d04195396ffae6898bd375ad64280de`, plus OpenMausBot's original
+  Windows-only `CREATE_NO_WINDOW` flag for Chrome children and native console
+  regression test. The separate MCP output-reader rewrite is deliberately
+  excluded. `agent-browser-windows-stdio.patch` includes the exact changes,
+  original OpenMausBot modification notices, and current package-version
   metadata; dependency versions remain locked. The original Apache and axe
-  notices remain unchanged. `scripts/build-windows-browser-vendor.mjs` pins
-  the source archive, patch, Rust 1.97.1, pnpm 11.1.3 and Windows GNU target,
-  builds the real upstream dashboard, and emits executable and build-input
-  digests in `provenance.json`. Native Windows cold-start and close/reopen
-  checks are required before those executable bytes are published and pinned.
-  Upstream 0.37.0 does not include that fix; keep this tested Windows build
-  until an updated official or backported release passes those native checks.
+  notices remain unchanged. The build script pins the source archive, patch,
+  Rust 1.97.1, pnpm 11.1.3 and Windows GNU target, builds the real upstream
+  dashboard, and emits executable and build-input digests in `provenance.json`.
+  Native Windows cold-start and close/reopen checks are required before those
+  executable bytes are published and explicitly configured with their reviewed
+  version, size and digest. Upstream 0.37.0 does not include the inheritance fix;
+  an updated official or backported release also needs those native checks.
 - **Chromium Headless Shell 153.0.8010.47**, Google's official
   `chrome-headless-shell` assets published through Chrome for Testing:
   <https://googlechromelabs.github.io/chrome-for-testing/153.0.8010.47.json>.
@@ -50,22 +59,23 @@ Chrome terms reference are retained without modification:
 <https://www.google.com/chrome/terms/>.
 
 All five archive sizes and SHA-256 digests were calculated from the vendor
-downloads on 2026-09-16 and pinned in `server/browser-bundle-release.ts`.
-Engine asset pins are reused from `server/browser-engine-release.ts`.
+downloads on 2026-09-16 and pinned in `desktop/server/browser-bundle-release.ts`.
+Engine asset pins and Windows configuration are resolved by
+`desktop/server/browser-engine-release.ts`.
 Preparation checks the exact archive bytes on every run, including cached
 downloads, then records a complete file/symlink inventory. Missing, modified,
 or incomplete staged resources fail the pre-signing package check.
 
 Archives and extracted binaries are generated build output, not git content.
-Set `OMB_BROWSER_ARCHIVE_DIR` to a directory of reviewed vendor assets for an
+Set `HEZUO_BROWSER_ARCHIVE_DIR` to a directory of reviewed vendor assets for an
 offline build; cached bytes are still verified. Browser dependencies are
-updated through reviewed OpenMausBot releases, not a silent browser updater.
+updated through reviewed Hezuo releases, not a silent browser updater.
 
-On macOS, release signing applies OpenMausBot's Developer ID to native
+On macOS, release signing applies the application's Developer ID to native
 executables and libraries after validating the upstream bytes. The original
 notices remain intact. Packaged browser profiles, cookies and downloads are
 never included here; those belong in the user's isolated bot data directory.
 
 Google, Chromium and Vercel are their owners' names; their inclusion does not
-imply endorsement of OpenMausBot. This provenance record is not legal advice
+imply endorsement of Hezuo. This provenance record is not legal advice
 or a replacement for the included upstream licenses.

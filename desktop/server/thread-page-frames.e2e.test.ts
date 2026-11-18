@@ -63,7 +63,7 @@ describe("transcript pages on bot and room frames", () => {
   const newestPage = Array.from({ length: 50 }, (_, i) => `message ${LONG - 50 + i}`);
 
   beforeAll(async () => {
-    home = mkdtempSync(join(tmpdir(), "omb-thread-page-frames-"));
+    home = mkdtempSync(join(tmpdir(), "hezuo-thread-page-frames-"));
     const data = join(home, ".hezuo");
     mkdirSync(data, { recursive: true });
     // one deliberately unknown driver: no engine CLI runs, nothing answers
@@ -78,7 +78,7 @@ describe("transcript pages on bot and room frames", () => {
       env: {
         ...(process.env.PATH ? { PATH: process.env.PATH } : {}),
         ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}),
-        HOME: home, USERPROFILE: home, OMB_PORT: String(port), OMB_WEBHOOK_PORT: String(port + 1),
+        HOME: home, USERPROFILE: home, HEZUO_PORT: String(port), HEZUO_WEBHOOK_PORT: String(port + 1),
       },
       stdio: ["ignore", "pipe", "pipe"],
     });

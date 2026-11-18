@@ -6,7 +6,7 @@ import { act, createElement } from "react";
 import * as React from "react";
 import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -552,14 +552,14 @@ describe("#Title thread links in markdown", () => {
   });
 
   it("renders a sent canonical link as a chip that opens the thread", () => {
-    const markup = render("done in [QA PR 245](hezuo://thread/qa-245?bot=scout) today");
+    const markup = render("done in [QA PR 245](hezuobot://thread/qa-245?bot=scout) today");
     expect(markup).toContain('<button type="button" data-thread-link="qa-245"');
     expect(markup).toContain(">QA PR 245</button>");
     expect(markup).not.toContain('href="hezuo://');
   });
 
   it("keeps a dead thread link as plain text, never an external anchor", () => {
-    const markup = render("see [Gone](hezuo://thread/dead?bot=scout)");
+    const markup = render("see [Gone](hezuobot://thread/dead?bot=scout)");
     expect(markup).toContain(">Gone<");
     expect(markup).not.toContain("data-thread-link");
     expect(markup).not.toContain('href="hezuo://');
@@ -568,21 +568,23 @@ describe("#Title thread links in markdown", () => {
 });
 
 describe("a Use my Mac link in an older bot message", () => {
-  const text = "To let me use your apps, press [Use my Mac](hezuo://use-my-computer).";
-
-  it("is plain text everywhere, even in this app with an older Cloud's bridge: this computer is lent by itself", () => {
+  it.each([
+    ["hezuobot://use-my-computer", "hezuobot://use-my-computer"],
+    ["hezuo://use-my-computer", ""],
+  ])("renders %s as plain text even with an older Cloud's bridge, without lending this computer", (url, transformed) => {
+    const text = `To let me use your apps, press [Use my Mac](${url}).`;
     const offer = vi.fn(async () => {});
-    window.ogb = { platform: "darwin", cloudLending: { open: async () => {}, offer } } as unknown as typeof window.ogb;
+    window.hezuo = { platform: "darwin", cloudLending: { open: async () => {}, offer } } as unknown as typeof window.hezuo;
     try {
       const markup = renderToStaticMarkup(createElement(ChatMarkdown, { text }));
       expect(markup).toContain(">Use my Mac<");
       expect(markup).not.toContain("<button");
-      expect(markup).not.toContain('href="hezuo://');
+      expect(markup).not.toContain("<a");
       expect(offer).not.toHaveBeenCalled();
     } finally {
-      delete window.ogb;
+      delete window.hezuo;
     }
-    expect(chatUrlTransform("hezuo://use-my-computer")).toBe("hezuo://use-my-computer");
+    expect(chatUrlTransform(url)).toBe(transformed);
   });
 });
 
@@ -637,7 +639,9 @@ describe("application and rejected Markdown links", () => {
 });
 
 describe("a bot's link to a page it published", () => {
-  const PAGE = "https://abcdefghijklmnopqrstuvwxyz.mausbot.page/";
+  const PAGE = "https://abcdefghijklmnopqrstuvwxyz.pages.example.test/";
+  beforeEach(() => { vi.stubEnv("VITE_HEZUO_PAGES_ORIGIN", "https://pages.example.test"); });
+  afterEach(() => { vi.unstubAllEnvs(); });
   const text = `Here is your dashboard: [Sales dashboard](${PAGE})`;
   async function clickPage(store?: Parameters<typeof BotEditorStore>[0]["value"]) {
     const host = document.createElement("div");
@@ -657,18 +661,18 @@ describe("a bot's link to a page it published", () => {
     }
   }
 
-  it("in the desktop app, opens like the card's Open: in the bot's browser panel, never as a message", async () => {
+  it("opens published pages externally without opening a bot panel or sending a message", async () => {
     const openExternal = vi.fn(async () => {});
-    window.ogb = { platform: "darwin", openExternal } as unknown as typeof window.ogb;
+    window.hezuo = { platform: "darwin", openExternal } as unknown as typeof window.hezuo;
     const dispatch = vi.fn();
     try {
       const state = { ...initialState, selectedId: "pepper", bots: [{ id: "pepper" }], config: { features: { browser: true }, browserEngine: { kind: "engine" } } };
       const click = await clickPage({ state, dispatch, flushBotPatches: async () => null, refreshInstances: async () => {}, refreshModels: async () => {} } as never);
       expect(click.defaultPrevented).toBe(true);
-      expect(dispatch.mock.calls).toEqual([[{ type: "toggleComputer", open: true }]]);
-      expect(openExternal).not.toHaveBeenCalled();
+      expect(dispatch).not.toHaveBeenCalled();
+      expect(openExternal).toHaveBeenCalledWith(PAGE);
     } finally {
-      delete window.ogb;
+      delete window.hezuo;
     }
   });
 
@@ -720,7 +724,7 @@ describe("message-scoped file targets", () => {
   });
 
   it("preserves supported local file spellings without widening unsafe protocols", () => {
-    expect(chatUrlTransform("file:///Users/milind/report.md")).toBe("file:///Users/milind/report.md");
+    expect(chatUrlTransform("file:///Users/morgan/report.md")).toBe("file:///Users/morgan/report.md");
     expect(chatUrlTransform("C:/Users/Hezuo/report.md")).toBe("C:/Users/Hezuo/report.md");
     expect(chatUrlTransform("\\\\server\\share\\report.md")).toBe("\\\\server\\share\\report.md");
     expect(chatUrlTransform("C:%5CUsers%5CHezuo%5Crelease%20notes.md")).toBe("C:\\Users\\Hezuo\\release%20notes.md");
@@ -752,11 +756,11 @@ describe("ChatMarkdown attachments", () => {
 
   it("keeps host paths private while routing them through the scoped file handler", () => {
     const html = renderToStaticMarkup(createElement(ChatMarkdown, {
-      text: "[macOS](file:///Users/milind/report.md) [Windows](C:/Users/Hezuo/report.md)",
+      text: "[macOS](file:///Users/morgan/report.md) [Windows](C:/Users/Hezuo/report.md)",
       message: { threadId: "thread-1", messageId: "message-1" },
     }));
     expect(html).toContain('title="Save a copy"');
-    expect(html).not.toContain("/Users/milind/report.md");
+    expect(html).not.toContain("/Users/morgan/report.md");
     expect(html).not.toContain("C:/Users/Hezuo/report.md");
   });
 
@@ -879,7 +883,7 @@ describe("ChatMarkdown attachments", () => {
     const revealInFolder = vi.fn(async () => "shown" as const);
 
     it("offers Show in folder in the local desktop app, without printing the path", () => {
-      vi.stubGlobal("window", { ogb: { revealInFolder, remoteClient: { active: false } } });
+      vi.stubGlobal("window", { hezuo: { revealInFolder, remoteClient: { active: false } } });
       try {
         const html = render(true);
         expect(html).toContain("This file is outside this chat&#x27;s working folder, so it can&#x27;t be saved from here");
@@ -892,7 +896,7 @@ describe("ChatMarkdown attachments", () => {
     });
 
     it("shows the full path as selectable text to a remote client instead", () => {
-      vi.stubGlobal("window", { ogb: { revealInFolder, remoteClient: { active: true } } });
+      vi.stubGlobal("window", { hezuo: { revealInFolder, remoteClient: { active: true } } });
       try {
         const html = render(true);
         expect(html).not.toContain("Show in folder");
@@ -913,7 +917,7 @@ describe("ChatMarkdown attachments", () => {
     });
 
     it("leaves other failures alone", () => {
-      vi.stubGlobal("window", { ogb: { revealInFolder, remoteClient: { active: false } } });
+      vi.stubGlobal("window", { hezuo: { revealInFolder, remoteClient: { active: false } } });
       try {
         const html = render(false);
         expect(html).toContain("the linked file is outside this conversation&#x27;s workspace");

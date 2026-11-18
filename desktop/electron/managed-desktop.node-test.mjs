@@ -279,7 +279,7 @@ test("utility replies cannot be forged by another child or reused across request
   await assert.rejects(pending, /could not be connected/);
 });
 test("secure record is encrypted, atomic, bounded and does not follow a symlink on read", async t => {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "omb-managed-store-")); t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "hezuo-managed-store-")); t.after(() => fs.rm(root, { recursive: true, force: true }));
   const key = randomBytes(32); let unlocked = true;
   const encryption = { available: async () => unlocked, encrypt: async text => {
     const iv = randomBytes(12), cipher = createCipheriv("aes-256-gcm", key, iv);
@@ -316,7 +316,7 @@ function electron43Store(file, lock = { locked: false }, decrypt) {
 const until = async check => { const end = Date.now() + 5000; while (!check()) { if (Date.now() > end) assert.fail("did not happen"); await new Promise(resolve => setImmediate(resolve)); } };
 
 test("a saved company sign-in that can never be read is removed, and signing in again is the one next step", async t => {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "omb-managed-unreadable-")); t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "hezuo-managed-unreadable-")); t.after(() => fs.rm(root, { recursive: true, force: true }));
   const file = path.join(root, "company-connection.bin");
   for (const decrypt of [
     // This computer's key no longer opens it (Windows after a reinstall onto a new profile).
@@ -333,7 +333,7 @@ test("a saved company sign-in that can never be read is removed, and signing in 
 });
 
 test("a locked keychain never removes the saved company sign-in: it is read again, sooner then each minute, until it opens", async t => {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "omb-managed-locked-")); t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "hezuo-managed-locked-")); t.after(() => fs.rm(root, { recursive: true, force: true }));
   const file = path.join(root, "company-connection.bin"), lock = { locked: false }, saved = grant();
   await electron43Store(file).write(saved);
   lock.locked = true;
@@ -341,7 +341,7 @@ test("a locked keychain never removes the saved company sign-in: it is read agai
   const f = fixture(t, { store, handler: (url, options) => url.endsWith("/api/desktop/session") && options.method !== "DELETE" ? Response.json(session(saved)) : null });
   const first = await f.client.start();
   assert.equal(first.status, "unavailable"); assert.equal(f.policies.length, 0);
-  assert.equal(first.message, "The saved company sign-in can't be read right now. Hezuo tries again every minute.");
+  assert.equal(first.message, "The saved company sign-in can't be read right now. HezuoBot tries again every minute.");
   for (const delay of [15_000, 30_000, 60_000]) {
     const reads = store.reads;
     await f.tick(delay - 1); assert.equal(store.reads, reads, "not read again early");
@@ -355,7 +355,7 @@ test("a locked keychain never removes the saved company sign-in: it is read agai
 });
 
 test("a decrypt answer in a shape this app does not know is never taken for an unreadable company sign-in", async t => {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "omb-managed-shape-")); t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "hezuo-managed-shape-")); t.after(() => fs.rm(root, { recursive: true, force: true }));
   const file = path.join(root, "company-connection.bin");
   await electron43Store(file).write(grant());
   await assert.rejects(electron43Store(file, undefined, async () => ({ shouldReEncrypt: false })).read(), error => !unreadableRecord(error));
@@ -438,7 +438,7 @@ test("against an Admin without renewal or policies it behaves as before: no rene
 test("a lapsed Admin licence is not revocation: no sign-in loop, Company models unavailable, recovers by itself", async t => {
   let lapsed = false;
   const f = fixture(t, { saved: grant(), handler: (url, options) => lapsed && options.method !== "DELETE"
-    ? Response.json({ code: "admin_license_expired", error: "Your organization's Hezuo Admin license has expired." }, { status: 503 }) : null });
+    ? Response.json({ code: "admin_license_expired", error: "Your organization's HezuoBot Admin license has expired." }, { status: 503 }) : null });
   await f.client.start(); lapsed = true;
   await f.client.refresh();
   assert.equal(f.client.state().status, "license-expired"); assert.equal(f.client.state().message, undefined);

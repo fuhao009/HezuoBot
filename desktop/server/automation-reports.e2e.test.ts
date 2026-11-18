@@ -5,7 +5,7 @@ import { connect, type Socket } from "node:net";
 import { join } from "node:path";
 import { afterEach, expect, it } from "vitest";
 
-import { launchVerificationServer, runControlOmb, type VerificationServer } from "../../scripts/control-omb.ts";
+import { launchVerificationServer, runControlHezuo, type VerificationServer } from "../../scripts/control-hezuo.ts";
 import { AUTOMATION_REPLY_PROMPT } from "./system-prompt.ts";
 import { launchRestartableServer } from "./testing/restartable-server.ts";
 import { openSse, type SseRecorder } from "./testing/sse.ts";
@@ -41,7 +41,7 @@ async function server(env: NodeJS.ProcessEnv = {}) {
     else expect(response.status, `${method} ${path}: ${JSON.stringify(value)}`).toBe(status);
     return value;
   };
-  const cli = (...args: string[]) => runControlOmb([...args, "--url", url]) as Promise<any>;
+  const cli = (...args: string[]) => runControlHezuo([...args, "--url", url]) as Promise<any>;
   const { bot } = await cli("new-bot", "--name", "Pepper");
   const main = bot.activeTaskId as string;
   const planPath = join(dataDir, "room-plan.json");
@@ -80,9 +80,9 @@ async function server(env: NodeJS.ProcessEnv = {}) {
 async function brokerOf(s: Awaited<ReturnType<typeof server>>, threadId: string): Promise<any[]> {
   const dump = join(s.dataDir, "fake-claude-dump.json");
   await expect.poll(() => {
-    try { return JSON.parse(readFileSync(dump, "utf8")).mcpConfig?.mcpServers?.agents?.env?.OMB_THREAD_ID === threadId; } catch { return false; }
+    try { return JSON.parse(readFileSync(dump, "utf8")).mcpConfig?.mcpServers?.agents?.env?.HEZUO_THREAD_ID === threadId; } catch { return false; }
   }, { timeout: 20_000 }).toBe(true);
-  const socketPath = JSON.parse(readFileSync(dump, "utf8")).mcpConfig.mcpServers.ogb.args.at(-1);
+  const socketPath = JSON.parse(readFileSync(dump, "utf8")).mcpConfig.mcpServers.hezuo.args.at(-1);
   const socket = broker = connect(socketPath);
   socket.on("error", () => {});
   await new Promise<void>((resolve, reject) => { socket.once("connect", resolve); socket.once("error", reject); });
@@ -393,7 +393,7 @@ it("tells the main chat about a run missed while the computer was off, which has
     method, headers: { "content-type": "application/json", origin: restartable.url }, ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   })).json() as Promise<any>;
   try {
-    const { bot } = await runControlOmb(["new-bot", "--name", "Pepper", "--url", restartable.url]) as any;
+    const { bot } = await runControlHezuo(["new-bot", "--name", "Pepper", "--url", restartable.url]) as any;
     const main = bot.activeTaskId as string;
     const { routine } = await api("POST", "/api/routines", {
       name: "Inbox watch", prompt: "Do the Inbox watch check.", botId: bot.id,

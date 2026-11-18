@@ -12,7 +12,7 @@ const { once } = require("node:events");
 const { setTimeout: delay } = require("node:timers/promises");
 
 const root = resolve(__dirname, "..");
-const home = mkdtempSync(join(tmpdir(), "omb-phone-auth-smoke-"));
+const home = mkdtempSync(join(tmpdir(), "hezuo-phone-auth-smoke-"));
 app.setPath("userData", join(home, "electron"));
 const children = [];
 let logs = "";
@@ -62,13 +62,13 @@ app.whenReady().then(async () => {
     claude: { driver: "claudeAgent", config: { cli: join(root, "desktop/server/testing/fake-claude-cli.ts") } },
   } }));
   const env = {
-    HOME: home, USERPROFILE: home, OMB_DATA_DIR: home, PATH: "",
+    HOME: home, USERPROFILE: home, HEZUO_DATA_DIR: home, PATH: "",
     ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}),
-    OMB_PORT: String(harnessPort), OMB_WEBHOOK_PORT: String(webhookPort),
-    OMB_COMPANION_PORT: String(phonePort), OMB_CONTROL_PORT: String(controlPort),
+    HEZUO_PORT: String(harnessPort), HEZUO_WEBHOOK_PORT: String(webhookPort),
+    HEZUO_COMPANION_PORT: String(phonePort), HEZUO_CONTROL_PORT: String(controlPort),
     FAKE_CLAUDE_MODE: "happy",
   };
-  const harness = fork("dist-server/index.js", { ...env, OMB_DESKTOP_PARENT: "1" });
+  const harness = fork("dist-server/index.js", { ...env, HEZUO_DESKTOP_PARENT: "1" });
   await until(() => api(harnessPort, "/api/health").catch(() => null));
   assert.equal((await api(harnessPort, "/api/bots", "POST", {})).status, 403);
   harness.postMessage({ type: "hezuo:desktop-mutation-token", token: owner, companionToken: relay });
@@ -127,7 +127,7 @@ app.whenReady().then(async () => {
   console.error(error);
   process.exitCode = 1;
 }).finally(async () => {
-  const evidence = join(tmpdir(), `omb-phone-auth-${Date.now()}.log`);
+  const evidence = join(tmpdir(), `hezuo-phone-auth-${Date.now()}.log`);
   writeFileSync(evidence, logs.replaceAll(owner, "[redacted]").replaceAll(relay, "[redacted]").replaceAll(control, "[redacted]"));
   console.log(`Fixture log: ${evidence}`);
   for (const child of children.reverse()) {

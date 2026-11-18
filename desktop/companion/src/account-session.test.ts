@@ -15,7 +15,7 @@ describe("account device ids", () => {
 describe("the product account trust file", () => {
   it("refuses a missing file, a loopback http origin, or a key block", () => {
     expect(readProductAccountTrust(undefined)).toBeNull();
-    const dir = mkdtempSync(join(tmpdir(), "omb-trust-"));
+    const dir = mkdtempSync(join(tmpdir(), "hezuo-trust-"));
     const file = join(dir, "trust.json");
     writeFileSync(file, JSON.stringify({ origin: "http://127.0.0.1:1/", ca: "nope", userId: "u" }));
     expect(readProductAccountTrust(file)).toBeNull();

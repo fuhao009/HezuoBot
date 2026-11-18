@@ -51,9 +51,9 @@ or taller than the card shows a box the app never draws.
 ## Setup
 
 - A packaged build of the branch installed beside, never over, the installed
-  Hezuo (maintainers: the OMB2 side-by-side build). Never touch
+  Hezuo (maintainers: the HezuoBot side-by-side side-by-side build). Never touch
   `/Applications/Hezuo.app` or `~/.hezuo`.
-- Launch with `OMB_DATA_DIR=$HOME/.hezuo-test` unless the check needs real
+- Launch with `HEZUO_DATA_DIR=$HOME/.hezuo-test` unless the check needs real
   bots. Only one running app may hold the key: quit any other Hezuo first.
 - Use composer dictation once first so Microphone and Speech Recognition are
   granted.

@@ -1,14 +1,9 @@
 import { Settings } from "lucide-react";
-import { useEffect } from "react";
 
-import { sayFrameDrawn } from "@/lib/chrome-rail";
 import { cn } from "@/lib/cn";
 import { t } from "@/lib/i18n";
 import { useStore } from "@/state/store";
-import { ChromeRailToggle } from "./ChromeRailToggle";
-import { captionChrome, useDesktopCapabilities, windowFrameable, windowFramed } from "./DesktopCapabilities";
-import { UpdateIndicator } from "./UpdateIndicator";
-import { WindowPlaceTitle } from "./WindowPlaceTitle";
+import { captionChrome, useDesktopCapabilities, windowFramed } from "./DesktopCapabilities";
 
 /** A button in the frame's top bar: small, quiet, the bar's height and no more. */
 export const FRAME_BAR_BUTTON = "flex size-[22px] shrink-0 items-center justify-center rounded-md text-ink-secondary transition-colors hover:bg-ink/[0.07] hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus";
@@ -21,8 +16,7 @@ export const FRAME_BAR_BUTTON = "flex size-[22px] shrink-0 items-center justify-
 export function WindowFrameBar() {
   const { capabilities } = useDesktopCapabilities();
   const { dispatch } = useStore();
-  const frameable = windowFrameable(capabilities), framed = windowFramed(capabilities);
-  useEffect(() => { if (frameable) sayFrameDrawn(framed); }, [frameable, framed]);
+  const framed = windowFramed(capabilities);
   if (!framed) return null;
   const mac = capabilities.windowChrome === "mac-inset";
   const { dragProps } = captionChrome(capabilities.windowChrome);
@@ -34,11 +28,9 @@ export function WindowFrameBar() {
     >
       {/* macOS: the traffic lights span 12-72px of the window, so the first button starts at 80px. */}
       <div data-frame-bar-start className={cn("flex items-center gap-0.5", mac ? "pl-20" : "pl-[calc(var(--rail-beside,0px)+8px)]")}>
-        <ChromeRailToggle bar={FRAME_BAR_BUTTON} />
       </div>
-      <WindowPlaceTitle />
+      <span />
       <div data-frame-bar-end className={cn("flex items-center justify-end gap-0.5", mac ? "pr-2" : "pr-[140px]")}>
-        <UpdateIndicator bar={FRAME_BAR_BUTTON} />
         <button
           type="button"
           data-frame-settings

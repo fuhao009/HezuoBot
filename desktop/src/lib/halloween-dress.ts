@@ -2,7 +2,7 @@ import { useSyncExternalStore } from "react";
 import { COSTUME_FOR_COLOR, isHalloweenBody, type BotBodyId } from "../../../packages/shared/bot-body";
 import type { HezuoColor } from "@/lib/mascot";
 
-export const HALLOWEEN_DRESS_KEY = "omb-halloween-dress";
+export const HALLOWEEN_DRESS_KEY = "hezuo-halloween-dress";
 
 let sessionChoice: boolean | undefined;
 const listeners = new Set<() => void>();

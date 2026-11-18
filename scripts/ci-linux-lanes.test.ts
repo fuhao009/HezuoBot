@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { EVALS_LANE, lanesFor, PACKAGED_SERVER_LANE, runLanes, vitestLane } from "./ci-linux-lanes.mjs";
+import { lanesFor, PACKAGED_SERVER_LANE, runLanes, vitestLane } from "./ci-linux-lanes.mjs";
 import { vitestMatrix } from "./ci-scope.mjs";
 
 const temporaryDirectories: string[] = [];
@@ -11,31 +11,31 @@ afterEach(() => {
 });
 
 function scratch() {
-  const directory = mkdtempSync(join(tmpdir(), "omb-ci-lanes-"));
+  const directory = mkdtempSync(join(tmpdir(), "hezuo-ci-lanes-"));
   temporaryDirectories.push(directory);
   return directory;
 }
 
 describe("Linux lanes", () => {
-  it("gives every Linux shard its own lane, the node tests only on the first, then evals and the packaged server", () => {
+  it("gives every Linux shard its own lane, the node tests only on the first, then the packaged server", () => {
     const shards = vitestMatrix(["ubuntu-latest"]).include;
-    const lanes = lanesFor({ vitest: shards, evals: true, packaged_server: true }, "/t/retries.jsonl");
+    const lanes = lanesFor({ vitest: shards, packaged_server: true }, "/t/retries.jsonl");
     expect(lanes.map((lane) => lane.name)).toEqual([
-      ...shards.map((entry) => `vitest (ubuntu-latest, ${entry.part})`), EVALS_LANE.name, PACKAGED_SERVER_LANE.name,
+      ...shards.map((entry) => `vitest (ubuntu-latest, ${entry.part})`), PACKAGED_SERVER_LANE.name,
     ]);
     expect(lanes[0]).toEqual({
       name: "vitest (ubuntu-latest, shard 1/8)",
-      env: { OMB_VITEST_RETRY_LOG: "/t/retries.jsonl", OMB_VITEST_E2E: "all", OMB_VITEST_SUBSET: "" },
-      commands: ["pnpm exec vitest run  --shard=1/8 --reporter=default --reporter=github-actions", "pnpm broker:test && pnpm test:electron"],
+      env: { HEZUO_VITEST_RETRY_LOG: "/t/retries.jsonl", HEZUO_VITEST_E2E: "all", HEZUO_VITEST_SUBSET: "" },
+      commands: ["pnpm exec vitest run  --shard=1/8 --reporter=default --reporter=github-actions", "pnpm test:electron"],
     });
     expect(lanes.slice(1, 8).every((lane) => lane.commands.length === 1)).toBe(true);
   });
 
   it("runs a subset's files and leaves out what the plan leaves out", () => {
     const entry = { os: "ubuntu-latest", part: "docs tests", shard: 1, shards: 1, files: "a.test.ts b.test.ts", e2e: "all", node_tests: false };
-    expect(lanesFor({ vitest: [entry], evals: false, packaged_server: false }, "/r")).toEqual([vitestLane(entry, "/r")]);
+    expect(lanesFor({ vitest: [entry], packaged_server: false }, "/r")).toEqual([vitestLane(entry, "/r")]);
     expect(vitestLane(entry, "/r").commands).toEqual(["pnpm exec vitest run a.test.ts b.test.ts --shard=1/1 --reporter=default --reporter=github-actions"]);
-    expect(lanesFor({ vitest: [], evals: true, packaged_server: false }, "/r")).toEqual([EVALS_LANE]);
+    expect(lanesFor({ vitest: [], packaged_server: false }, "/r")).toEqual([]);
   });
 
   // The lanes run on one Linux VM: a lane is a process group, stopped with kill(-pid), which Windows has no form of.

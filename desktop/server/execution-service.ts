@@ -33,8 +33,8 @@ export function createExecutionService(options: ExecutionConnectorOptions & { to
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const file = process.env.OMB_EXECUTION_SERVICE_CONFIG;
-  if (!file) throw new Error("Set OMB_EXECUTION_SERVICE_CONFIG to an account-owned mode-0600 JSON file.");
+  const file = process.env.HEZUO_EXECUTION_SERVICE_CONFIG;
+  if (!file) throw new Error("Set HEZUO_EXECUTION_SERVICE_CONFIG to an account-owned mode-0600 JSON file.");
   const stat = statSync(file);
   if (!stat.isFile() || (stat.mode & 0o077) !== 0 || (process.getuid && stat.uid !== process.getuid())) throw new Error("Execution config must be owned by this OS user and private (0600).");
   const config = JSON.parse(readFileSync(file, "utf8"));

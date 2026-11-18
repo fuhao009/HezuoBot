@@ -1,6 +1,5 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import type { Connect, Plugin } from "vite";
 import { configDefaults, defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
@@ -17,28 +16,15 @@ const { version } = JSON.parse(
 const root = fileURLToPath(new URL("..", import.meta.url));
 const page = (file: string) => fileURLToPath(new URL(file, import.meta.url));
 
-/** The window's rail of places loads /rail: rail.html, its own small page, in development as from the server. */
-function railPage(): Plugin {
-  const rewrite: Connect.NextHandleFunction = (req, _res, next) => {
-    if (req.url === "/rail" || req.url?.startsWith("/rail?")) req.url = `/rail.html${req.url.slice("/rail".length)}`;
-    next();
-  };
-  return {
-    name: "rail-page",
-    configureServer: (server) => void server.middlewares.use(rewrite),
-    configurePreviewServer: (server) => void server.middlewares.use(rewrite),
-  };
-}
 
 const include = [
-  "evals/**/*.test.ts",
   "desktop/server/**/*.test.ts",
   "desktop/electron/**/*.test.mjs",
+  "desktop/electron/embedded-browser-runtime.test.ts",
   "desktop/src/**/*.test.ts",
+  "desktop/src/**/*.test.tsx",
   "packages/shared/**/*.test.ts",
   "desktop/companion/**/*.test.ts",
-  "enterprise/**/*.test.ts",
-  "connector/**/*.test.ts",
   "scripts/**/*.test.mjs",
   "scripts/**/*.test.ts",
   "gateway/local/**/*.test.mjs",
@@ -47,11 +33,11 @@ const include = [
 
 export default defineConfig({
   base: "./",
-  plugins: [react(), tailwindcss(), railPage()],
+  plugins: [react(), tailwindcss()],
   build: {
     outDir: fileURLToPath(new URL("../dist", import.meta.url)),
     emptyOutDir: true,
-    rollupOptions: { input: { index: page("./index.html"), rail: page("./rail.html"), productAccount: page("./product-account.html") } },
+    rollupOptions: { input: { index: page("./index.html"), productAccount: page("./product-account.html") } },
   },
   define: {
     __APP_VERSION__: JSON.stringify(version),
@@ -59,7 +45,7 @@ export default defineConfig({
   test: {
     environment: "node",
     include,
-    // OMB_VITEST_E2E=host (CI's Windows and macOS shards) leaves the e2e files that run on Linux only.
+    // HEZUO_VITEST_E2E=host (CI's Windows and macOS shards) leaves the e2e files that run on Linux only.
     exclude: [...configDefaults.exclude, "gateway/local/local-gateway/companion-relay.test.mjs", ...(hostE2eOnly() ? portableE2eFiles(root, include) : [])],
     setupFiles: ["desktop/server/testing/setup.ts", "desktop/src/testing/all-locales.ts"],
     // the suite spawns fake provider CLIs and a real harness server;
@@ -83,7 +69,7 @@ export default defineConfig({
     // IPv4 explicitly — a bare ::1 bind makes localhost a coin-flip for
     // clients that resolve IPv4 first
     host: "127.0.0.1",
-    port: Number(process.env.OMB_UI_PORT) || 5199,
+    port: Number(process.env.HEZUO_UI_PORT) || 5199,
     // packager output lands inside the repo — its HTML files must never
     // trigger dev full-page reloads
     watch: {
@@ -94,10 +80,10 @@ export default defineConfig({
     proxy: {
       "/api": {
         ws: true,
-        target: `http://127.0.0.1:${process.env.OMB_PORT || process.env.OGB_PORT || 8799}`,
+        target: `http://127.0.0.1:${process.env.HEZUO_PORT || 8799}`,
       },
       "/.well-known/hezuo/environment": {
-        target: `http://127.0.0.1:${process.env.OMB_PORT || process.env.OGB_PORT || 8799}`,
+        target: `http://127.0.0.1:${process.env.HEZUO_PORT || 8799}`,
       },
     },
   },

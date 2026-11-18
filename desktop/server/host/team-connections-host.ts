@@ -6,11 +6,11 @@
 // Security: nothing else ever gets a member's connection: not another person's request or the work it hands on, not a
 // turn someone else wrote into, not a chat anyone else reads, a routine or a webhook. The relay checks it again on every
 // call. Off a team nothing changes.
-import { createHash } from "node:crypto";
 import { join } from "node:path";
 
 import { audienceMember, type Audience } from "../audience.ts";
-import type { CloudTeam, TeamRole } from "../cloud-team.ts";
+type TeamRole = "owner" | "admin" | "member";
+type ConnectionsTeam = { id: string; name: string };
 import type * as Composio from "../composio.ts";
 import type { AppConfig } from "../config.ts";
 import type { McpServerSpec } from "../contracts.ts";
@@ -18,7 +18,7 @@ import { serviceSlugFor } from "../connector-verdict.ts";
 import { type McpOAuthManager, type McpSignInPhase, withMcpSignIn, withoutPendingSignIn } from "../mcp-oauth.ts";
 import { isRemoteMcpServer, parseStoredMcpServer } from "../mcp-registry.ts";
 import { OWN_APPS_SERVER } from "../../../packages/shared/own-apps.ts";
-import { appLabel, ConnectionScopes, PeopleConnections, personAppOf, SCOPES_FILE, type BrokerAccess } from "../team-connections.ts";
+import { appLabel, ConnectionScopes, PeopleConnections, personAppOf, SCOPES_FILE, type PersonalAppAccess } from "../team-connections.ts";
 import { APP_TOOL_NAMES_ENV, APP_TOOLS_ENV, appToolsFor } from "../connector-app-tools.ts";
 import type { ConnectorScopes } from "../../../packages/shared/connector-scopes.ts";
 
@@ -27,18 +27,17 @@ type Integration = { command: string; args: string[]; env: Record<string, string
 type McpBot = { id: string; name: string; mcpServers?: string[] };
 
 export interface TeamConnectionsHostDeps {
-  team: CloudTeam | null;
+  team?: ConnectionsTeam | null;
   dataDir: string;
   cfg: () => AppConfig;
-  /** The Admin's origin (OMB_CLOUD_ADMIN_URL): a member connects their own on their team's page there. */
-  adminOrigin: string | null;
+  /** The team's connection management origin, when it has a separate management surface. */
+  adminOrigin?: string | null;
   harnessUrl: string;
   audienceOf(threadId: string): Audience;
-  /** The person this turn generation acts for (the latest one when none is named), or null: server/host/acting-person.ts. */
+  /** The person this turn generation acts for, or null when ownership cannot be proven. */
   requester(threadId: string, generation?: string): string | null;
   /** What a person is called in a bot's words: the name they chose, else their address. */
   personName?(person: string): string | undefined;
-  /** The members the Admin paired here, by person key, with their address and role (server/team-people.ts). */
   roster?(): ReadonlyArray<{ person: string; email: string; role: TeamRole }>;
   /** A `connectors` capability for this turn; `connectorsFor` makes it the member's own bridge's. */
   mint(capability: { botId: string; threadId: string; generation: string; connectorsFor?: string }): string;
@@ -48,8 +47,6 @@ export interface TeamConnectionsHostDeps {
   /** Whether whoever started a member's sign-in (a session, or a chat's Sign in card) is still there to finish it. */
   isOwnerLive(owner: string): boolean;
   onSettled?(name: string, phase: McpSignInPhase, owner: string): void;
-  /** The connected-apps service a member's own installation is made on; null: none here. */
-  brokerUrl(): string | null;
   composio: Pick<typeof Composio, "configured" | "mcpIntegration" | "connectedServices" | "connectedServiceSlugs" | "authorizeService" | "removeService">;
 }
 
@@ -60,7 +57,7 @@ const list = (names: readonly string[]) => names.length <= 1 ? names.join("") : 
 const APPS_FRESH_MS = 60_000, APPS_RETRY_MS = 10_000, FIRST_APPS_WAIT_MS = 3_000;
 
 export function createTeamConnectionsHost(deps: TeamConnectionsHostDeps) {
-  const team = deps.team;
+  const team = deps.team ?? null;
   const scopes = new ConnectionScopes(join(deps.dataDir, SCOPES_FILE));
   /** The sign-in app an admin set for a server (config.json), read when a member signs in: never copied anywhere. */
   const teamServer = (name: string) => {
@@ -70,7 +67,6 @@ export function createTeamConnectionsHost(deps: TeamConnectionsHostDeps) {
   };
   const people = new PeopleConnections({
     dataDir: deps.dataDir,
-    brokerUrl: deps.brokerUrl,
     clients: (name, url) => { const server = teamServer(name); return server && isRemoteMcpServer(server) && server.url === url ? server.oauth : undefined; },
     isOwnerLive: deps.isOwnerLive,
     ...(deps.onSettled ? { onSettled: deps.onSettled } : {}),
@@ -80,12 +76,12 @@ export function createTeamConnectionsHost(deps: TeamConnectionsHostDeps) {
    * is used at once, and read again in the background once it is a minute old. Only an installation's first answer is
    * waited for, at most a few seconds, and a failed first read is tried again soon; `primeApps` reads the team's at start. */
   const connectedApps = new Map<string, { at: number; apps: string[] | null; reading: Promise<void> | null }>();
-  const appsConnected = async (as?: BrokerAccess): Promise<string[]> => {
-    const key = as ? createHash("sha256").update(as.url).update("\u0000").update(as.token).digest("hex") : "";
+  const appsConnected = async (): Promise<string[]> => {
+    const key = "";
     const entry = connectedApps.get(key) ?? { at: -Infinity, apps: null, reading: null };
     connectedApps.set(key, entry);
     if (!entry.reading && Date.now() - entry.at >= (entry.apps ? APPS_FRESH_MS : APPS_RETRY_MS)) {
-      entry.reading = deps.composio.connectedServices(deps.cfg(), as).then((services) => {
+      entry.reading = deps.composio.connectedServices(deps.cfg()).then((services) => {
         entry.apps = Object.entries(services).filter(([, state]) => state.connected).map(([slug]) => slug);
       }, () => {}).finally(() => { entry.at = Date.now(); entry.reading = null; });
     }
@@ -94,8 +90,8 @@ export function createTeamConnectionsHost(deps: TeamConnectionsHostDeps) {
     }
     return entry.apps ?? [];
   };
-  const withAppTools = async (bridge: Integration, bot: Bot, names: "dotted" | "plain", as?: BrokerAccess): Promise<Integration> => {
-    const tools = appToolsFor(bot, await appsConnected(as));
+  const withAppTools = async (bridge: Integration, bot: Bot, names: "dotted" | "plain"): Promise<Integration> => {
+    const tools = appToolsFor(bot, await appsConnected());
     return tools.length ? { ...bridge, env: { ...bridge.env, [APP_TOOLS_ENV]: JSON.stringify(tools), [APP_TOOL_NAMES_ENV]: names } } : bridge;
   };
   const personMcp = () => (team ? scopes.person("mcp") : []);
@@ -222,23 +218,16 @@ export function createTeamConnectionsHost(deps: TeamConnectionsHostDeps) {
       const base = { harnessUrl: deps.harnessUrl, botId: bot.id, threadId, connectorTools: bot.connectorTools };
       const shared = await deps.composio.mcpIntegration(cfg, { ...base, commsToken: deps.mint({ botId: bot.id, threadId, generation }) });
       if (shared) out.composio = await withAppTools(shared, bot, names);
-      const person = personApps().length ? turnPerson(threadId, generation) : null;
-      const access = person ? people.appsAccess(person) : null;
-      if (person && access) {
-        const own = await deps.composio.mcpIntegration(cfg, { ...base, as: access, commsToken: deps.mint({ botId: bot.id, threadId, generation, connectorsFor: person }) });
-        if (own) out.composioOwn = await withAppTools(own, bot, names, access);
-      }
       return out;
     },
 
     /** Whose installation a relayed frame goes to: the team's (none named), or the member's own after checking the turn
      * still acts for them. A refusal is the plain line the bot gets back. */
-    relayActor(capability: { threadId: string; generation: string; connectorsFor?: string }): { access?: BrokerAccess; refusal?: string } {
+    relayActor(capability: { threadId: string; generation: string; connectorsFor?: string }): { access?: PersonalAppAccess; refusal?: string } {
       const own = capability.connectorsFor;
       if (!own) return {};
       if (turnPerson(capability.threadId, capability.generation) !== own) return { refusal: lines.ownOnly(nameOf(own)) };
-      const access = people.appsAccess(own);
-      return access ? { access } : { refusal: lines.ownGone(own) };
+      return { refusal: lines.ownGone(own) };
     },
 
     /** The app calls a frame would run, checked against the scopes: a `person` app never through the team's bridge, a
@@ -383,12 +372,6 @@ export function createTeamConnectionsHost(deps: TeamConnectionsHostDeps) {
       if (!team) return {};
       const apps = personApps(), servers = personMcp();
       const byApp: Record<string, string[]> = Object.fromEntries(apps.map((slug) => [slug, [] as string[]]));
-      if (apps.length) {
-        await Promise.all(people.appsPeople().map(async ({ email, access }) => {
-          const connected = await deps.composio.connectedServices(deps.cfg(), access).catch(() => null);
-          for (const slug of apps) if (connected?.[slug]?.connected) byApp[slug]!.push(email);
-        }));
-      }
       const byServer: Record<string, string[]> = {};
       for (const name of servers) {
         const server = teamServer(name);

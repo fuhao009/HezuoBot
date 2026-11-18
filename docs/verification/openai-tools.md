@@ -12,7 +12,7 @@ pnpm exec vitest run desktop/server/openai-tools.e2e.test.ts
 ```
 
 `desktop/server/openai-tools.e2e.test.ts` launches its own server with
-`launchVerificationServer`, then uses `runControlOmb` with the launcher's exact
+`launchVerificationServer`, then uses `runControlHezuo` with the launcher's exact
 URL for `new-bot`, `set-model`, `send`, `wait`, `messages`, and `interrupt`.
 Configuration and approval go through the fixture's existing HTTP routes;
 approval uses `/api/bots/ID/respond`. The fixture explicitly enables each MCP
@@ -144,8 +144,10 @@ capabilities and in-flight cancellation without replay. The hosted-desktop
 fixture runs the same tools for a Claude bot and proves Boat's own runner is
 never asked.
 
-`pnpm exec vitest run desktop/server/cloud-computer-lazy.e2e.test.ts desktop/server/cloud-computer-slow-start.e2e.test.ts desktop/server/computer-selection.test.ts desktop/server/room-turn-end.test.ts desktop/server/boat-wait-ready.test.ts desktop/src/components/ComputerPanel.lazy.test.ts`
-proves a cloud computer starts only when the bot uses it. Against a loopback
+`pnpm exec vitest run desktop/server/cloud-computer-slow-start.e2e.test.ts desktop/server/computer-selection.test.ts desktop/server/room-turn-end.test.ts desktop/server/boat-wait-ready.test.ts desktop/src/components/ComputerPanel.lazy.test.ts`
+The former Cloud lazy-start end-to-end fixture is retired; its plain-chat and
+first-use assertions below are historical, not coverage supplied by these retained checks.
+That former fixture checked that a cloud computer started only on use. Against a loopback
 relay that counts every request, a plain chat ("hi") on Works on: Cloud
 computer, in a bot's chat or a room, makes no relay call; choosing Cloud
 computer or opening the Computer panel creates and wakes nothing; the first
@@ -180,7 +182,7 @@ Content-Type: application/json
 {"tools": false}
 ```
 
-Use the exact instance ID from `pnpm control:omb models --url URL`, and direct
+Use the exact instance ID from `pnpm control:hezuo models --url URL`, and direct
 the request only to that explicitly selected server. The route accepts this
 setting for OpenAI-compatible, Grok API, and MiniMax API instances, refuses
 changes while the instance is busy, and stores `config.tools` on that instance.

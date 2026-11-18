@@ -25,15 +25,15 @@ import {
 } from "../src/mdns.ts";
 
 const service: ServiceInfo = {
-  name: "Milind's computer",
+  name: "Alex's computer",
   type: "_hezuo._tcp",
   port: 8800,
   host: "hezuo-1a2b3c4d.local",
   addresses: ["192.168.1.42"],
-  txt: ["v=1", "name=Milind's computer"],
+  txt: ["v=1", "name=Alex's computer"],
 };
 
-const INSTANCE = "Milind's computer._hezuo._tcp.local";
+const INSTANCE = "Alex's computer._hezuo._tcp.local";
 const SERVICE_NAME = "_hezuo._tcp.local";
 
 function query(name: string, type: number, opts: { id?: number; unicast?: boolean } = {}): Buffer {
@@ -238,16 +238,16 @@ describe("naming", () => {
     expect(dnsLabel("Dr. Smith's computer")).toBe("Dr  Smith's computer");
     expect(dnsLabel("x".repeat(200)).length).toBeLessThanOrEqual(63);
     expect(Buffer.byteLength(dnsLabel("é".repeat(60)), "utf8")).toBeLessThanOrEqual(63);
-    expect(dnsLabel("")).toBe("Hezuo");
-    expect(dnsLabel("   ")).toBe("Hezuo");
+    expect(dnsLabel("")).toBe("HezuoBot");
+    expect(dnsLabel("   ")).toBe("HezuoBot");
   });
 
   it("claims a host name the system responder will not fight us for", () => {
-    const name = defaultHostName("Milinds-MacBook-Pro");
+    const name = defaultHostName("Alexs-MacBook-Pro");
     expect(name).toMatch(/^hezuo-[0-9a-f]{8}\.local$/);
-    expect(defaultHostName("Milinds-MacBook-Pro")).toBe(name);
+    expect(defaultHostName("Alexs-MacBook-Pro")).toBe(name);
     expect(defaultHostName("another-machine")).not.toBe(name);
-    expect(name).not.toContain("Milinds-MacBook-Pro");
+    expect(name).not.toContain("Alexs-MacBook-Pro");
   });
 
   it("publishes only routable IPv4 addresses", () => {

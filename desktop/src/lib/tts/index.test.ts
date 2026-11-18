@@ -506,7 +506,7 @@ describe("stream identification", () => {
 
   it("adopts the completed message id into the snapshot and probe records", async () => {
     const probe: VoiceProbeSample[] = [];
-    vi.stubGlobal("window", { __ombVoiceProbe: probe });
+    vi.stubGlobal("window", { __hezuoVoiceProbe: probe });
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: string | URL | Request) =>
@@ -589,7 +589,7 @@ describe("local system voice stream", () => {
     synth = makeSynth();
     spoken = [];
     vi.stubGlobal("window", {
-      ogb: { remoteClient: { active: true }, platform: "darwin" },
+      hezuo: { remoteClient: { active: true }, platform: "darwin" },
       speechSynthesis: synth,
       SpeechSynthesisUtterance: FakeUtterance,
     });

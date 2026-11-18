@@ -1,4 +1,4 @@
-import { brokerRemoteMcp, type BrokerTurn } from "./bot-box/broker-mcp.ts";
+import { brokerRemoteMcp, type BrokerTurn } from "./execution-sandbox/broker-mcp.ts";
 import type { AppConfig } from "./config.ts";
 import type { McpServerSpec, SendTurnInput } from "./contracts.ts";
 import { parseStoredMcpServer } from "./mcp-registry.ts";

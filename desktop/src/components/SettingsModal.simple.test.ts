@@ -15,8 +15,6 @@ const fixture = vi.hoisted(() => ({
   dispatch: vi.fn(),
   switches: [] as ComponentProps<typeof Switch>[],
   ownerOrAdmin: null as boolean | null,
-  updater: null as import("@/lib/updater").UpdaterState | null,
-  serverUpdate: null as ReturnType<typeof import("./SidebarProfileMenu").useServerUpdateItem>,
   rail: null as { available: boolean; hidden: boolean } | null,
   railHidden: [] as boolean[],
 }));
@@ -52,8 +50,6 @@ vi.mock("./EnginesSettings", () => ({ EnginesSettings: marker("engines") }));
 vi.mock("./DecisionModelSettings", () => ({ DecisionModelSettings: marker("decisionModel") }));
 vi.mock("./keys/KeysPage", () => ({ KeysPage: marker("apiKey") }));
 vi.mock("./RemoteComputerSection", () => ({ RemoteComputerSection: marker("companion") }));
-vi.mock("./CustomDomainSettings", () => ({ CustomDomainSettings: () => null }));
-vi.mock("./CompanionSection", () => ({ CompanionSection: () => null }));
 vi.mock("./ServerPairingCard", () => ({ ServerPairingCard: () => null }));
 vi.mock("./ConnectedWorkspacesSettings", () => ({ ConnectedWorkspacesSettings: marker("desktopWorkspaces") }));
 vi.mock("./LocalComputerSection", () => ({ LocalComputerSection: marker("computer") }));
@@ -66,20 +62,8 @@ vi.mock("./WorkspaceBackupSettings", () => ({ WorkspaceBackupSettings: marker("b
 vi.mock("./RoomTurnTimeoutSettings", () => ({ RoomTurnTimeoutSettings: () => null }));
 vi.mock("./CompanyBackupSettings", () => ({ CompanyBackupSettings: () => null }));
 vi.mock("./ImportSettings", () => ({ ImportSettings: marker("import") }));
-vi.mock("./UpdatesConsent", async (importOriginal) => ({
-  ...await importOriginal<typeof import("./UpdatesConsent")>(),
-  UpdatesConsentRow: marker("updatesConsent"),
-}));
-vi.mock("./SidebarProfileMenu", async (importOriginal) => ({
-  ...await importOriginal<typeof import("./SidebarProfileMenu")>(),
-  useServerUpdateItem: () => fixture.serverUpdate,
-}));
-vi.mock("@/lib/updater", async (importOriginal) => ({
-  ...await importOriginal<typeof import("@/lib/updater")>(),
-  useUpdaterState: () => fixture.updater,
-}));
 
-const desktop = { ogb: { environments: {}, organization: {}, cloudAccount: {} } };
+const desktop = { hezuo: { environments: {}, organization: {}, cloudAccount: {} } };
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -88,8 +72,6 @@ beforeEach(() => {
   fixture.config = { features: { browser: false }, browserEngine: { kind: "bundled", installable: true }, composio: { mode: "self" } };
   fixture.switches = [];
   fixture.ownerOrAdmin = null;
-  fixture.updater = null;
-  fixture.serverUpdate = null;
   fixture.rail = null;
   fixture.railHidden = [];
   fixture.api.mockResolvedValue({});
@@ -159,7 +141,7 @@ describe("Settings in Simple mode", () => {
     const placed = SIMPLE_PAGES.flatMap((page) => page.sections);
     expect(new Set(placed).size).toBe(placed.length);
     const hidden = SECTIONS.map((entry) => entry.id).filter((id) => !placed.includes(id));
-    expect(hidden).toEqual(["decisionModel", "skills", "backups", "workspaces", "experimental"]);
+    expect(hidden).toEqual(["decisionModel", "skills", "backups", "experimental"]);
     for (const id of hidden) expect(SIMPLE_HIDDEN_SECTIONS).toContain(id);
   });
 
@@ -175,32 +157,25 @@ describe("Settings in Simple mode", () => {
     expect(html).toMatch(/aria-expanded="false" aria-controls="[^"]+"[^>]*>Add<\/button>/);
   });
 
-  it("puts the sidebar's colour and picture right under Theme in General, the switch for the window's rail beside them, and only the skins behind More looks", () => {
-    fixture.rail = { available: true, hidden: false };
+  it("keeps Theme before message colours and More looks, with only skins behind More looks", () => {
     const html = render();
     const appearance = html.slice(html.indexOf('data-settings-block="appearance"'), html.indexOf(">Notifications<"));
-    const order = ['role="radiogroup" aria-label="Theme"', ">Sidebar picture<", 'aria-label="Show your computers"', 'aria-label="Color my messages with the bot&#x27;s color"', ">More looks<"]
+    const order = ['role="radiogroup" aria-label="Theme"', 'aria-label="Color my messages with the bot&#x27;s color"', ">More looks<"]
       .map((needle) => appearance.indexOf(needle));
     expect(order.every((at) => at > -1), String(order)).toBe(true);
     expect(order).toEqual([...order].sort((a, b) => a - b));
-    expect(appearance).toContain("A circle for each place your bots live, at the window&#x27;s left edge.");
-    const toggle = fixture.switches.find((props) => props["aria-label"] === "Show your computers")!;
-    expect(toggle.checked).toBe(true);
-    toggle.onClick!({} as never);
-    expect(fixture.railHidden).toEqual([true]);
+    expect(appearance).not.toContain("Sidebar picture");
+    expect(appearance).not.toContain("data-place-picture");
     const looks = renderToStaticMarkup(createElement(SimpleLooksPage, { onBack: () => {} }));
     expect(looks).toContain('data-settings-block="looks"');
     expect(looks).not.toContain("data-place-picture");
   });
 
-  it("shows the rail's switch only where this window has a rail to hide", () => {
-    for (const rail of [null, { available: false, hidden: true }]) {
-      fixture.rail = rail;
-      expect(render()).not.toContain("Show your computers");
-    }
-    fixture.rail = { available: true, hidden: true };
-    render();
-    expect(fixture.switches.find((props) => props["aria-label"] === "Show your computers")?.checked).toBe(false);
+  it.each([null, { available: false, hidden: true }, { available: true, hidden: true }, { available: true, hidden: false }])("does not offer the removed rail switch for legacy state %j", (rail) => {
+    fixture.rail = rail;
+    expect(render()).not.toContain("Show your computers");
+    expect(fixture.switches.some((props) => props["aria-label"] === "Show your computers")).toBe(false);
+    expect(fixture.railHidden).toEqual([]);
   });
 
   it("keeps the everyday rows and leaves the fourteen builder controls to Advanced, where search still points", () => {
@@ -209,7 +184,6 @@ describe("Settings in Simple mode", () => {
       'aria-label="Notification sounds"', 'aria-label="Show the notification feed"', 'aria-label="App language"', 'role="radiogroup" aria-label="Theme"']) {
       expect(placement(general, shown), shown).toBe("shown");
     }
-    expect(placement(open("updates"), "MARKER:updatesConsent;")).toBe("shown");
     const everyPage = ["general", "engines", "companion", "usage", "updates"].map((section) => open(section as AppSettingsSection)).join("");
     for (const gone of ["Effort for new bots", "Defaults for new bots", "Group turns", "MCP calls", "Parallel threads", "Automatic recovery", "Event log cleanup",
       "Interface font", "Chat width", "Pinned bots as circles", "Universal pins", "Tool calls", "This run", "Keep prompt cache warm"]) {
@@ -219,20 +193,9 @@ describe("Settings in Simple mode", () => {
     expect(SIMPLE_ADVANCED_ONLY.map((key) => t(key))).toEqual(expect.arrayContaining(["Effort for new bots", "Interface font", "Keep prompt cache warm"]));
   });
 
-  it("shows update checks, product updates, the welcome tour and diagnostics", () => {
-    vi.stubGlobal("window", { ogb: { ...desktop.ogb, updater: { check: vi.fn(), install: vi.fn(), onState: vi.fn() } } });
-    fixture.updater = { status: "idle" };
+  it("shows the welcome tour and diagnostics without update controls", () => {
     const html = open("updates");
-    for (const shown of ["Check for updates", "MARKER:updatesConsent;", "Replay welcome tour", "Diagnostics"]) expect(placement(html, shown), shown).toBe("shown");
-  });
-
-  it("checks the server's version from a browser", () => {
-    vi.stubGlobal("window", {});
-    const onSelect = vi.fn();
-    fixture.serverUpdate = { phase: "up-to-date", pending: false, label: "Up to date", item: { key: "update", label: "Up to date", subtitle: "v1.2.3", icon: null, disabled: false, onSelect } };
-    const html = open("updates");
-    expect(html).toContain("Up to date v1.2.3");
-    expect(placement(html, "Check for updates")).toBe("shown");
+    for (const shown of ["Replay welcome tour", "Diagnostics"]) expect(placement(html, shown), shown).toBe("shown");
   });
 
   it("opens the fold that holds a linked setting: API keys, Servers or this app as a client", () => {
@@ -262,14 +225,17 @@ describe("Settings in Simple mode", () => {
     expect(html).toContain('aria-label="Enable the built-in browser"');
   });
 
-  it("leads Usage & billing with one usage block, folds the limits, then shows the plan", () => {
-    fixture.section = "cloudAccount";
+  it("leads Usage & billing with one usage summary and folds the detailed limits without a retired Cloud plan", () => {
+    fixture.section = "usage";
     const html = render();
     expect(currentPage(html)).toBe("billing");
-    expect(blocks(html)).toEqual(["usage", "cloudAccount"]);
-    expect(html.indexOf("See all limits")).toBeLessThan(html.indexOf("MARKER:cloudAccount;"));
+    expect(blocks(html)).toEqual(["usage"]);
+    const limits = html.indexOf("See all limits");
+    expect(limits).toBeGreaterThan(-1);
+    expect(html.indexOf('data-settings-block="usage"')).toBeLessThan(limits);
     expect(placement(html, "MARKER:usage;")).toBe("folded");
-    expect(groupLabels(html)).toContain("Plan");
+    expect(html).not.toContain("MARKER:cloudAccount;");
+    expect(groupLabels(html)).not.toContain("Plan");
   });
 
   it("shows a hosted workspace's admins People in Account and Activity as its own group", () => {
@@ -285,7 +251,7 @@ describe("Settings in Simple mode", () => {
   });
 
   it("keeps a paired remote client's reduced set: General for appearance, and Computer with your devices and Connect from elsewhere", () => {
-    vi.stubGlobal("window", { ogb: { ...desktop.ogb, remoteClient: { active: true } } });
+    vi.stubGlobal("window", { hezuo: { ...desktop.hezuo, remoteClient: { active: true } } });
     fixture.section = "desktopWorkspaces";
     const html = render();
     expect(pages(html)).toEqual(["general", "computer"]);
@@ -313,7 +279,6 @@ describe("Settings in Simple mode", () => {
     ["computer", "computer"],
     ["logins", "vault"],
     ["usage", "billing"],
-    ["cloudAccount", "billing"],
     ["updates", "updates"],
   ])("lands a deep link to %s on %s", (section, page) => {
     fixture.section = section;

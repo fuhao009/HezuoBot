@@ -2,7 +2,7 @@ import type { AppConfig } from "./config.ts";
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 import { SPAWNED_PROXIES } from "./proxy-paths.ts";
-import { managedConnectorUnavailableReason, managedCustomAuthReason } from "../../packages/shared/connector-availability.ts";
+import { managedCustomAuthReason } from "../../packages/shared/connector-availability.ts";
 import {
   DEFAULT_BACKEND_ORIGIN,
   apiBase,
@@ -29,12 +29,10 @@ import {
 } from "./connector-advertisement.ts";
 import { serviceSlugFor, serviceSlugForCandidates } from "./connector-verdict.ts";
 import { parseMcpResponse, withToolsListFallback } from "./connector-tools-list.ts";
-import { brokerAccess, type BrokerAccess } from "./composio-broker-access.ts";
-export { applyManagedBrokerMessage, brokerAccess, setManagedBrokerAccess, type BrokerAccess } from "./composio-broker-access.ts";
 export { prepareProjectSession, trustedSessionMcpUrl } from "./composio-session.ts";
 
 function toolkitBase() {
-  return (process.env.OMB_COMPOSIO_TOOLKITS_API ?? `${DEFAULT_BACKEND_ORIGIN}/api/v3`).replace(/\/$/, "");
+  return (process.env.HEZUO_COMPOSIO_TOOLKITS_API ?? `${DEFAULT_BACKEND_ORIGIN}/api/v3`).replace(/\/$/, "");
 }
 
 export interface ConnectedAccountSummary {
@@ -80,15 +78,6 @@ const toolkitPageSchema = z.object({
   next_cursor: z.string().nullable().optional(),
 });
 
-const connectorServiceSchema = z.object({
-  connected: z.boolean(),
-  pending: z.boolean().optional(),
-  status: z.string().optional(),
-  accounts: z.array(z.object({ id: z.string(), alias: z.string().optional(), status: z.string() })).optional(),
-});
-const connectorServicesResponseSchema = z.object({ services: z.record(z.string(), connectorServiceSchema).optional() });
-const removalResponseSchema = z.object({ removed: z.number() });
-const authUrlResponseSchema = z.object({ url: z.string().optional() });
 const linkResponseSchema = z.object({ redirect_url: z.string().optional() });
 
 const MAX_CONNECTED_ACCOUNT_PAGES = 100;
@@ -115,8 +104,6 @@ interface IntegrationContext {
   botId: string;
   threadId: string;
   connectorTools?: Record<string, ConnectorToolGrant>;
-  /** A Team Cloud member's own installation, instead of this server's. */
-  as?: BrokerAccess;
 }
 
 /** Separates caches and transports per credential without keeping another plaintext copy of it. */
@@ -143,70 +130,36 @@ function rememberTransportSession(sessionId: string, identity: string): void {
   }
 }
 
-function canonicalServiceRecord<T>(services: Record<string, T>): Record<string, T> {
-  return Object.fromEntries(
-    Object.entries(services).map(([slug, state]) => [canonicalToolkitSlug(slug), state]),
-  );
-}
 
-function requestedServiceRecord<T>(services: Record<string, T>, requested: string[]): Record<string, T> {
-  const canonical = canonicalServiceRecord(services);
-  return Object.fromEntries(
-    requested.flatMap((slug) => {
-      const state = canonical[canonicalToolkitSlug(slug)];
-      return state === undefined ? [] : [[slug, state]];
-    }),
-  );
-}
 
-export function connectionMode(cfg: AppConfig): "managed" | "self-hosted" | "unavailable" {
-  if (projectApiKey(cfg)) return "self-hosted";
-  if (brokerAccess()) return "managed";
-  return "unavailable";
+export function connectionMode(cfg: AppConfig): "self-hosted" | "unavailable" {
+  return projectApiKey(cfg) ? "self-hosted" : "unavailable";
 }
 
 export function configured(cfg: AppConfig): boolean {
   return connectionMode(cfg) !== "unavailable";
 }
 
-/** "unreadable": the desktop shell set OMB_CREDENTIAL_STORE=unavailable, so the UI keeps its list instead of wiping it. */
+/** "unreadable": the desktop shell set HEZUO_CREDENTIAL_STORE=unavailable, so the UI keeps its list instead of wiping it. */
 export type ConnectorAvailability = "configured" | "unconfigured" | "unreadable";
 
 export function connectorAvailability(
   cfg: AppConfig,
-  storeState: string | undefined = process.env.OMB_CREDENTIAL_STORE,
+  storeState: string | undefined = process.env.HEZUO_CREDENTIAL_STORE,
 ): ConnectorAvailability {
   if (configured(cfg)) return "configured";
   return storeState === "unavailable" ? "unreadable" : "unconfigured";
 }
 
-/** Only a host the managed service comes with (the desktop app, OMB_DESKTOP_PARENT=1, or a Cloud home) calls a missing one an outage. */
-export type ConnectorSetup = "ready" | "needs-setup" | "service-unavailable";
+export type ConnectorSetup = "ready" | "needs-setup";
 
 export function connectorSetup(
   cfg: AppConfig,
-  managedHost: boolean = process.env.OMB_DESKTOP_PARENT === "1",
 ): ConnectorSetup {
   if (configured(cfg)) return "ready";
-  return managedHost ? "service-unavailable" : "needs-setup";
+  return "needs-setup";
 }
 
-async function brokerRequest(path: string, init?: RequestInit, broker = brokerAccess()): Promise<Response> {
-  if (!broker) throw new Error("The connected-apps service is unavailable");
-  const headers = new Headers(init?.headers);
-  headers.set("authorization", `Bearer ${broker.token}`);
-  if (init?.body) headers.set("content-type", "application/json");
-  return fetch(`${broker.url}${path}`, {
-    ...init,
-    headers,
-    signal: init?.signal ?? AbortSignal.timeout(30_000),
-  });
-}
-
-async function throwBrokerError(res: Response, fallback: string): Promise<never> {
-  const status = res.status >= 400 && res.status < 500 ? res.status : 502;
-  throw Object.assign(new Error(await responseError(res, fallback)), { status });
-}
 
 function trustedAuthUrl(value: string | undefined, slug: string): string {
   if (!value) throw new Error(`Connected-apps service returned no authorization link for ${slug}`);
@@ -251,7 +204,7 @@ export async function mcpIntegration(
   }
   const serviceSlugs = context.connectorTools === undefined
     ? undefined
-    : serializeConnectorServiceSlugs(await connectedServiceSlugs(cfg, context.as));
+    : serializeConnectorServiceSlugs(await connectedServiceSlugs(cfg));
   if (serviceSlugs?.oversized) {
     console.warn(
       `[composio] connector service slugs for bot ${context.botId} exceed ${CONNECTOR_SERVICE_SLUGS_MAX_BYTES} bytes;`
@@ -264,13 +217,13 @@ export async function mcpIntegration(
     env: {
       ELECTRON_RUN_AS_NODE: "1",
       // The bridge gets only this boot's loopback token; project and broker credentials never leave the harness.
-      OMB_CONNECTOR_UPSTREAM_URL: `${context.harnessUrl}/api/internal/connectors/mcp`,
-      OMB_CONNECTOR_UPSTREAM_HEADERS: JSON.stringify({ authorization: `Bearer ${context.commsToken}` }),
-      OMB_HARNESS_URL: context.harnessUrl,
+      HEZUO_CONNECTOR_UPSTREAM_URL: `${context.harnessUrl}/api/internal/connectors/mcp`,
+      HEZUO_CONNECTOR_UPSTREAM_HEADERS: JSON.stringify({ authorization: `Bearer ${context.commsToken}` }),
+      HEZUO_HARNESS_URL: context.harnessUrl,
       // A name apart from the agents proxy token: Codex flattens all mounted MCP env into one environment.
-      OMB_CONNECTOR_TOKEN: context.commsToken,
-      OMB_BOT_ID: context.botId,
-      OMB_THREAD_ID: context.threadId,
+      HEZUO_CONNECTOR_TOKEN: context.commsToken,
+      HEZUO_BOT_ID: context.botId,
+      HEZUO_THREAD_ID: context.threadId,
       ...(allowlist?.env ? { [CONNECTOR_ALLOWED_TOOLS_ENV]: allowlist.env } : {}),
       ...(serviceSlugs?.env ? { [CONNECTOR_SERVICE_SLUGS_ENV]: serviceSlugs.env } : {}),
     },
@@ -281,27 +234,20 @@ export async function relayMcp(
   cfg: AppConfig,
   payload: JsonValue,
   transportSessionId?: string,
-  beforeSend?: () => void, signal?: AbortSignal, as?: BrokerAccess,
+  beforeSend?: () => void, signal?: AbortSignal,
 ): Promise<{ status: number; bytes: Uint8Array; contentType: string; transportSessionId?: string }> {
-  const apiKey = as ? null : projectApiKey(cfg);
+  const apiKey = projectApiKey(cfg);
   let url: string;
   let identity: string;
   const headers = new Headers({
     "content-type": "application/json",
     accept: "application/json, text/event-stream",
   });
-  if (apiKey) {
-    const session = await ensureProjectSession(cfg);
-    url = session.mcp.url;
-    headers.set("x-api-key", apiKey);
-    identity = backendFingerprint("project-mcp", url, apiKey);
-  } else {
-    const broker = as ?? brokerAccess();
-    if (!broker) throw new Error("Connected apps are unavailable");
-    url = `${broker.url}/v1/mcp`;
-    headers.set("authorization", `Bearer ${broker.token}`);
-    identity = backendFingerprint("managed-mcp", url, broker.token);
-  }
+  if (!apiKey) throw new Error("Composio API key is not configured");
+  const session = await ensureProjectSession(cfg);
+  url = session.mcp.url;
+  headers.set("x-api-key", apiKey);
+  identity = backendFingerprint("project-mcp", url, apiKey);
   const knownIdentity = transportSessionId
     ? transportSessionBackends.get(transportSessionId)
     : undefined;
@@ -470,25 +416,9 @@ export interface ConnectedServicesInventory {
   complete: boolean;
 }
 
-export async function connectedServicesInventory(cfg: AppConfig, as?: BrokerAccess): Promise<ConnectedServicesInventory> {
-  const apiKey = as ? null : projectApiKey(cfg);
-  if (!apiKey) {
-    const response = await brokerRequest("/v1/connectors/connected", undefined, as);
-    if (!response.ok) await throwBrokerError(response, `Connected apps: HTTP ${response.status}`);
-    const body = connectorServicesResponseSchema.parse(await response.json());
-    const services = canonicalServiceRecord(body.services ?? {});
-    return {
-      services: Object.fromEntries(
-        Object.entries(services).map(([slug, state]) => [slug, {
-          connected: state.connected,
-          pending: state.pending ?? false,
-          status: state.status ?? (state.connected ? "ACTIVE" : "not_connected"),
-          accounts: state.accounts ?? [],
-        }]),
-      ),
-      complete: true,
-    };
-  }
+export async function connectedServicesInventory(cfg: AppConfig): Promise<ConnectedServicesInventory> {
+  const apiKey = projectApiKey(cfg);
+  if (!apiKey) throw new Error("Composio API key is not configured");
   const session = await ensureProjectSession(cfg);
   const userId = session.config?.user_id ?? cfg.composio?.userId;
   if (!userId) throw new Error("Composio Session returned no user ID");
@@ -504,8 +434,8 @@ export async function connectedServicesInventory(cfg: AppConfig, as?: BrokerAcce
   };
 }
 
-export async function connectedServices(cfg: AppConfig, as?: BrokerAccess): Promise<Record<string, ConnectorServiceState>> {
-  return (await connectedServicesInventory(cfg, as)).services;
+export async function connectedServices(cfg: AppConfig): Promise<Record<string, ConnectorServiceState>> {
+  return (await connectedServicesInventory(cfg)).services;
 }
 
 /** Rejects a connectorTools patch naming an unconnected service or a tool without its service prefix. Checks that need the
@@ -514,7 +444,8 @@ export async function validateConnectorGrants(
   cfg: AppConfig,
   grants: Record<string, ConnectorToolGrant>,
 ): Promise<string | null> {
-  const connected = await connectedServices(cfg).catch(() => null);
+  const inventory = await connectedServicesInventory(cfg).catch(() => null);
+  const connected = inventory?.services;
   const candidates = connected ? Object.keys(connected) : [];
   for (const [slug, grant] of Object.entries(grants)) {
     if (grant.tools === "*") continue;
@@ -525,7 +456,7 @@ export async function validateConnectorGrants(
       return `connectorTools.${slug}.tools names tools that belong to another service: ${misplaced.join(", ")}`;
     }
   }
-  if (!connected) return null;
+  if (!inventory?.complete || !connected) return null;
   const unconnected = Object.keys(grants).filter((slug) => !connected[slug]?.connected);
   if (unconnected.length) {
     return `connectorTools names services that are not connected: ${unconnected.join(", ")}`;
@@ -571,24 +502,22 @@ export async function listConnectorTools(
 const CONNECTOR_TOOLS_CACHE_MS = 60_000;
 let connectorToolsCache: { at: number; identity: string; services: Record<string, ConnectorToolListing[]> } | null = null;
 /** Cache key per backend, so a config switch never serves the previous backend's tools. */
-function connectorToolsIdentity(cfg: AppConfig, as?: BrokerAccess): string {
-  const apiKey = as ? null : projectApiKey(cfg);
-  if (apiKey) return backendFingerprint("project-tools", apiBase(), apiKey);
-  const broker = as ?? brokerAccess();
-  return broker ? backendFingerprint("managed-tools", broker.url, broker.token) : "none";
+function connectorToolsIdentity(cfg: AppConfig): string {
+  const apiKey = projectApiKey(cfg);
+  return apiKey ? backendFingerprint("project-tools", apiBase(), apiKey) : "none";
 }
 
 let connectorToolsRequest: { identity: string; services: Promise<Record<string, ConnectorToolListing[]>> } | null = null;
 
 /** Real backend slugs, so an underscored service (bland_ai) is never captured by a plain-prefix grant (bland); a failed read answers the last good one. */
-export async function connectedServiceSlugs(cfg: AppConfig, as?: BrokerAccess): Promise<readonly string[]> {
-  const identity = connectorToolsIdentity(cfg, as);
+export async function connectedServiceSlugs(cfg: AppConfig): Promise<readonly string[]> {
+  const identity = connectorToolsIdentity(cfg);
   if (connectorServiceSlugsCache?.identity === identity
     && Date.now() - connectorServiceSlugsCache.at < CONNECTOR_SERVICE_SLUGS_CACHE_MS) {
     return connectorServiceSlugsCache.slugs;
   }
   if (connectorServiceSlugsRequest?.identity === identity) return connectorServiceSlugsRequest.slugs;
-  const walk = connectedServices(cfg, as).then(
+  const walk = connectedServices(cfg).then(
     (services) => {
       const slugs = Object.keys(services);
       connectorServiceSlugsCache = { at: Date.now(), identity, slugs };
@@ -629,7 +558,7 @@ async function collectConnectorTools(cfg: AppConfig): Promise<Record<string, Con
   const candidates = connected ? Object.keys(connected) : [];
   const initialize = await relayMcp(cfg, {
     jsonrpc: "2.0",
-    id: "omb-grants-initialize",
+    id: "hezuo-grants-initialize",
     method: "initialize",
     params: {
       protocolVersion: "2025-03-26",
@@ -651,14 +580,14 @@ async function collectConnectorTools(cfg: AppConfig): Promise<Record<string, Con
   for (let page = 0; page < TOOLS_LIST_PAGES_MAX; page += 1) {
     const list = await relayMcp(cfg, {
       jsonrpc: "2.0",
-      id: "omb-grants-tools",
+      id: "hezuo-grants-tools",
       method: "tools/list",
       params: cursor ? { cursor } : {},
     }, transportSessionId);
     if (list.status !== 200) {
       throw new Error(await responseErrorFromBytes(list.status, list.bytes));
     }
-    const frame = parseMcpResponse(new TextDecoder().decode(list.bytes), "omb-grants-tools");
+    const frame = parseMcpResponse(new TextDecoder().decode(list.bytes), "hezuo-grants-tools");
     const error = frame && typeof frame.error === "object" && frame.error !== null
       ? (frame.error as { message?: unknown }).message
       : undefined;
@@ -680,6 +609,9 @@ async function collectConnectorTools(cfg: AppConfig): Promise<Record<string, Con
     }
     cursor = typeof result.nextCursor === "string" && result.nextCursor ? result.nextCursor : undefined;
     if (!cursor) break;
+  }
+  if (cursor) {
+    throw new Error(`Composio tools/list exceeded the ${TOOLS_LIST_PAGES_MAX}-page limit with more tools remaining`);
   }
   for (const bucket of grouped.values()) bucket.sort((a, b) => a.name.localeCompare(b.name));
   return Object.fromEntries([...grouped.entries()].sort(([a], [b]) => a.localeCompare(b)));
@@ -704,12 +636,7 @@ async function responseErrorFromBytes(status: number, bytes: Uint8Array): Promis
 export async function connectionStatus(cfg: AppConfig, slugs: string[]) {
   const canonicalSlugs = [...new Set(slugs.map(canonicalToolkitSlug))];
   const apiKey = projectApiKey(cfg);
-  if (!apiKey) {
-    const response = await brokerRequest(`/v1/connectors?${new URLSearchParams({ services: canonicalSlugs.join(",") })}`);
-    if (!response.ok) await throwBrokerError(response, `Connected apps: HTTP ${response.status}`);
-    const body = connectorServicesResponseSchema.parse(await response.json());
-    return requestedServiceRecord(body.services ?? {}, slugs);
-  }
+  if (!apiKey) throw new Error("Composio API key is not configured");
   const session = await ensureProjectSession(cfg);
   const params = new URLSearchParams({ limit: "50" });
   if (canonicalSlugs.length) params.set("toolkits", canonicalSlugs.join(","));
@@ -753,14 +680,10 @@ export async function connectionStatus(cfg: AppConfig, slugs: string[]) {
   );
 }
 
-export async function removeService(cfg: AppConfig, slug: string, as?: BrokerAccess) {
+export async function removeService(cfg: AppConfig, slug: string) {
   const toolkit = canonicalToolkitSlug(slug);
-  const apiKey = as ? null : projectApiKey(cfg);
-  if (!apiKey) {
-    const response = await brokerRequest(`/v1/connectors/${encodeURIComponent(toolkit)}`, { method: "DELETE" }, as);
-    if (!response.ok) await throwBrokerError(response, `Connected apps: HTTP ${response.status}`);
-    return removalResponseSchema.parse(await response.json());
-  }
+  const apiKey = projectApiKey(cfg);
+  if (!apiKey) throw new Error("Composio API key is not configured");
   const session = await ensureProjectSession(cfg);
   const params = new URLSearchParams({ limit: "50", toolkits: toolkit });
   const list = await fetch(
@@ -788,14 +711,7 @@ export async function removeAccount(cfg: AppConfig, slug: string, accountId: str
   if (!validAccountId(accountId)) throw inputError("Invalid connected-account ID");
   const toolkit = canonicalToolkitSlug(slug);
   const apiKey = projectApiKey(cfg);
-  if (!apiKey) {
-    const response = await brokerRequest(
-      `/v1/connectors/${encodeURIComponent(toolkit)}/accounts/${encodeURIComponent(accountId)}`,
-      { method: "DELETE" },
-    );
-    if (!response.ok) await throwBrokerError(response, `Connected apps: HTTP ${response.status}`);
-    return removalResponseSchema.parse(await response.json());
-  }
+  if (!apiKey) throw new Error("Composio API key is not configured");
   const session = await ensureProjectSession(cfg);
   const userId = session.config?.user_id ?? cfg.composio?.userId;
   if (!userId) throw new Error("Composio Session has no user ID");
@@ -833,23 +749,11 @@ export async function prepareConnectionAuthConfigs(
   return lines.length ? lines.join(" ") : undefined;
 }
 
-export async function authorizeService(cfg: AppConfig, slug: string, requestedAlias?: string | null, as?: BrokerAccess) {
+export async function authorizeService(cfg: AppConfig, slug: string, requestedAlias?: string | null) {
   const alias = normalizeAccountAlias(requestedAlias);
   const toolkit = canonicalToolkitSlug(slug);
-  const unavailable = managedConnectorUnavailableReason(as ? "managed" : connectionMode(cfg), toolkit);
-  if (unavailable) throw inputError(unavailable, 409);
-  const apiKey = as ? null : projectApiKey(cfg);
-  if (!apiKey) {
-    const request: RequestInit = { method: "POST" };
-    if (alias) request.body = JSON.stringify({ alias });
-    const response = await brokerRequest(`/v1/connectors/${encodeURIComponent(toolkit)}/authorize`, request, as);
-    if (!response.ok && noManagedAuthToolkit(await response.clone().text().catch(() => ""))) {
-      throw inputError(managedCustomAuthReason(toolkit), 409);
-    }
-    if (!response.ok) await throwBrokerError(response, `Connected apps: HTTP ${response.status}`);
-    const body = authUrlResponseSchema.parse(await response.json());
-    return { url: trustedAuthUrl(body.url, toolkit) };
-  }
+  const apiKey = projectApiKey(cfg);
+  if (!apiKey) throw new Error("Composio API key is not configured");
   const { session } = await sessionForToolkit(cfg, toolkit);
   const userId = session.config?.user_id ?? cfg.composio?.userId;
   if (!userId) throw new Error("Composio Session has no user ID");
@@ -857,7 +761,7 @@ export async function authorizeService(cfg: AppConfig, slug: string, requestedAl
   const serviceAccounts = accounts.filter((account) =>
     account.toolkit?.slug !== undefined && canonicalToolkitSlug(account.toolkit.slug) === toolkit
   );
-  const plan = planAccountLink(toolkit, serviceAccounts, alias, MULTI_ACCOUNT_CONFIG.max_accounts_per_toolkit, () => `omb-retry-${randomUUID()}`);
+  const plan = planAccountLink(toolkit, serviceAccounts, alias, MULTI_ACCOUNT_CONFIG.max_accounts_per_toolkit, () => `hezuo-retry-${randomUUID()}`);
   if (!plan.ok) throw inputError(plan.error, plan.status);
   for (const id of plan.replace) await deleteConnectedAccount(apiKey, id);
   const linkRequest: AccountLinkRequest = { toolkit };
@@ -963,16 +867,13 @@ export interface CatalogPagination {
 
 export async function listToolkits(cfg: AppConfig): Promise<{ cards: ToolkitCard[]; source: "api" | "curated"; pagination?: CatalogPagination }> {
   const backendKey = projectApiKey(cfg);
-  const broker = backendKey ? null : brokerAccess();
   const identity = backendKey
     ? backendFingerprint("project-catalog", toolkitBase(), backendKey)
-    : broker
-      ? backendFingerprint("managed-catalog", broker.url, broker.token)
-      : null;
+    : null;
   if (identity && toolkitCache?.identity === identity && Date.now() - toolkitCache.at < 10 * 60_000) {
     return { cards: toolkitCache.cards, source: "api", pagination: toolkitCache.pagination };
   }
-  if (backendKey || broker) {
+  if (backendKey) {
     try {
       const items: any[] = [];
       const seenCursors = new Set<string>();
@@ -984,14 +885,10 @@ export async function listToolkits(cfg: AppConfig): Promise<{ cards: ToolkitCard
       for (let page = 0; page < MAX_CONNECTED_ACCOUNT_PAGES; page += 1) {
         const params = new URLSearchParams({ limit: "500", sort_by: "usage" });
         if (cursor) params.set("cursor", cursor);
-        const res = backendKey
-          ? await fetch(`${toolkitBase()}/toolkits?${params}`, {
-              headers: { "x-api-key": backendKey },
-              signal: AbortSignal.timeout(15_000),
-            })
-          : await brokerRequest(cursor ? `/v1/catalog?cursor=${encodeURIComponent(cursor)}` : "/v1/catalog", {
-              signal: AbortSignal.timeout(15_000),
-            });
+        const res = await fetch(`${toolkitBase()}/toolkits?${params}`, {
+          headers: { "x-api-key": backendKey },
+          signal: AbortSignal.timeout(15_000),
+        });
         if (!res.ok) {
           stop = "http-error";
           break;
@@ -1005,7 +902,6 @@ export async function listToolkits(cfg: AppConfig): Promise<{ cards: ToolkitCard
         items.push(...pageItems);
         const pageTotalItems = Number(json.total_items);
         if (Number.isFinite(pageTotalItems) && pageTotalItems > 0) reportedTotalItems = pageTotalItems;
-        // A broker that drops the cursor can replay a page while minting fresh cursors, so trust Composio's current_page movement.
         const reportedPage = Number(json.current_page);
         if (Number.isFinite(reportedPage)) {
           if (lastReportedPage !== undefined && reportedPage <= lastReportedPage) {

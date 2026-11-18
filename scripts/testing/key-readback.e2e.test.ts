@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
-import { launchVerificationServer, verificationServerArgs, verificationServerEnvironment, type VerificationServer } from "../control-omb.ts";
+import { launchVerificationServer, verificationServerArgs, verificationServerEnvironment, type VerificationServer } from "../control-hezuo.ts";
 import { waitForExit } from "../../desktop/server/testing/cleanup.ts";
 import { hostTimeout } from "../../desktop/server/testing/host-timeout.ts";
 
@@ -78,8 +78,8 @@ beforeAll(async () => {
   writeFileSync(configFile, JSON.stringify({ ...JSON.parse(readFileSync(configFile, "utf8")), decider }));
   const env = {
     ...verificationServerEnvironment({}, fixture.info.dataDir, Number(new URL(fixture.info.url).port)),
-    OMB_BOAT_API: origin, OMB_COMPOSIO_API: `${origin}/composio`, OMB_COMPOSIO_TOOLKITS_API: `${origin}/composio`,
-    OMB_ELEVENLABS_API: `${origin}/eleven`, OMB_FISH_AUDIO_API: `${origin}/fish`, OMB_POSTIZ_CLOUD_URL: `${origin}/postiz`,
+    HEZUO_BOAT_API: origin, HEZUO_COMPOSIO_API: `${origin}/composio`, HEZUO_COMPOSIO_TOOLKITS_API: `${origin}/composio`,
+    HEZUO_ELEVENLABS_API: `${origin}/eleven`, HEZUO_FISH_AUDIO_API: `${origin}/fish`, HEZUO_POSTIZ_CLOUD_URL: `${origin}/postiz`,
   };
   const log = openSync(fixture.info.logPath, "a", 0o600);
   server = spawn(process.execPath, verificationServerArgs(env), { cwd: fileURLToPath(ROOT), env, stdio: ["ignore", log, log] });

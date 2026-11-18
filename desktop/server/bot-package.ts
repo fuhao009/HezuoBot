@@ -3,7 +3,7 @@ import { stringify as stringifyYaml } from "yaml";
 import type { JsonValue } from "./schema.ts";
 import { cronScheduleLabel } from "../../packages/shared/cron-label.ts";
 import {
-  BOTMRR_MARKDOWN_VERSION,
+  PACKAGE_MARKDOWN_VERSION,
   isPackageDocument,
   PACKAGE_V1_MAX_SKILLS,
   parsePackageV1,
@@ -65,7 +65,7 @@ function intervalScheduleText(
 /** The body is complete enough for any Chief-of-Staff agent to run without Hezuo or a proprietary parser. */
 export function renderBotPackageMarkdown(document: ParsedBotPackage): string {
   const pkg = parseBotPackage(document).package;
-  const frontmatter = stringifyYaml({ botmrr: BOTMRR_MARKDOWN_VERSION, ...pkg }, { lineWidth: 0 }).trim();
+  const frontmatter = stringifyYaml({ botmrr: PACKAGE_MARKDOWN_VERSION, ...pkg }, { lineWidth: 0 }).trim();
   const agents = pkg.agents.map((agent) => [
     `### ${agent.name} — ${agent.title || "Specialist"}`,
     `**Role key:** \`${agent.key}\``,

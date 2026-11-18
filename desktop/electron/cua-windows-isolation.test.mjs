@@ -23,7 +23,7 @@ vi.mock("node:net", () => ({ default: { createConnection: vi.fn(() => { throw ne
 let cua;
 const connection = { socketPath: "\\\\.\\pipe\\fixture-owned-cua" };
 beforeEach(async () => {
-  fixture.home = mkdtempSync(join(tmpdir(), "omb-cua-win-"));
+  fixture.home = mkdtempSync(join(tmpdir(), "hezuo-cua-win-"));
   fixture.hosts = [];
   fixture.packaged = false;
   fixture.handlers.clear();

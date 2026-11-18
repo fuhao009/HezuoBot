@@ -44,7 +44,7 @@ export interface McpProbeOptions {
    * passing the box's allow-list, from the bot's own folder when the server is one bot's (`id`). */
   asBot?: { id?: string; cwd?: string };
   /** Reach a URL server as a bot's turn does: at `url` with `fetch` and no headers of its own (the credential broker adds
-   * them, server/bot-box/broker-probe.ts). A sign-in is still looked for at the server's own address. */
+   * them, server/execution-sandbox/broker-probe.ts). A sign-in is still looked for at the server's own address. */
   via?: { url: string; fetch: typeof fetch };
 }
 

@@ -16,10 +16,10 @@ async function certificate(directory) {
 }
 
 test("packaged identity requires its resource and ignores environment overrides", async () => {
-  const dir = await mkdtemp(path.join(tmpdir(), "omb-product-service-"));
+  const dir = await mkdtemp(path.join(tmpdir(), "hezuo-product-service-"));
   try {
-    const options = { isPackaged: true, appPath: dir, resourcesPath: dir, environment: { OMB_PRODUCT_SERVICE_URL: "https://override.example" } };
-    await writeFile(path.join(dir, "package.json"), JSON.stringify({ ombProductManaged: true }));
+    const options = { isPackaged: true, appPath: dir, resourcesPath: dir, environment: { HEZUO_PRODUCT_SERVICE_URL: "https://override.example" } };
+    await writeFile(path.join(dir, "package.json"), JSON.stringify({ hezuoProductManaged: true }));
     await assert.rejects(resolveProductService(options), /product_service_missing/);
     await writeFile(path.join(dir, "product-service.json"), JSON.stringify({ version: 1, origin: "https://operator.example" }));
     assert.deepEqual(await resolveProductService(options), { managed: true, origin: "https://operator.example", ca: null });
@@ -33,11 +33,11 @@ test("packaged identity requires its resource and ignores environment overrides"
 });
 
 test("a version 2 resource pins a certificate bound to its own origin", async () => {
-  const dir = await mkdtemp(path.join(tmpdir(), "omb-product-service-ca-"));
+  const dir = await mkdtemp(path.join(tmpdir(), "hezuo-product-service-ca-"));
   try {
     const pem = await certificate(dir);
     if (!pem) return;
-    await writeFile(path.join(dir, "package.json"), JSON.stringify({ ombProductManaged: true }));
+    await writeFile(path.join(dir, "package.json"), JSON.stringify({ hezuoProductManaged: true }));
     const resource = (value) => writeFile(path.join(dir, "product-service.json"), JSON.stringify(value));
     const resolve = (fixtureOrigin) => resolveProductService({ isPackaged: true, appPath: dir, resourcesPath: dir, ...(fixtureOrigin ? { fixtureOrigin } : {}) });
 
@@ -63,7 +63,7 @@ test("a version 2 resource pins a certificate bound to its own origin", async ()
 });
 
 test("a version 2 resource for a private-network origin is read, and only with a certificate naming that address", async () => {
-  const dir = await mkdtemp(path.join(tmpdir(), "omb-product-service-lan-"));
+  const dir = await mkdtemp(path.join(tmpdir(), "hezuo-product-service-lan-"));
   try {
     const key = path.join(dir, "lan-key.pem");
     const cert = path.join(dir, "lan-cert.pem");
@@ -71,7 +71,7 @@ test("a version 2 resource for a private-network origin is read, and only with a
       "-subj", "/CN=192.168.66.193", "-addext", "basicConstraints=critical,CA:TRUE", "-addext", "subjectAltName=IP:192.168.66.193"], { stdio: "pipe" });
     if (made.status !== 0) return;
     const pem = await readFile(cert, "utf8");
-    await writeFile(path.join(dir, "package.json"), JSON.stringify({ ombProductManaged: true }));
+    await writeFile(path.join(dir, "package.json"), JSON.stringify({ hezuoProductManaged: true }));
     const resource = (value) => writeFile(path.join(dir, "product-service.json"), JSON.stringify(value));
     const resolve = () => resolveProductService({ isPackaged: true, appPath: dir, resourcesPath: dir });
     await resource({ version: 2, origin: "https://192.168.66.193:18487", ca: pem });
@@ -87,8 +87,21 @@ test("a version 2 resource for a private-network origin is read, and only with a
 
 test("development is explicit and origin boundaries exclude secrets and paths", async () => {
   assert.equal(await resolveProductService({ isPackaged: false, environment: {} }), null);
-  assert.deepEqual(await resolveProductService({ isPackaged: false, environment: { OMB_PRODUCT_SERVICE_URL: "http://127.0.0.1:1234" } }), { managed: true, origin: "http://127.0.0.1:1234", ca: null });
+  assert.deepEqual(await resolveProductService({ isPackaged: false, environment: { HEZUO_PRODUCT_SERVICE_URL: "http://127.0.0.1:1234" } }), { managed: true, origin: "http://127.0.0.1:1234", ca: null });
   for (const origin of ["http://operator.example", "https://user:secret@operator.example", "https://operator.example/path", "https://operator.example?key=x", "https://operator.example#fragment"]) {
     assert.throws(() => validateProductOrigin(origin), /product_service_invalid/);
+  }
+});
+
+test("obsolete desktop environment variables are rejected, even alongside their replacements", async () => {
+  for (const isPackaged of [false, true]) {
+    await assert.rejects(resolveProductService({ isPackaged, environment: {
+      OMB_PRODUCT_SERVICE_URL: "http://127.0.0.1:1234",
+      HEZUO_PRODUCT_SERVICE_URL: "http://127.0.0.1:5678",
+    } }), /OMB_PRODUCT_SERVICE_URL → HEZUO_PRODUCT_SERVICE_URL/);
+    await assert.rejects(resolveProductService({ isPackaged, environment: {
+      OMB_DATA_DIR: "/old-workspace",
+      HEZUO_DATA_DIR: "/new-workspace",
+    } }), /OMB_DATA_DIR → HEZUO_DATA_DIR/);
   }
 });

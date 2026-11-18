@@ -1,4 +1,4 @@
-# MCP Registry (Connections Center, part 1) Implementation Plan
+# MCP Registry (Connections Center, part 1) Implementation Plan — Hezuo
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -24,13 +24,6 @@ See [the roadmap](2026-08-31-00-control-plane-roadmap.md#global-constraints). Lo
 ---
 
 ## Background
-
-MCP is already everywhere in this codebase — and nowhere a user can reach.
-`desktop/server/drivers/claude.ts:562-631` assembles `mcpServers` from six harness-owned
-integrations (composio, computer, agents, phone, dweb, and the `ogb` permission proxy),
-writes them to a temp config, and passes it to the CLI. `desktop/server/mcp-bridge.ts` is a
-complete, tested stdio bridge with a liveness watchdog and a policy gate.
-`desktop/server/container-mcp.ts` and `desktop/server/vps-container-mcp.ts` are two entry points onto it.
 
 What does not exist: any way for a person to add a server. `desktop/server/config.ts` has no
 `mcpServers` key. The only user-authored MCP that reaches a bot is whatever was already
@@ -155,10 +148,10 @@ merges but does not manage.
 
 **Interfaces:**
 - Consumes: `McpServerConfig` (Task 1), `createGateInterceptor` (Task 3), `runMcpBridge` (`desktop/server/mcp-bridge.ts:208`).
-- Produces: a process spawned as `node mcp-user-entry.ts <serverName>`, reading its definition and its allowlist from env — `OMB_MCP_SERVER` (JSON definition) and `OMB_MCP_ALLOW` (comma-separated tool names, or `*`).
+- Produces: a process spawned as `node mcp-user-entry.ts <serverName>`, reading its definition and its allowlist from env — `HEZUO_MCP_SERVER` (JSON definition) and `HEZUO_MCP_ALLOW` (comma-separated tool names, or `*`).
 
-- [ ] Write a failing test: with `OMB_MCP_ALLOW="read_file"`, a `tools/call` for `read_file` reaches the fake child and a call for `write_file` is refused with a message naming the tool and saying it is not granted to this bot.
-- [ ] Write a failing test that `OMB_MCP_ALLOW="*"` forwards everything, and that an **absent** `OMB_MCP_ALLOW` refuses everything. Default-deny: a bridge started without a policy must not become a bridge with no policy.
+- [ ] Write a failing test: with `HEZUO_MCP_ALLOW="read_file"`, a `tools/call` for `read_file` reaches the fake child and a call for `write_file` is refused with a message naming the tool and saying it is not granted to this bot.
+- [ ] Write a failing test that `HEZUO_MCP_ALLOW="*"` forwards everything, and that an **absent** `HEZUO_MCP_ALLOW` refuses everything. Default-deny: a bridge started without a policy must not become a bridge with no policy.
 - [ ] Write a failing test that the definition rides in **env, not argv** — assert the spawn arguments contain no token. `desktop/server/container-mcp.ts:20` already establishes this rule: argv is world-readable through `ps`.
 - [ ] Write a failing test that an HTTP server's responses are relayed to stdout unchanged and that its `headers` never appear in the bridge's own stderr.
 - [ ] Run; expect FAIL.
@@ -203,11 +196,10 @@ merges but does not manage.
 - Produces: `integrations.custom?: Array<{ name: string; command: string; args: string[]; env: Record<string, string> }>` — already bridged, so every driver mounts it identically to the existing `composio` entry.
 - Produces: `capabilities.customMcp?: boolean`.
 
-- [ ] Write a failing test in `desktop/server/drivers/claude.test.ts`: a turn carrying two `integrations.custom` entries writes both into the CLI's `mcpServers` config alongside the harness's own, without colliding with the reserved names `composio`, `computer`, `agents`, `phone`, `dweb`, `ogb`. Assert a user server named `computer` is namespaced rather than overwriting the real one — this is the collision that would silently disarm the computer gate.
 - [ ] Write a failing test that `argsKey` at `desktop/server/drivers/claude.ts:642` includes the custom entries, so changing a grant invalidates the cached session rather than silently reusing a process started under the old policy.
 - [ ] Write a failing test in `desktop/server/drivers/antigravity.test.ts` that harness-provided custom servers merge with the user's own pre-existing config file entries and win on a name collision.
 - [ ] Run; expect FAIL.
-- [ ] Add the contract fields. In `desktop/server/index.ts`, build `integrations.custom` from `bot.mcpGrants` × the registry, spawning each through `mcp-user-entry.ts` with `OMB_MCP_SERVER` and `OMB_MCP_ALLOW` set. Declare `customMcp: true` on claude, antigravity, and pi; leave it absent everywhere else.
+- [ ] Add the contract fields. In `desktop/server/index.ts`, build `integrations.custom` from `bot.mcpGrants` × the registry, spawning each through `mcp-user-entry.ts` with `HEZUO_MCP_SERVER` and `HEZUO_MCP_ALLOW` set. Declare `customMcp: true` on claude, antigravity, and pi; leave it absent everywhere else.
 - [ ] Run `pnpm vitest run desktop/server/drivers/`; expect PASS.
 - [ ] Commit `feat(mcp): mount user MCP servers on the drivers that can hold them`.
 

@@ -1,15 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type * as ComposerAttachments from "./composer-attachments";
 
-const fixture = vi.hoisted(() => ({ track: vi.fn(), openBot: vi.fn() }));
+const fixture = vi.hoisted(() => ({ track: vi.fn(), openBot: vi.fn(), uploadImage: vi.fn() }));
 vi.mock("@/lib/analytics", () => ({ track: fixture.track }));
 vi.mock("@/state/thread-navigation", async (importOriginal) => ({
   ...await importOriginal<typeof import("@/state/thread-navigation")>(), openBot: fixture.openBot,
 }));
+vi.mock("./composer-attachments", async (importOriginal) => ({
+  ...await importOriginal<typeof ComposerAttachments>(), imageAttachmentFromFile: fixture.uploadImage,
+}));
 
 import type { Action, Bot } from "@/state/store";
+import { BotCreationDraft } from "./bot-creation-draft";
 import { setTeamChats } from "@/state/team-chats";
 import { setTeamPeople, type TeamPeople } from "@/state/team-people";
-import { makeNewBot, type BotDefaultsAnswer } from "./new-bot";
+import { makeNewBot, newBotDraft, validNewBotProfile, type BotDefaultsAnswer } from "./new-bot";
 
 const ME = { email: "ada@acme.test", name: "Ada", role: "member", you: true as const };
 const BOB = { email: "bob@acme.test", name: "Bob", role: "admin" };
@@ -43,11 +48,11 @@ async function newBot(request: never, action: Partial<Extract<Action, { type: "n
   return dispatch.mock.calls.map(([sent]) => sent);
 }
 
-beforeEach(() => { fixture.track.mockReset(); fixture.openBot.mockReset(); });
+beforeEach(() => { fixture.track.mockReset(); fixture.openBot.mockReset(); fixture.uploadImage.mockReset(); });
 afterEach(() => { vi.unstubAllGlobals(); setTeamPeople(null); setTeamChats(null); });
 
 describe("New bot", () => {
-  it("makes a bot at once from the New bot defaults and opens its chat", async () => {
+  it("creates from reviewed defaults and selects the new chat", async () => {
     const { calls, request, created } = server();
     const sent = await newBot(request);
     expect(calls.map((call) => `${call.method} ${call.path}`)).toEqual(["GET /api/bot-defaults", "POST /api/bots", "PATCH /api/bots/created"]);
@@ -116,10 +121,114 @@ describe("New bot", () => {
   });
 
   it("from a paired device, sends one request and leaves the defaults to the host", async () => {
-    vi.stubGlobal("window", { ogb: { remoteClient: { active: true } } });
+    vi.stubGlobal("window", { hezuo: { remoteClient: { active: true } } });
     const { calls, request } = server();
     const sent = await newBot(request, { section: "Sales" });
     expect(calls).toEqual([{ method: "POST", path: "/api/bots", body: { section: "Sales" } }]);
     expect(sent.map((action) => action.type)).toEqual(["botAdded"]);
+  });
+
+  it("loads a unique prefilled draft without creating anything", async () => {
+    const { calls, request } = server();
+    const draft = await newBotDraft("Sales", [{ name: "pixel" }, { name: "Pixel 2" }] as Bot[], vi.fn(), request);
+    expect(draft.bot).toMatchObject({ name: "Pixel 3", section: "Sales", color: "green", soul: "" });
+    expect(calls.map(call => call.path)).toEqual(["/api/bot-defaults"]);
+    draft.dispose();
+    expect(calls).toHaveLength(1);
+  });
+
+  it("creates the chosen avatar and optional standing instructions while retaining other defaults", async () => {
+    const { calls, request } = server({ defaults: { profile: { title: "Research", notifications: false, browser: true }, memory: {}, skills: [], routines: [] } });
+    const draft = await newBotDraft(undefined, [], vi.fn(), request);
+    draft.patch({ name: "  Writer  ", soul: "只用中文回答。", color: "blue", mascotBody: "cursor", avatarUrl: "/api/attachments/avatar.png", avatarCrop: "circle" });
+    const dispatch = vi.fn();
+    const onCreated = vi.fn();
+    expect(await makeNewBot({ type: "newBot", onCreated }, [], dispatch, false, request, draft)).toBe(true);
+    expect(calls.filter(call => call.path === "/api/bot-defaults")).toHaveLength(1);
+    expect(calls.find(call => call.method === "PATCH")?.body).toMatchObject({ name: "Writer", title: "Research", notifications: false, browser: true,
+      soul: "只用中文回答。", color: "blue", mascotBody: "cursor", avatarUrl: "/api/attachments/avatar.png", avatarCrop: "circle" });
+    expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: "botAdded", preserveSelection: false }));
+    expect(onCreated).toHaveBeenCalledWith(expect.objectContaining({ name: "Writer", soul: "只用中文回答。" }));
+    draft.dispose();
+  });
+
+  it.each(["", " ", "\n"])("rejects blank names (%j) before creating", async name => {
+    const { calls, request } = server();
+    const draft = await newBotDraft(undefined, [], vi.fn(), request);
+    draft.patch({ name });
+    expect(validNewBotProfile(draft.bot)).toBe(false);
+    expect(await makeNewBot({ type: "newBot", onError: vi.fn() }, [], vi.fn(), false, request, draft)).toBe(false);
+    expect(calls).toHaveLength(1);
+    draft.dispose();
+  });
+
+  it("counts multibyte prompts in UTF-8, allowing exactly 24,000 bytes and rejecting one byte more", async () => {
+    const { calls, request } = server();
+    const draft = await newBotDraft(undefined, [], vi.fn(), request);
+    draft.patch({ soul: "中".repeat(8000) });
+    expect(validNewBotProfile(draft.bot)).toBe(true);
+    draft.patch({ soul: draft.bot.soul + "a" });
+    expect(validNewBotProfile(draft.bot)).toBe(false);
+    expect(await makeNewBot({ type: "newBot", onError: vi.fn() }, [], vi.fn(), false, request, draft)).toBe(false);
+    expect(calls).toHaveLength(1);
+    draft.patch({ soul: "" });
+    expect(validNewBotProfile(draft.bot)).toBe(true);
+    draft.dispose();
+  });
+
+  it("stores an uploaded avatar before creation and announces the persisted image", async () => {
+    const { calls, request } = server();
+    const draft = await newBotDraft(undefined, [], vi.fn(), request);
+    const avatar = new File(["image"], "avatar.png", { type: "image/png" });
+    draft.avatarFile = avatar;
+    draft.patch({ avatarUrl: "blob:avatar-preview", avatarCrop: "circle" });
+    fixture.uploadImage.mockResolvedValue({ path: "/private/attachments/uploaded-avatar.png" });
+    const dispatch = vi.fn();
+    const onCreated = vi.fn();
+    expect(await makeNewBot({ type: "newBot", onCreated }, [], dispatch, false, request, draft)).toBe(true);
+    expect(fixture.uploadImage).toHaveBeenCalledWith(avatar);
+    expect(calls.find(call => call.method === "PATCH")?.body).toMatchObject({ avatarUrl: "/api/attachments/uploaded-avatar.png", avatarCrop: "circle" });
+    expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: "botAdded", bot: expect.objectContaining({ avatarUrl: "/api/attachments/uploaded-avatar.png" }), preserveSelection: false }));
+    expect(onCreated).toHaveBeenCalledWith(expect.objectContaining({ avatarUrl: "/api/attachments/uploaded-avatar.png" }));
+    draft.dispose();
+  });
+
+  it("does not create a bot if an uploaded avatar cannot be stored", async () => {
+    const { calls, request } = server();
+    const draft = await newBotDraft(undefined, [], vi.fn(), request);
+    draft.avatarFile = new File(["image"], "avatar.png", { type: "image/png" });
+    draft.patch({ avatarUrl: "blob:avatar-preview" });
+    fixture.uploadImage.mockRejectedValue(new Error("upload unavailable"));
+    const onError = vi.fn();
+    const dispatch = vi.fn();
+    expect(await makeNewBot({ type: "newBot", onError }, [], dispatch, false, request, draft)).toBe(false);
+    expect(onError).toHaveBeenCalledWith("Couldn't make a new bot: upload unavailable");
+    expect(calls).toHaveLength(1);
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(draft.bot.avatarUrl).toBe("blob:avatar-preview");
+    draft.dispose();
+  });
+
+  it("does not turn a completed creation into a retry when its callback throws", async () => {
+    const { calls, request } = server();
+    const dispatch = vi.fn();
+    const onCreated = vi.fn(() => { throw new Error("callback failed"); });
+    expect(await makeNewBot({ type: "newBot", onCreated }, [], dispatch, false, request)).toBe(true);
+    expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: "botAdded", preserveSelection: false }));
+    expect(dispatch).toHaveBeenCalledWith({ type: "error", message: "callback failed" });
+    expect(calls.filter(call => call.method === "POST")).toHaveLength(1);
+    expect(calls.some(call => call.method === "DELETE")).toBe(false);
+  });
+
+  it("disposes an internally loaded draft when its saved prompt exceeds the limit", async () => {
+    const { calls, request } = server({ defaults: { profile: { soul: "中".repeat(8001) }, memory: {}, skills: [], routines: [] } });
+    const dispose = vi.spyOn(BotCreationDraft.prototype, "dispose");
+    try {
+      const onError = vi.fn();
+      expect(await makeNewBot({ type: "newBot", onError }, [], vi.fn(), false, request)).toBe(false);
+      expect(onError).toHaveBeenCalledWith(expect.stringContaining("24,000 UTF-8 bytes"));
+      expect(dispose).toHaveBeenCalledOnce();
+      expect(calls).toHaveLength(1);
+    } finally { dispose.mockRestore(); }
   });
 });

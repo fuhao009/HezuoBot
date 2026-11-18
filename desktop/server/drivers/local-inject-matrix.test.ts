@@ -128,14 +128,14 @@ describe("host credentials", () => {
   });
 
   it("reads the Unsloth studio key file from HOME", () => {
-    const home = scratchHome("omb-unsloth-key-");
+    const home = scratchHome("hezuo-unsloth-key-");
     mkdirSync(join(home, ".unsloth", "studio", "auth"), { recursive: true });
     writeFileSync(join(home, ".unsloth", "studio", "auth", "agent_api_key.json"), JSON.stringify({ api_key: "from-file" }));
     expect(hostApiKey(localHost("unsloth")!, { HOME: home })).toBe("from-file");
   });
 
   it("reads a minted Unsloth Studio token from the servers map", () => {
-    const home = scratchHome("omb-unsloth-minted-");
+    const home = scratchHome("hezuo-unsloth-minted-");
     mkdirSync(join(home, ".unsloth", "studio", "auth"), { recursive: true });
     writeFileSync(
       join(home, ".unsloth", "studio", "auth", "agent_api_key.json"),
@@ -150,7 +150,7 @@ describe("host credentials", () => {
   });
 
   it("prefers a localhost minted token over a stale top-level api_key", () => {
-    const home = scratchHome("omb-unsloth-mixed-");
+    const home = scratchHome("hezuo-unsloth-mixed-");
     mkdirSync(join(home, ".unsloth", "studio", "auth"), { recursive: true });
     writeFileSync(
       join(home, ".unsloth", "studio", "auth", "agent_api_key.json"),
@@ -211,7 +211,7 @@ describe("Grok / Kimi / Droid / OpenCode writers × live ids", () => {
   it.each(["gemma-4-31b-it-bf16", "mlx-community/GLM-5.2-mxfp4", "Qwen3.6-35B-A3B-bf16:qwen3-5-6-n-r-reasoning"] as const)(
     "Grok writes a reusable slug for %s",
     (model) => {
-      const home = scratchHome("omb-grok-mx-");
+      const home = scratchHome("hezuo-grok-mx-");
       mkdirSync(join(home, ".grok"), { recursive: true });
       const slug = ensureGrokInjectSlug(encodeInjectId("omlx", model), { HOME: home });
       expect(slug).not.toContain("::");
@@ -222,7 +222,7 @@ describe("Grok / Kimi / Droid / OpenCode writers × live ids", () => {
   );
 
   it("Kimi keeps the API id in model= and sanitizes slashes only in the alias", () => {
-    const home = scratchHome("omb-kimi-mx-");
+    const home = scratchHome("hezuo-kimi-mx-");
     mkdirSync(join(home, ".kimi-code"), { recursive: true });
     const alias = ensureKimiInjectAlias("omlx::qwen/qwen3-coder-next", { HOME: home });
     expect(alias).toBe("omlx/qwen-qwen3-coder-next");
@@ -232,7 +232,7 @@ describe("Grok / Kimi / Droid / OpenCode writers × live ids", () => {
   });
 
   it.each(UNIQUE_HOSTS)("Droid BYOK row for $id uses generic-chat-completion-api", (host) => {
-    const home = scratchHome("omb-droid-mx-");
+    const home = scratchHome("hezuo-droid-mx-");
     mkdirSync(join(home, ".factory"), { recursive: true });
     writeFileSync(join(home, ".factory", "settings.json"), "{}");
     const id = ensureDroidInjectModel(encodeInjectId(host.id, "gemma-4-31b-it-bf16"), {
@@ -253,7 +253,7 @@ describe("Grok / Kimi / Droid / OpenCode writers × live ids", () => {
   });
 
   it.each(["omlx", "ollama", "lmstudio"] as const)("OpenCode provider/%s model key keeps slashes", (hostId) => {
-    const home = scratchHome("omb-oc-mx-");
+    const home = scratchHome("hezuo-oc-mx-");
     const native = ensureOpenCodeInjectModel(encodeInjectId(hostId, "qwen/qwen3-coder-next"), { HOME: home });
     expect(native).toBe(`${hostId}/qwen/qwen3-coder-next`);
     const config = JSON.parse(readFileSync(join(home, ".config", "opencode", "opencode.json"), "utf8")) as {
@@ -266,7 +266,7 @@ describe("Grok / Kimi / Droid / OpenCode writers × live ids", () => {
 
 describe("Qwen writer × hosts", () => {
   it.each(UNIQUE_HOSTS)("stores $id credentials in settings.env, not in the model row", (host) => {
-    const home = scratchHome("omb-qwen-mx-");
+    const home = scratchHome("hezuo-qwen-mx-");
     mkdirSync(join(home, ".qwen"), { recursive: true });
     const native = ensureQwenInjectModel(encodeInjectId(host.id, "gemma-4-31b-it-bf16"), {
       HOME: home,
@@ -285,7 +285,7 @@ describe("Qwen writer × hosts", () => {
   });
 
   it("leaves official Qwen slugs untouched", () => {
-    expect(ensureQwenInjectModel("qwen3-coder-plus", { HOME: scratchHome("omb-qwen-cloud-") })).toBe("qwen3-coder-plus");
+    expect(ensureQwenInjectModel("qwen3-coder-plus", { HOME: scratchHome("hezuo-qwen-cloud-") })).toBe("qwen3-coder-plus");
   });
 });
 
@@ -295,7 +295,7 @@ describe("Hermes writer — OpenRouter 401 class", () => {
   });
 
   it.each(UNIQUE_HOSTS)("writes providers.$id without flipping model.provider away from auto", (host) => {
-    const home = scratchHome("omb-hermes-mx-");
+    const home = scratchHome("hezuo-hermes-mx-");
     mkdirSync(join(home, ".hermes"), { recursive: true });
     writeFileSync(
       join(home, ".hermes", "config.yaml"),
@@ -316,7 +316,7 @@ describe("Hermes writer — OpenRouter 401 class", () => {
   });
 
   it("does not rewrite the user's OpenRouter default when the pick is a cloud slug", () => {
-    const home = scratchHome("omb-hermes-cloud-");
+    const home = scratchHome("hezuo-hermes-cloud-");
     mkdirSync(join(home, ".hermes"), { recursive: true });
     const original = "model:\n  provider: auto\n";
     writeFileSync(join(home, ".hermes", "config.yaml"), original);
@@ -325,7 +325,7 @@ describe("Hermes writer — OpenRouter 401 class", () => {
   });
 
   it("upserts the same host once when two models share oMLX", () => {
-    const home = scratchHome("omb-hermes-two-");
+    const home = scratchHome("hezuo-hermes-two-");
     mkdirSync(join(home, ".hermes"), { recursive: true });
     ensureHermesInjectProvider("omlx::gemma-4-31b-it-bf16", { HOME: home });
     ensureHermesInjectProvider("omlx::GLM-5.2-fp8", { HOME: home });
@@ -456,7 +456,7 @@ describe("loaded host probes", () => {
 
 describe("Qwen / Hermes ACP turns", () => {
   it("Qwen selects the full local route over ACP before prompting", async () => {
-    const home = scratchHome("omb-qwen-turn-");
+    const home = scratchHome("hezuo-qwen-turn-");
     const dump = join(home, "env.json");
     const instance = await QwenAgentDriver.create({
       instanceId: "qwen",
@@ -485,7 +485,7 @@ describe("Qwen / Hermes ACP turns", () => {
   });
 
   it("Hermes ACP does not inherit OPENAI_API_KEY and set_model uses custom:omlx:…", async () => {
-    const home = scratchHome("omb-hermes-turn-");
+    const home = scratchHome("hezuo-hermes-turn-");
     mkdirSync(join(home, ".hermes"), { recursive: true });
     writeFileSync(
       join(home, ".hermes", "config.yaml"),
@@ -532,7 +532,7 @@ describe("Qwen / Hermes ACP turns", () => {
 
 describe("room turns must pass the picker model", () => {
   it("Qwen without a model never injects — the room used to do this", async () => {
-    const home = scratchHome("omb-qwen-noroom-");
+    const home = scratchHome("hezuo-qwen-noroom-");
     const dump = join(home, "env.json");
     const instance = await QwenAgentDriver.create({
       instanceId: "qwen",
@@ -554,7 +554,7 @@ describe("room turns must pass the picker model", () => {
   });
 
   it("Hermes without a model never session/set_model — that is the OpenRouter 401", async () => {
-    const home = scratchHome("omb-hermes-noroom-");
+    const home = scratchHome("hezuo-hermes-noroom-");
     mkdirSync(join(home, ".hermes"), { recursive: true });
     const dump = join(home, "env.json");
     const instance = await HermesAgentDriver.create({
@@ -581,7 +581,7 @@ describe("room turns must pass the picker model", () => {
 
 describe("Pi writer × hosts", () => {
   it.each(UNIQUE_HOSTS)("stores $id in ~/.pi/agent/models.json as openai-completions", (host) => {
-    const home = scratchHome("omb-pi-mx-");
+    const home = scratchHome("hezuo-pi-mx-");
     const split = ensurePiInjectModel(encodeInjectId(host.id, "gemma-4-31b-it-bf16"), {
       HOME: home,
       UNSLOTH_STUDIO_AUTH_TOKEN: "unsloth-secret",
@@ -601,7 +601,7 @@ describe("Pi writer × hosts", () => {
   });
 
   it("leaves official pi slugs untouched", () => {
-    expect(ensurePiInjectModel("ollama-cloud/glm-5.2", { HOME: scratchHome("omb-pi-cloud-") })).toEqual({
+    expect(ensurePiInjectModel("ollama-cloud/glm-5.2", { HOME: scratchHome("hezuo-pi-cloud-") })).toEqual({
       provider: "ollama-cloud",
       modelId: "glm-5.2",
     });

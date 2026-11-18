@@ -17,7 +17,7 @@ export function egressFailureCodes(error) {
   return [...codes];
 }
 
-export async function directEgress(request, { fetchImpl = fetch, log = console.error, now = Date.now, trace = process.env.OMB_LOCAL_GATEWAY_DEBUG_EGRESS === "1" } = {}) {
+export async function directEgress(request, { fetchImpl = fetch, log = console.error, now = Date.now, trace = process.env.HEZUO_LOCAL_GATEWAY_DEBUG_EGRESS === "1" } = {}) {
   const started = now();
   const target = new URL(request.url);
   let bytes = 0;

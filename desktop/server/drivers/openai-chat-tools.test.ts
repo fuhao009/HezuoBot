@@ -93,7 +93,7 @@ afterEach(async () => {
 });
 
 async function fixture(script: Script, provider: Provider = "openai-compat", apiKey = API_KEY_CANARY) {
-  const directory = mkdtempSync(join(tmpdir(), "omb-chat-tools-"));
+  const directory = mkdtempSync(join(tmpdir(), "hezuo-chat-tools-"));
   const requests: ChatRequest[] = [];
   const rpcStarted = deferred<{ name: string; args: Record<string, unknown> }>();
   const server = createServer(async (request, response) => {
@@ -1422,15 +1422,15 @@ describe("a turn with the person's Windows computer, the built-in browser and th
     const warn = console.warn;
     console.warn = () => {};
     try {
-      await f.start({ integrations: integrations(51, { composio: catalog(syntheticToolNames("router", 14)), device: catalog(syntheticToolNames("phone", 23)) }) });
+      await f.start({ integrations: integrations(51, { composio: catalog(syntheticToolNames("router", 14)), device: catalog(syntheticToolNames("sensor", 23)) }) });
       expect(await f.completed()).toMatchObject({ ok: true });
     } finally { console.warn = warn; }
     const names = f.requests[0].tools!.map((tool) => tool.function.name);
     expect(names).toHaveLength(128);
     expect(names.at(-1)).toBe("ask_user");
     expect(names).toEqual(expect.arrayContaining(syntheticToolNames("data_table", 5)));
-    expect(names.filter(name => name.startsWith("device_phone_")).length).toBeGreaterThan(0);
-    expect(names.filter(name => name.startsWith("device_phone_")).length).toBeLessThan(23);
+    expect(names.filter(name => name.startsWith("device_sensor_")).length).toBeGreaterThan(0);
+    expect(names.filter(name => name.startsWith("device_sensor_")).length).toBeLessThan(23);
     expect(f.recorder.events.some(event => event.type === "runtime.notice")).toBe(true);
     expect(f.recorder.events.some((event) => event.type === "runtime.error")).toBe(false);
   });

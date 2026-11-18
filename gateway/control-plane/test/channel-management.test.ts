@@ -212,7 +212,7 @@ describe("operator channel management", () => {
       calls.push({ url: String(input), init });
       return response;
     }) as typeof fetch;
-    const instance = createWorker(undefined, undefined, undefined, aiFetch);
+    const instance = createWorker(undefined, aiFetch);
     const probe = () => call(op.target, "/v1/operator/channels/alpha/probe", { token: op.token, body: {}, instance });
     const result = await probe();
     expect(result.status).toBe(200);
@@ -272,7 +272,7 @@ describe("operator channel management", () => {
         usage: { prompt_tokens: 12, completion_tokens: 3, prompt_tokens_details: { cached_tokens: 2 } },
       });
     }) as typeof fetch;
-    const instance = createWorker(undefined, undefined, undefined, aiFetch);
+    const instance = createWorker(undefined, aiFetch);
     for (const model of [MODEL, second]) {
       const response = await call(op.target, model.protocol === "chat" ? "/v1/ai/chat/completions" : "/v1/ai/responses", { token, instance,
         body: model.protocol === "chat"

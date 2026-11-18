@@ -21,7 +21,7 @@ const routineTurn = (id: string, name: string, text: string, trigger: "schedule"
   `[${trigger === "schedule" ? "Scheduled routine" : "Routine"} ${JSON.stringify(name)} — do this now:]\nTrigger id: ${id}\n${text}`;
 
 function tempFile() {
-  const dir = mkdtempSync(join(tmpdir(), "omb-routines-"));
+  const dir = mkdtempSync(join(tmpdir(), "hezuo-routines-"));
   dirs.push(dir);
   return join(dir, "routines.json");
 }

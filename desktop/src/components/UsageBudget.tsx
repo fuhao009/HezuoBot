@@ -22,10 +22,6 @@ export interface ModelPrice {
   cachedInputPerMillion?: number;
 }
 
-export function entitledTo(config: ConfigStatus | null | undefined, feature: string): boolean {
-  return config?.edition?.features?.includes(feature) === true;
-}
-
 export function budgetTone(state: BudgetState | null): "quiet" | "warning" | "danger" {
   if (!state) return "quiet";
   return state.exceeded ? "danger" : state.warn ? "warning" : "quiet";
@@ -194,8 +190,8 @@ export function PricesCard() {
 
 export function UsageBudgetCards({ budget }: { budget: BudgetState | null }) {
   const { state } = useStore();
-  const budgets = entitledTo(state.config, "budgets");
-  const billing = entitledTo(state.config, "billing");
+  const budgets = state.config?.budgets != null;
+  const billing = state.config?.billing != null;
   if (!budgets && !billing) return null;
   return (
     <>

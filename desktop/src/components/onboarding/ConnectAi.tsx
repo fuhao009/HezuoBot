@@ -45,7 +45,7 @@ function OtherWay({ instance, open, onToggle }: { instance: InstanceInfo; open: 
  * OpenCode's free model is only ever a backup. */
 export function ConnectAi({ hosted = false, tested }: { hosted?: boolean; tested: WelcomeAiNow | null }) {
   const { state, dispatch } = useStore();
-  const organisation = organisationSignIn(window.ogb, { hosted });
+  const organisation = organisationSignIn(window.hezuo, { hosted });
   const [failed, setFailed] = useState(false);
   const [checking, setChecking] = useState(false);
   const [open, setOpen] = useState<string | null>(null);

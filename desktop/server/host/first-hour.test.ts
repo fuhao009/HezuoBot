@@ -18,7 +18,7 @@ afterEach(() => {
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 function setup(options: { start?: string; connected?: { gmail?: boolean; googlecalendar?: boolean } } = {}) {
-  const dir = mkdtempSync(join(tmpdir(), "omb-first-hour-"));
+  const dir = mkdtempSync(join(tmpdir(), "hezuo-first-hour-"));
   dirs.push(dir);
   let now = Date.parse(options.start ?? "2026-10-27T15:00:00Z");
   const store = new Store(() => ({ instanceId: "claude", model: "claude-sonnet-5" }));
@@ -28,7 +28,7 @@ function setup(options: { start?: string; connected?: { gmail?: boolean; googlec
   store.appendMessage(thread(), greetingMessage(chief, {}, undefined));
   const world = {
     person: {} as { name?: string; email?: string }, language: undefined as string | undefined, zone: "UTC",
-    connected: { gmail: false, googlecalendar: false, ...options.connected }, briefOn: false, phones: 0, busy: false,
+    connected: { gmail: false, googlecalendar: false, ...options.connected }, briefOn: false, busy: false,
     pushed: [] as string[], turns: [] as Array<{ text: string; threadId: string }>, welcomeDone: 0, runs: [] as RoutineRun[],
     reply: "This week: Standup Tue 10:00." as string | null,
     /** While set, the first look's turn runs until this is called. */
@@ -39,7 +39,7 @@ function setup(options: { start?: string; connected?: { gmail?: boolean; googlec
     store, dataDir: dir, now: () => now, chief: () => store.bot(chief.id), mainThread: () => thread(), threadBusy: () => world.busy,
     person: () => world.person, language: () => world.language, timeZone: () => world.zone,
     apps: { reachable: () => true, connected: async () => ({ ...world.connected }), card: async (slug) => ({ label: slug === "gmail" ? "Gmail" : "Google Calendar", description: "" }) },
-    briefOn: () => world.briefOn, ensureBrief: () => { world.briefOn = true; }, phones: () => world.phones,
+    briefOn: () => world.briefOn, ensureBrief: () => { world.briefOn = true; },
     startTurn: async (_botId, text, opts) => {
       world.turns.push({ text, threadId: opts.threadId });
       const end = () => {
@@ -147,7 +147,7 @@ describe("a new Cloud's first hour", () => {
     fh.stop();
   });
 
-  it("the moment Gmail is in, gives its first look in the Chief's chat, then says the brief once and offers the phone", async () => {
+  it("the moment Gmail is in, gives its first look in the Chief's chat, then says the brief once", async () => {
     const s = setup();
     const fh = s.make();
     fh.begin();
@@ -164,16 +164,12 @@ describe("a new Cloud's first hour", () => {
     expect(s.world.pushed).toEqual(["Your first look is ready"]);
     fh.tick();
     expect(s.texts().slice(-2)).toEqual(["This week: Standup Tue 10:00.", "Every morning at 8 I'll send you a brief of what needs you."]);
-    const phone = s.rows().at(-1)!;
-    expect(phone).toMatchObject({ serverCard: true, kind: "widget" });
-    expect(JSON.stringify(phone.widget!.root)).toContain('"onClickAction":{"type":"open_phone_pairing"}');
     fh.tick();
     expect(s.texts().filter((text) => text?.startsWith("Every morning at 8"))).toHaveLength(1);
-    expect(s.rows().filter((row) => row.serverCard)).toHaveLength(1);
     expect(fh.health()).toMatchObject({ apps: ["gmail"], look: "delivered" });
   });
 
-  it("carries on without apps when the person sets the cards aside: no first look, no brief line, the phone offered", async () => {
+  it("carries on without apps when the person sets the cards aside: no first look or brief line", async () => {
     const s = setup();
     const fh = s.make();
     fh.begin();
@@ -183,11 +179,10 @@ describe("a new Cloud's first hour", () => {
     await settle();
     expect(s.world.turns).toEqual([]);
     expect(s.texts().some((text) => text?.startsWith("Every morning at 8"))).toBe(false);
-    expect(s.rows().at(-1)!.widget?.root.title).toBe("Get me on your phone");
     expect(fh.health()!.ms.declined).toBeDefined();
   });
 
-  it("says plainly when the first look could not run, and still offers the phone", async () => {
+  it("says plainly when the first look could not run", async () => {
     const s = setup({ connected: { googlecalendar: true } });
     const fh = s.make();
     fh.begin();
@@ -197,11 +192,10 @@ describe("a new Cloud's first hour", () => {
     expect(s.world.turns[0]!.text).toContain("just connected Google Calendar");
     expect(s.texts()).toContain("You're connected. I couldn't take a first look just now; I'll keep an eye on it and tell you when something needs you.");
     fh.tick();
-    expect(s.rows().at(-1)!.widget?.root.title).toBe("Get me on your phone");
     expect(fh.health()).toMatchObject({ look: "failed" });
   });
 
-  it("pushes the first look to a phone paired after it, once; otherwise the first morning brief says it is the first", async () => {
+  it("announces the first morning brief once, then uses the normal summary", async () => {
     const s = setup();
     const fh = s.make();
     fh.begin();
@@ -209,10 +203,6 @@ describe("a new Cloud's first hour", () => {
     const gmail = s.cards()[0]!;
     s.store.patchMessage(s.thread(), gmail.id, { connector: { ...gmail.connector!, status: "connected" } });
     await settle();
-    s.world.phones = 1;
-    fh.tick();
-    fh.tick();
-    expect(s.world.pushed).toEqual(["Your first look is ready", "Your first look is ready"]);
     expect(fh.morningPush("Your brief: 2 meetings")).toBe("Your first brief is ready");
     expect(fh.morningPush("Your brief: 2 meetings")).toBe("Your brief: 2 meetings");
   });

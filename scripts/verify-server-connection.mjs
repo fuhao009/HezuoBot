@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
-const fixtureFlag = "--omb-server-connection-fixture";
+const fixtureFlag = "--hezuo-server-connection-fixture";
 
 if (process.versions.electron && process.argv.includes(fixtureFlag)) {
   const { app, BrowserWindow, ipcMain, Menu, session } = await import("electron");
@@ -82,7 +82,7 @@ if (process.versions.electron && process.argv.includes(fixtureFlag)) {
         webPreferences: {
           preload: join(root, "desktop/electron/preload.cjs"), contextIsolation: true,
           sandbox: true, nodeIntegration: false,
-          additionalArguments: [`--omb-local-origin=${local ? new URL(url).origin : "https://remote-fixture.invalid"}`],
+          additionalArguments: [`--hezuo-local-origin=${local ? new URL(url).origin : "https://remote-fixture.invalid"}`],
         },
       });
       win.webContents.on("console-message", (event) => { if (event.level === "error") console.error(event.message, event.sourceId, event.lineNumber); });
@@ -152,7 +152,7 @@ if (process.versions.electron && process.argv.includes(fixtureFlag)) {
     const hostedConnect = button("Connect");
     const addressLabel = "Server address or pairing link";
     await until(() => evaluate(`Boolean(${hostedConnect}) && document.body.textContent.includes('My cloud team')`), "hosted workspace settings rendered");
-    await evaluate("void window.ogb.environments.onOpenSettings(() => { document.body.dataset.settingsRequested = 'yes'; })");
+    await evaluate("void window.hezuo.environments.onOpenSettings(() => { document.body.dataset.settingsRequested = 'yes'; })");
     await evaluate("document.querySelector('[aria-label=\"Switch server: This computer\"]').click()");
     await until(() => evaluate("document.body.dataset.settingsRequested === 'yes'"), "native connect item requested Settings");
     assert.equal(saved.activeId, "local", "opening connection settings did not select a server");
@@ -258,7 +258,7 @@ if (process.versions.electron && process.argv.includes(fixtureFlag)) {
     await until(() => evaluate("document.body.textContent.includes('Connect to a server') && document.querySelector('input[aria-label=\"Search settings\"]').value === ''"), "native connection request clears Settings search");
 
     const remote = await open(false);
-    assert.deepEqual(await remote.webContents.executeJavaScript("({ server: typeof window.ogb?.environments, companion: typeof window.ogb?.remoteClient, sharing: typeof window.ogb?.computerSharing, node: typeof window.require, workspaceMethods: Object.keys(window.ogb?.workspaces ?? {}) })"),
+    assert.deepEqual(await remote.webContents.executeJavaScript("({ server: typeof window.hezuo?.environments, companion: typeof window.hezuo?.remoteClient, sharing: typeof window.hezuo?.computerSharing, node: typeof window.require, workspaceMethods: Object.keys(window.hezuo?.workspaces ?? {}) })"),
       { server: "undefined", companion: "undefined", sharing: "undefined", node: "undefined", workspaceMethods: ["state", "menu"] });
     assert.deepEqual(blockedRequests, [], "unexpected external request attempted");
     // Exercise Chromium's actual HttpOnly cookie jar and main-process fetch.
@@ -294,9 +294,9 @@ if (process.versions.electron && process.argv.includes(fixtureFlag)) {
   const { createServer } = await import("vite");
   const { default: react } = await import("@vitejs/plugin-react");
   const { default: tailwindcss } = await import("@tailwindcss/vite");
-  const { launchVerificationServer } = await import("./control-omb.ts");
+  const { launchVerificationServer } = await import("./control-hezuo.ts");
   const fixture = await launchVerificationServer();
-  const output = mkdtempSync(join(tmpdir(), "omb-server-connection-"));
+  const output = mkdtempSync(join(tmpdir(), "hezuo-server-connection-"));
   for (const dir of ["home", "user-data"]) mkdirSync(join(output, dir));
   const ui = await createServer({
     configFile: false, root, resolve: { alias: { "@": join(root, "desktop", "src") } },
@@ -305,7 +305,7 @@ if (process.versions.electron && process.argv.includes(fixtureFlag)) {
       name: "server-connection-fixture",
       resolveId(id) { if (id === "virtual:server-connection") return `\0${id}`; },
       load(id) {
-        if (id === "\0virtual:server-connection") return `import React from 'react'; import { createRoot } from 'react-dom/client'; import { setLocale } from '/src/lib/i18n.ts'; import { StoreProvider } from '/src/state/store.tsx'; import { RemoteComputerSection } from '/src/components/RemoteComputerSection.tsx'; import { ConnectedWorkspacesSettings } from '/src/components/ConnectedWorkspacesSettings.tsx'; import { DesktopWorkspaceSwitcher } from '/src/components/DesktopWorkspaceSwitcher.tsx'; import '/src/styles.css'; setLocale('en'); localStorage.setItem('omb-analytics-opt-out', '1'); const root = createRoot(document.getElementById('root')); if (location.search.includes('app=1')) { document.body.classList.remove('p-4'); import('/src/App.tsx').then(({default: App}) => root.render(React.createElement(App))); } else root.render(React.createElement(StoreProvider, null, location.search.includes('workspaces=1') ? React.createElement('div', { className: 'flex flex-col gap-5 max-w-2xl mx-auto' }, React.createElement(DesktopWorkspaceSwitcher), React.createElement('h1', { className: 'text-lg font-semibold text-ink' }, 'Servers'), React.createElement(ConnectedWorkspacesSettings)) : React.createElement(RemoteComputerSection)));`;
+        if (id === "\0virtual:server-connection") return `import React from 'react'; import { createRoot } from 'react-dom/client'; import { setLocale } from '/src/lib/i18n.ts'; import { StoreProvider } from '/src/state/store.tsx'; import { RemoteComputerSection } from '/src/components/RemoteComputerSection.tsx'; import { ConnectedWorkspacesSettings } from '/src/components/ConnectedWorkspacesSettings.tsx'; import { DesktopWorkspaceSwitcher } from '/src/components/DesktopWorkspaceSwitcher.tsx'; import '/src/styles.css'; setLocale('en'); localStorage.setItem('hezuo-analytics-opt-out', '1'); const root = createRoot(document.getElementById('root')); if (location.search.includes('app=1')) { document.body.classList.remove('p-4'); import('/src/App.tsx').then(({default: App}) => root.render(React.createElement(App))); } else root.render(React.createElement(StoreProvider, null, location.search.includes('workspaces=1') ? React.createElement('div', { className: 'flex flex-col gap-5 max-w-2xl mx-auto' }, React.createElement(DesktopWorkspaceSwitcher), React.createElement('h1', { className: 'text-lg font-semibold text-ink' }, 'Servers'), React.createElement(ConnectedWorkspacesSettings)) : React.createElement(RemoteComputerSection)));`;
       },
       configureServer(server) {
         server.middlewares.use((req, res, next) => {

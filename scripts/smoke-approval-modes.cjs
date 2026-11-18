@@ -13,7 +13,7 @@ const { setTimeout: delay } = require("node:timers/promises");
 const { createTrustedApprovalModeCoordinator } = require("../desktop/electron/approval-trusted-mode.cjs");
 
 const root = resolve(__dirname, "..");
-const home = mkdtempSync(join(tmpdir(), "omb-approval-smoke-"));
+const home = mkdtempSync(join(tmpdir(), "hezuo-approval-smoke-"));
 app.setPath("userData", join(home, "electron"));
 let child;
 let logs = "";
@@ -95,10 +95,10 @@ app.whenReady().then(async () => {
     cwd: root,
     execArgv: ["--experimental-strip-types"],
     env: {
-      HOME: home, USERPROFILE: home, OMB_DATA_DIR: home, PATH: "",
+      HOME: home, USERPROFILE: home, HEZUO_DATA_DIR: home, PATH: "",
       ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}),
-      OMB_PORT: String(port), OMB_WEBHOOK_PORT: String(webhookPort),
-      OMB_TEST_INTERNAL_CAPABILITY_KEY: testCapabilityKey,
+      HEZUO_PORT: String(port), HEZUO_WEBHOOK_PORT: String(webhookPort),
+      HEZUO_TEST_INTERNAL_CAPABILITY_KEY: testCapabilityKey,
       FAKE_CLAUDE_MODE: "happy", FAKE_CLAUDE_DUMP: dump,
       FAKE_ACP_MODE: "permission", FAKE_ACP_AUTH_METHOD: "oauth-personal",
       FAKE_ACP_MODELS: "gemini-3.8-flash-high,gemini-3.8-flash-low", FAKE_ACP_MODES: "default,yolo",

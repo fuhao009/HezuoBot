@@ -9,8 +9,8 @@ import test from "node:test";
 import { createManagedDesktopRelay } from "./managed-desktop.mjs";
 
 const ORIGIN = "https://operator.example";
-const token = `omb_product_ai_${"a".repeat(22)}.${"b".repeat(43)}`;
-const model = () => ({ id: "hezuo-default", label: "Hezuo", protocol: "chat", pricingVersion: "v1",
+const token = `hezuo_product_ai_${"a".repeat(22)}.${"b".repeat(43)}`;
+const model = () => ({ id: "hezuo-default", label: "HezuoBot", protocol: "chat", pricingVersion: "v1",
   inputMicroPointsPerMillion: 2_000_000, cachedInputMicroPointsPerMillion: 500_000, outputMicroPointsPerMillion: 4_000_000,
   maxContextTokens: 1000, maxOutputTokens: 100 });
 const connection = () => ({ origin: ORIGIN, userId: "user-1", tokenId: "token-1", token, expiresAt: Date.now() + 15 * 60_000,
@@ -19,7 +19,7 @@ const settle = async () => { for (let i = 0; i < 10; i++) await new Promise(reso
 
 /** A throwaway certificate for the fixture origin, or null without openssl. */
 function certificateForOperator() {
-  const directory = mkdtempSync(join(tmpdir(), "omb-relay-ca-"));
+  const directory = mkdtempSync(join(tmpdir(), "hezuo-relay-ca-"));
   try {
     const made = spawnSync("openssl", ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "2",
       "-keyout", join(directory, "key.pem"), "-out", join(directory, "cert.pem"),

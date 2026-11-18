@@ -12,7 +12,7 @@ ipcRenderer.on("product-account:state-changed", (_event, state) => {
 /** The values a renderer may speak: text and an opaque cursor, nothing else. */
 const text = (value, max) => (typeof value === "string" ? value.slice(0, max) : "");
 
-contextBridge.exposeInMainWorld("ogb", {
+contextBridge.exposeInMainWorld("hezuo", {
   productAccount: {
     state: () => ipcRenderer.invoke("product-account:state"),
     requestCode: (email) => ipcRenderer.invoke("product-account:request-code", text(email, 254)),

@@ -53,35 +53,53 @@ describe("/setup connects an app through a Connect card, against the real server
   };
 
   beforeAll(async () => {
-    home = mkdtempSync(join(tmpdir(), "omb-setup-connect-"));
+    home = mkdtempSync(join(tmpdir(), "hezuo-setup-connect-"));
     data = join(home, "data");
     dump = join(home, "fake-claude-dump.json");
     mkdirSync(data);
-    // The managed connection service is present but knows no accounts, so Gmail is not connected.
-    broker = createServer((req, res) => {
-      req.resume();
-      res.writeHead(404, { "content-type": "application/json" });
-      res.end(JSON.stringify({ error: "fixture knows no accounts" }));
+    broker = createServer(async (req, res) => {
+      let raw = "";
+      for await (const chunk of req) raw += chunk;
+      const path = new URL(req.url ?? "/", "http://fixture").pathname;
+      const reply = (status: number, body: unknown) => {
+        res.writeHead(status, { "content-type": "application/json" });
+        res.end(JSON.stringify(body));
+      };
+      if (req.headers["x-api-key"] !== "ak_setup_fixture") return reply(401, { error: "invalid project key" });
+      if (path === "/api/v3.1/auth_configs" || path === "/api/v3/toolkits"
+        || path === "/api/v3.1/connected_accounts" || path === "/api/v3.1/tool_router/session/trs_setup/toolkits") {
+        return reply(200, { items: [] });
+      }
+      if (path === "/api/v3.1/tool_router/session" || path === "/api/v3.1/tool_router/session/trs_setup") {
+        return reply(req.method === "POST" ? 201 : 200, {
+          session_id: "trs_setup", mcp: { type: "http", url: `${brokerUrl}/mcp` },
+          config: raw ? JSON.parse(raw) : { multi_account: { enable: true } },
+        });
+      }
+      return reply(404, { error: `Unexpected direct Composio request: ${req.method} ${path}` });
     });
     await new Promise<void>(resolve => broker.listen(0, "127.0.0.1", resolve));
-    brokerUrl = `http://127.0.0.1:${(broker.address() as { port: number }).port}/broker`;
+    const address = broker.address();
+    if (!address || typeof address === "string") throw new Error("Direct Composio fixture has no TCP address");
+    brokerUrl = `http://127.0.0.1:${address.port}`;
     writeFileSync(join(data, "config.json"), JSON.stringify({
+      composio: { apiKey: "ak_setup_fixture" },
       instances: { claude: {
-        driver: "claudeAgent", config: { cli: join(ROOT, "server/testing/fake-claude-cli.ts") },
+        driver: "claudeAgent", config: { cli: join(ROOT, "desktop/server/testing/fake-claude-cli.ts") },
         // Every turn with the connected-apps tools starts a Gmail connection through them, as a model told to would.
         environment: { FAKE_CLAUDE_CONNECT_APPS: "gmail", FAKE_CLAUDE_DUMP: dump },
       } },
     }));
     const port = await freePortBlock([0, 1]);
     base = `http://127.0.0.1:${port}`;
-    const proc = spawn(process.execPath, [join(ROOT, "server/index.ts")], {
+    const proc = spawn(process.execPath, [join(ROOT, "desktop/server/index.ts")], {
       cwd: ROOT, env: {
         PATH: dirname(process.execPath), ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}),
-        HOME: home, USERPROFILE: home, OMB_DATA_DIR: data,
+        HOME: home, USERPROFILE: home, HEZUO_DATA_DIR: data,
         APPDATA: join(home, "appdata"), LOCALAPPDATA: join(home, "localappdata"),
-        TEMP: home, TMP: home, TMPDIR: home, OMB_TEST_SEALED_PATH: "1",
-        OMB_PORT: String(port), OMB_WEBHOOK_PORT: String(port + 1), OMB_USER_DATA: join(home, "user-data"),
-        OMB_COMPOSIO_BROKER_URL: brokerUrl, OMB_COMPOSIO_BROKER_TOKEN: "c".repeat(64),
+        TEMP: home, TMP: home, TMPDIR: home, HEZUO_TEST_SEALED_PATH: "1",
+        HEZUO_PORT: String(port), HEZUO_WEBHOOK_PORT: String(port + 1), HEZUO_USER_DATA: join(home, "user-data"),
+        HEZUO_COMPOSIO_API: `${brokerUrl}/api/v3.1`, HEZUO_COMPOSIO_TOOLKITS_API: `${brokerUrl}/api/v3`,
       }, stdio: ["ignore", "pipe", "pipe"],
     });
     child = proc;
@@ -100,6 +118,7 @@ describe("/setup connects an app through a Connect card, against the real server
 
   it("shows a Connect card for Gmail in the chat when the bot's connected apps are on", async () => {
     const { bot } = await api("POST", "/api/bots", { name: "Inbox" });
+    await api("PATCH", `/api/bots/${bot.id}`, { composio: true });
     const { seen, messages: chat } = await setupTurn(bot);
     expect(seen.mcpConfig.mcpServers.composio).toBeDefined();
     expect(seen.systemPrompt).toContain("make COMPOSIO_MANAGE_CONNECTIONS for its toolkit (for example gmail) your last tool call");

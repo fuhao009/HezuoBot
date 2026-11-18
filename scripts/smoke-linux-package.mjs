@@ -1,5 +1,4 @@
 import { spawn } from "node:child_process";
-import { createServer } from "node:http";
 import {
   chmodSync,
   existsSync,
@@ -15,11 +14,11 @@ import { fileURLToPath } from "node:url";
 import { linuxDisablesGpu } from "../desktop/electron/linux-gpu.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const wayland = process.env.OMB_SMOKE_WAYLAND === "1";
-const hardDeath = process.env.OMB_SMOKE_HARD_DEATH === "1";
-const bundled = process.env.OMB_SMOKE_BUNDLED_CUA === "1";
-const sessionBlocked = process.env.OMB_SMOKE_LINUX_CUA_BLOCKED === "1";
-const signalShutdown = process.env.OMB_SMOKE_SIGNAL_SHUTDOWN === "1";
+const wayland = process.env.HEZUO_SMOKE_WAYLAND === "1";
+const hardDeath = process.env.HEZUO_SMOKE_HARD_DEATH === "1";
+const bundled = process.env.HEZUO_SMOKE_BUNDLED_CUA === "1";
+const sessionBlocked = process.env.HEZUO_SMOKE_LINUX_CUA_BLOCKED === "1";
+const signalShutdown = process.env.HEZUO_SMOKE_SIGNAL_SHUTDOWN === "1";
 if ([hardDeath, bundled, sessionBlocked].filter(Boolean).length > 1) {
   throw new Error("hard-death, bundled, and release-safety smoke modes are mutually exclusive");
 }
@@ -27,11 +26,11 @@ if (signalShutdown && !bundled) {
   throw new Error("signal-shutdown smoke requires the bundled runtime mode");
 }
 const executable = path.resolve(
-  process.env.OMB_SMOKE_EXECUTABLE ?? path.join(root, "release", "linux-unpacked", "hezuo"),
+  process.env.HEZUO_SMOKE_EXECUTABLE ?? path.join(root, "release", "linux-unpacked", "hezuo"),
 );
 if (!existsSync(executable)) throw new Error(`[smoke-linux-package] missing executable: ${executable}`);
 
-const sandbox = mkdtempSync(path.join(tmpdir(), "omb-linux-smoke-"));
+const sandbox = mkdtempSync(path.join(tmpdir(), "hezuo-linux-smoke-"));
 const home = path.join(sandbox, "home");
 const xdgConfig = path.join(sandbox, "config");
 const xdgRuntime = path.join(sandbox, "runtime");
@@ -165,27 +164,6 @@ process.on("SIGTERM", shutdown);
 );
 chmodSync(sentinel, 0o755);
 
-// Accept the optional managed-Composio request but never answer it. The
-// renderer must still become ready and close normally while this request is
-// pending, proving hosted integration latency is outside first paint.
-let brokerRequests = 0;
-const brokerSockets = new Set();
-const slowBroker = createServer(() => {
-  brokerRequests += 1;
-});
-slowBroker.on("connection", (socket) => {
-  brokerSockets.add(socket);
-  socket.once("close", () => brokerSockets.delete(socket));
-});
-await new Promise((resolve, reject) => {
-  slowBroker.once("error", reject);
-  slowBroker.listen(0, "127.0.0.1", resolve);
-});
-const brokerAddress = slowBroker.address();
-if (!brokerAddress || typeof brokerAddress === "string") {
-  throw new Error("could not start the deterministic slow Composio broker");
-}
-
 const desktopEnv = {
   ...process.env,
   HOME: home,
@@ -194,12 +172,11 @@ const desktopEnv = {
   XDG_SESSION_TYPE: wayland ? "wayland" : "x11",
   XDG_CURRENT_DESKTOP: "GNOME",
   CUA_DRIVER_PATH: sentinel,
-  OMB_COMPOSIO_BROKER_URL: `http://127.0.0.1:${brokerAddress.port}`,
-  OMB_SMOKE_TEST: "1",
-  OMB_SMOKE_CUA: hardDeath || bundled || sessionBlocked ? "0" : "1",
-  OMB_SMOKE_BUNDLED_CUA: bundled ? "1" : "0",
+  HEZUO_SMOKE_TEST: "1",
+  HEZUO_SMOKE_CUA: hardDeath || bundled || sessionBlocked ? "0" : "1",
+  HEZUO_SMOKE_BUNDLED_CUA: bundled ? "1" : "0",
 };
-if (hardDeath || signalShutdown) desktopEnv.OMB_SMOKE_KEEP_OPEN = "1";
+if (hardDeath || signalShutdown) desktopEnv.HEZUO_SMOKE_KEEP_OPEN = "1";
 if (bundled) delete desktopEnv.CUA_DRIVER_PATH;
 if (wayland) desktopEnv.WAYLAND_DISPLAY = "wayland-smoke";
 else delete desktopEnv.WAYLAND_DISPLAY;
@@ -329,10 +306,9 @@ try {
     }
   }
   if (result.hardwareAccelerationEnabled !== !linuxDisablesGpu({ env: desktopEnv })) {
-    throw new Error("Linux package did not apply the GPU rule (off on NVIDIA or OMB_LINUX_GPU=off) before startup");
+    throw new Error("Linux package did not apply the GPU rule (off on NVIDIA or HEZUO_LINUX_GPU=off) before startup");
   }
   if (displayMediaRequests !== 0) throw new Error("launch triggered display capture without user intent");
-  await until(async () => brokerRequests > 0, "the optional slow-broker request");
   if (sessionBlocked) {
     await waitForExit();
     if (existsSync(marker)) throw new Error("release safety block still invoked a CUA executable");
@@ -347,7 +323,7 @@ try {
       throw new Error("release safety block did not clear the durable Linux opt-in");
     }
     console.log(
-      `[smoke-linux-package] OK (${wayland ? "GNOME/Wayland" : path.basename(executable)}): slow optional broker did not block first paint and Wayland CUA failed closed`,
+      `[smoke-linux-package] OK (${wayland ? "GNOME/Wayland" : path.basename(executable)}): renderer started and Wayland CUA failed closed`,
     );
   } else if (bundled) {
     if (signalShutdown) child.kill("SIGTERM");
@@ -495,7 +471,7 @@ try {
     const restart = spawn(executable, wayland ? ["--ozone-platform=x11"] : [], {
       cwd: root,
       detached: true,
-      env: { ...desktopEnv, OMB_SMOKE_KEEP_OPEN: "0" },
+      env: { ...desktopEnv, HEZUO_SMOKE_KEEP_OPEN: "0" },
       stdio: ["ignore", "pipe", "pipe"],
     });
     try {
@@ -590,8 +566,6 @@ try {
   }
 } finally {
   await stopProcess();
-  for (const socket of brokerSockets) socket.destroy();
-  await new Promise((resolve) => slowBroker.close(resolve));
-  if (process.env.OMB_KEEP_SMOKE_DIR !== "1") rmSync(sandbox, { recursive: true, force: true });
+  if (process.env.HEZUO_KEEP_SMOKE_DIR !== "1") rmSync(sandbox, { recursive: true, force: true });
   else console.log(`[smoke-linux-package] kept ${sandbox}`);
 }

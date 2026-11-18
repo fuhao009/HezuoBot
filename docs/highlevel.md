@@ -8,7 +8,7 @@ HighLevel brand. Composio is not involved; the server (`desktop/server/highlevel
 ## How it works
 
 ```
-OMB server (desktop or Cloud home)         accounts.openmausbot.com (relay)              HighLevel
+HezuoBot server (desktop or Cloud home)         configured relay              HighLevel
   POST /api/highlevel/sign-in ───────────▶ POST /v1/highlevel/start → state + auth URL
   app opens the auth URL in the browser ─────────────────────────────────────────────▶ sign in, pick a location
                                             ◀── GET /v1/highlevel/callback?code&state ── redirect
@@ -70,13 +70,13 @@ listed.
 
 | Variable | Meaning |
 |---|---|
-| `OMB_HIGHLEVEL_RELAY_URL` | The relay. Default `https://accounts.openmausbot.com`. `off` disables the integration (`state: "unavailable"`); a Private Integration token still works. Loopback `http://` is accepted for tests. |
-| `OMB_HIGHLEVEL_API_URL` | Tests only: a fake HighLevel in place of `https://services.leadconnectorhq.com`. |
+| `HEZUO_HIGHLEVEL_RELAY_URL` | The relay. Set this to the operator-configured relay URL; no Hezuo relay endpoint is established here. `off` disables the integration (`state: "unavailable"`); a Private Integration token still works. Loopback `http://` is accepted for tests. |
+| `HEZUO_HIGHLEVEL_API_URL` | Tests only: a fake HighLevel in place of `https://services.leadconnectorhq.com`. |
 
 ## Tools (bots)
 
 Mounted as the MCP server `highlevel` through the harness proxy (`/api/internal/highlevel/mcp`, token env
-`OMB_MCP_TOKEN_HIGHLEVEL`), so drivers see `mcp__highlevel__HIGHLEVEL_GET_CONTACT` and the like. Every call carries the
+`HEZUO_MCP_TOKEN_HIGHLEVEL`), so drivers see `mcp__highlevel__HIGHLEVEL_GET_CONTACT` and the like. Every call carries the
 turn's capability; the server re-reads the live bot on every call for the verdict.
 
 | Tool | Does | Read/write |

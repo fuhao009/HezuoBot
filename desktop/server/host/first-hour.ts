@@ -1,6 +1,6 @@
 // A new personal Cloud's first hour, run by its Chief in its own chat, with no setup screen: a greeting by name and one
 // question; after the first answer, Gmail and Google Calendar offered with the reason; a first look the moment one of
-// them is in; the morning brief said once; the phone offered; and on day two a recap of what was really done. Each step
+// them is in; the morning brief said once; and on day two a recap of what was really done. Each step
 // happens once, kept with its time in first-hour.json, which the health report carries to the Admin.
 import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
@@ -11,7 +11,6 @@ import type { RoutineRun } from "../routines.ts";
 import type { BotRecord, Message, Store } from "../store.ts";
 import type { HostTurnResult } from "../coordinator.ts";
 import { writeFileAtomic } from "../atomic.ts";
-import { createAgentCard } from "../chat-widgets.ts";
 import { connectorCardText } from "../connector-card-text.ts";
 import type { DraftReply } from "../read-and-draft.ts";
 import { localDate, validZone } from "./check-plan.ts";
@@ -29,7 +28,6 @@ export const MORNING = "08:00";
 /** The person is here and has not written: the offer comes anyway. */
 export const OFFER_UNASKED_MS = 90 * SECOND;
 export const LOOK_DRAFTS = 3;
-/** While the offer is open, how often a connection made elsewhere (another tab, the phone) is looked for, and how long. */
 const CONNECTED_POLL_MS = MINUTE;
 const CONNECTED_POLL_FOR_MS = 6 * HOUR;
 /** A first look that never reports back frees its chat after this. */
@@ -64,9 +62,6 @@ const stateSchema = z.object({
   /** Why there was no first look: it failed, or the person's own task continued once its app was connected. */
   lookSkipped: z.enum(["failed", "own-task"]).optional(),
   briefOnAt: at.optional(),
-  phoneOfferedAt: at.optional(),
-  phonePairedAt: at.optional(),
-  firstPushAt: at.optional(),
   firstBriefAt: at.optional(),
   recapAt: at.optional(),
   recapQuiet: z.boolean().optional(),
@@ -76,7 +71,7 @@ type FirstHourState = z.infer<typeof stateSchema>;
 /** The milestones as times since the Cloud's first boot, for the Admin to set beside the trial's outcome. Times only. */
 export interface FirstHourReport {
   startedAt: number;
-  ms: Partial<Record<"seen" | "firstMessage" | "offered" | "firstApp" | "declined" | "firstLook" | "briefOn" | "phoneOffered" | "phonePaired" | "recap", number>>;
+  ms: Partial<Record<"seen" | "firstMessage" | "offered" | "firstApp" | "declined" | "firstLook" | "briefOn" | "recap", number>>;
   apps: LookApp[];
   look?: "delivered" | "failed" | "own-task";
 }
@@ -103,7 +98,6 @@ export interface FirstHourDeps {
   briefOn(): boolean;
   /** An app it reads is in: the brief is made now if it was not yet. */
   ensureBrief(): void;
-  phones(): number;
   startTurn(botId: string, text: string, opts: { threadId: string; cardContinuation: true; onSettled: (outcome: HostTurnResult) => void }): Promise<unknown>;
   notify(bot: BotRecord, threadId: string, body: string): void;
   /** A line the server wrote: the next turn reads it. */
@@ -309,7 +303,7 @@ export function createFirstHour(deps: FirstHourDeps) {
     soon(afterLook);
   }
 
-  /** After the first look (or a decline): the brief said once, then the phone offered, each once and only in a quiet chat. */
+  /** After the first look: the brief said once, only in a quiet chat. */
   async function afterLook(): Promise<void> {
     if (!state) return;
     const place = home();
@@ -320,38 +314,6 @@ export function createFirstHour(deps: FirstHourDeps) {
       say(place.bot, place.threadId, words().briefOn);
       mark({ briefOnAt: now() });
     }
-    if ((looked || state.declinedAt) && !state.phoneOfferedAt) {
-      if (deps.phones() > 0) mark({ phoneOfferedAt: now(), phonePairedAt: state.phonePairedAt ?? now() });
-      else if (offerPhone(place.bot, place.threadId)) mark({ phoneOfferedAt: now() });
-    }
-  }
-
-  function offerPhone(bot: BotRecord, threadId: string): boolean {
-    const w = words();
-    const widget = {
-      type: "Card", id: "root", title: w.phoneTitle,
-      children: [
-        { type: "Text", value: w.phoneBody },
-        { type: "Row", gap: 2, children: [{ type: "Button", label: w.phoneButton, style: "primary", iconStart: "phone", onClickAction: { type: "open_phone_pairing" } }] },
-      ],
-    };
-    const posted = createAgentCard({ store: deps.store as Parameters<typeof createAgentCard>[0]["store"], bot, threadId, input: { tool: "show_widget", widget }, serverCard: true });
-    if (!posted.ok) {
-      console.warn(`first hour: the phone card was refused: ${posted.error}`);
-      return false;
-    }
-    deps.store.patchTask(bot.id, threadId, { unread: true });
-    deps.wrote(bot, threadId);
-    return true;
-  }
-
-  function phonePaired(): void {
-    if (!state || state.phonePairedAt) return;
-    mark({ phonePairedAt: now() });
-    const place = home();
-    if (!place || !state.firstLookAt || state.firstPushAt) return;
-    deps.notify(place.bot, place.threadId, words().firstLookReady);
-    mark({ firstPushAt: now() });
   }
 
   function tally(): ValueTally {
@@ -404,9 +366,8 @@ export function createFirstHour(deps: FirstHourDeps) {
     if (look && now() > look.until) look = null;
     const place = home();
     if (!state.offeredAt && state.firstMessageAt && place && answered(place.threadId, state.firstMessageAt)) void offer();
-    if (!state.phonePairedAt && deps.phones() > 0) phonePaired();
     if (state.firstAppAt && !state.lookStartedAt && !state.lookSkipped) void startLook();
-    if ((state.firstLookAt || state.lookSkipped || state.declinedAt) && (!state.phoneOfferedAt || (!state.briefOnAt && state.apps?.length))) void afterLook();
+    if ((state.firstLookAt || state.lookSkipped) && !state.briefOnAt && state.apps?.length) void afterLook();
     void poll();
     recap();
   }
@@ -469,10 +430,6 @@ export function createFirstHour(deps: FirstHourDeps) {
         return;
       }
       if (state.lookSkipped === "own-task" && !state.briefOnAt) soon(afterLook);
-      else if (!state.firstAppAt && !state.declinedAt && !state.phoneOfferedAt && said(threadId, state.offeredAt)) {
-        mark({ declinedAt: now() });
-        soon(afterLook);
-      }
     },
     /** The read-and-draft fence of the first look's turn: reads, and up to three reply drafts. */
     look(threadId: string): { draft(reply: DraftReply): boolean } | null {
@@ -483,7 +440,7 @@ export function createFirstHour(deps: FirstHourDeps) {
     /** The push for the morning brief: the very first says it is the first. */
     morningPush(summary: string): string {
       if (!state || state.firstBriefAt) return summary;
-      mark({ firstBriefAt: now(), ...(state.phonePairedAt && !state.firstPushAt ? { firstPushAt: now() } : {}) });
+      mark({ firstBriefAt: now() });
       return words().firstBriefReady;
     },
     /** The morning brief's first line: what was done while the person was away, from the counts kept as it happened. */
@@ -511,7 +468,7 @@ export function createFirstHour(deps: FirstHourDeps) {
       const since = (time: number | undefined) => (time === undefined ? undefined : Math.max(0, time - s.startedAt));
       const ms: FirstHourReport["ms"] = {};
       const times = { seen: s.seenAt, firstMessage: s.firstMessageAt, offered: s.offeredAt, firstApp: s.firstAppAt, declined: s.declinedAt, firstLook: s.firstLookAt,
-        briefOn: s.briefOnAt, phoneOffered: s.phoneOfferedAt, phonePaired: s.phonePairedAt, recap: s.recapAt };
+        briefOn: s.briefOnAt, recap: s.recapAt };
       for (const [key, time] of Object.entries(times) as Array<[keyof FirstHourReport["ms"], number | undefined]>) {
         const value = since(time);
         if (value !== undefined) ms[key] = value;

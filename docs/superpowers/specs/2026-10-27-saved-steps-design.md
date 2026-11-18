@@ -1,4 +1,4 @@
-# Saved steps: repeat a computer task without AI
+# Saved steps: repeat a computer task without AI — Hezuo
 
 Date: 2026-10-27 · Branch: `feat/learned-replay` · Idea source: Atticus (SaarthurR/atticus-mac, MIT). We take the idea, not the code.
 
@@ -28,7 +28,6 @@ part people feel.
 - Room (group) turns, routine runs, peer asks.
 - Fuzzy or semantic matching. Same words (after normalising) or nothing.
 - Editing or teaching steps by hand; a list of saved steps in bot settings.
-- Phone UI for the chips (phones ignore the new message fields).
 
 ## Anti-goals (a failure even if it "works")
 
@@ -44,7 +43,7 @@ part people feel.
 
 The bridge already sees every `tools/call` and its response. It also runs the
 Local VM and VPS proxies with the same control variables, so recording is
-switched on by a separate `OMB_COMPUTER_JOURNAL=1` that only the host mount
+switched on by a separate `HEZUO_COMPUTER_JOURNAL=1` that only the host mount
 (`gatedLocalComputer`) sets (builder's call), and only for a direct request
 that began with the person's own line while saved steps are on: room turns,
 routine runs, work a peer hands on (though it keeps the person's origin) and
@@ -329,7 +328,7 @@ new input route, no second binary, one permission identity. Update that doc's
 
 ## Decisions
 
-- Omkar, 2026-10-27: replays run for Full access bots only; other modes always
+- maintainer, 2026-10-27: replays run for Full access bots only; other modes always
   use the AI.
 - 2026-10-28, after main began asking before a bot first uses the person's own
   computer: replays only where the person picked this computer as the place;
@@ -348,7 +347,7 @@ new input route, no second binary, one permission identity. Update that doc's
   entry and 32 MB in all; toggles are known by role only (accepted);
   the "next time no AI" chip shows only when a replay could follow. Not done
   here: no real app has been driven by a replay yet; that smoke test is
-  Omkar's, by hand, before merge.
+  maintainer's, by hand, before merge.
 - Owner, 2026-10-29: saved steps never include a final, can't-undo action;
   such a request always goes to the AI, automatically, with no new button,
   setting or prompt.

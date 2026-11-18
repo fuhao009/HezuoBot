@@ -1,5 +1,7 @@
-import { createHash } from "node:crypto";
+import { mkdtempSync, rmSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 type ProviderBoat = Record<string, unknown> & { id: string; name: string; state: string };
@@ -9,13 +11,7 @@ type DeletionStatus = "pending" | "processing" | "blocked" | "completed";
 
 const DELETION_OPERATION_ID = "bdop_0123456789abcdef0123456789abcdef";
 
-const legacyNameFor = (botId: string) => {
-  const prefix = botId.slice(0, 8).toLowerCase().replace(/[^a-z0-9]/g, "");
-  const hash = createHash("sha256").update(botId).digest("hex").slice(0, 6);
-  return `ogb-${prefix}-${hash}`;
-};
-
-describe("Hezuo-managed Boat inventory", () => {
+describe("HezuoBot-managed Boat inventory", () => {
   let api: Server;
   let boats: ProviderBoat[] = [];
   let listStatus = 200;
@@ -120,7 +116,8 @@ describe("Hezuo-managed Boat inventory", () => {
     });
     await new Promise<void>((resolve) => api.listen(0, "127.0.0.1", resolve));
     const port = (api.address() as { port: number }).port;
-    vi.stubEnv("OMB_BOAT_API", `http://127.0.0.1:${port}/api/v1`);
+    vi.stubEnv("HEZUO_DATA_DIR", mkdtempSync(join(tmpdir(), "hezuo-boat-inventory-")));
+    vi.stubEnv("HEZUO_BOAT_API", `http://127.0.0.1:${port}/api/v1`);
     vi.resetModules();
     boat = await import("./boat.ts");
     journal = await import("./boat-create-idempotency.ts");
@@ -154,25 +151,27 @@ describe("Hezuo-managed Boat inventory", () => {
   });
 
   afterAll(async () => {
+    const dataDir = process.env.HEZUO_DATA_DIR;
     vi.unstubAllEnvs();
     for (const response of hung.splice(0)) response.end("{}");
     await new Promise<void>((resolve) => api.close(() => resolve()));
+    if (dataDir) rmSync(dataDir, { recursive: true, force: true });
   });
 
-  it("lists only sanitized managed boats and keeps an owned legacy Boat discoverable", async () => {
+  it("lists only sanitized managed boats and keeps an owned Boat discoverable", async () => {
     const botId = "current-bot-123";
     boats = [
       {
         id: "bx_23456789",
-        name: legacyNameFor(botId),
+        name: await boat.boatNameFor(botId),
         state: "READY",
         desktopUrl: "https://secret.example/?token=do-not-leak",
         dedicatedIp: "203.0.113.8",
         env: { PRIVATE_KEY: "do-not-leak" },
       },
-      { id: "bx_abcdefgh", name: "ogb-orphaned-abcdef", state: "archived", desktopUrl: "secret" },
+      { id: "bx_abcdefgh", name: "hezuo-orphaned-abcdef", state: "archived", desktopUrl: "secret" },
       { id: "bx_jkmnpqrs", name: "my-production-box", state: "running" },
-      { id: "bad/id", name: "ogb-invalid0-123456", state: "running" },
+      { id: "bad/id", name: "hezuo-invalid0-123456", state: "running" },
     ];
 
     const inventory = await boat.listManagedBoats(cfg, [{ botId, name: "Research", inUse: true }]);
@@ -184,7 +183,7 @@ describe("Hezuo-managed Boat inventory", () => {
       instances: [
         {
           boxId: "bx_23456789",
-          name: legacyNameFor(botId),
+          name: await boat.boatNameFor(botId),
           state: "ready",
           ownerBotId: botId,
           ownerName: "Research",
@@ -201,14 +200,15 @@ describe("Hezuo-managed Boat inventory", () => {
     })]);
   });
 
-  it("keeps an adopted Boat visible when an eventually-consistent listing omits it", async () => {
-    const botId = "legacy-adoption";
+  it("keeps a recorded Boat visible when an eventually-consistent listing omits it", async () => {
+    const botId = "recorded-owner";
     const boxId = "bx_3456789a";
-    boats = [{ id: boxId, name: legacyNameFor(botId), state: "ready" }];
+    boats = [{ id: boxId, name: await boat.boatNameFor(botId), state: "ready" }];
+    journal.adoptResolvedBoat(botId, boxId);
 
-    expect((await boat.listManagedBoats(cfg, [{ botId, name: "Legacy", inUse: false }])).available).toBe(true);
+    expect((await boat.listManagedBoats(cfg, [{ botId, name: "Recorded", inUse: false }])).available).toBe(true);
     requests.length = 0;
-    expect((await boat.listManagedBoats(cfg, [{ botId, name: "Legacy", inUse: false }])).available).toBe(true);
+    expect((await boat.listManagedBoats(cfg, [{ botId, name: "Recorded", inUse: false }])).available).toBe(true);
     expect(requests.map(({ method, path }) => `${method} ${path}`)).toEqual([
       "GET /api/v1/sandboxes",
     ]);
@@ -218,10 +218,10 @@ describe("Hezuo-managed Boat inventory", () => {
 
     pageResponses = new Map([["", { sandboxes: [], nextCursor: null }]]);
     requests.length = 0;
-    expect((await boat.listManagedBoats(cfg, [{ botId, name: "Legacy", inUse: false }])).instances).toEqual([
+    expect((await boat.listManagedBoats(cfg, [{ botId, name: "Recorded", inUse: false }])).instances).toEqual([
       expect.objectContaining({
         boxId,
-        name: legacyNameFor(botId),
+        name: await boat.boatNameFor(botId),
         state: "ready",
         ownerBotId: botId,
       }),
@@ -246,7 +246,7 @@ describe("Hezuo-managed Boat inventory", () => {
     const inventory = await boat.listManagedBoats(
       cfg,
       [{ botId, name: "Replacement", inUse: false }],
-      { adoptLegacy: false },
+      { reconcileRecords: false },
     );
 
     expect(inventory.instances).toEqual([]);
@@ -286,7 +286,7 @@ describe("Hezuo-managed Boat inventory", () => {
     const inventory = await boat.listManagedBoats(cfg, [{ botId, name: "Conflict", inUse: false }]);
 
     expect(inventory).toMatchObject({ available: false, instances: [] });
-    expect(inventory.problem).toMatch(/no longer has its Hezuo owner name/i);
+    expect(inventory.problem).toMatch(/no longer has its HezuoBot owner name/i);
     expect(journal.boatCreateRecoverySnapshot()).toContainEqual({ botId, boxId, resolved: true });
     expect(requests.map(({ method, path }) => `${method} ${path}`)).toEqual([
       "GET /api/v1/sandboxes",
@@ -314,14 +314,14 @@ describe("Hezuo-managed Boat inventory", () => {
     expect(journal.boatCreateRecoverySnapshot().some((record) => record.boxId === boxId)).toBe(false);
   });
 
-  it("can compare a replacement account without adopting its legacy identities", async () => {
+  it("can compare a replacement account without changing its recovery records", async () => {
     const botId = "replacement-probe";
-    boats = [{ id: "bx_789abcde", name: legacyNameFor(botId), state: "ready" }];
+    boats = [{ id: "bx_789abcde", name: await boat.boatNameFor(botId), state: "ready" }];
 
     const inventory = await boat.listManagedBoats(
       cfg,
       [{ botId, name: "Replacement", inUse: false }],
-      { adoptLegacy: false },
+      { reconcileRecords: false },
     );
 
     expect(inventory.available).toBe(true);
@@ -331,10 +331,9 @@ describe("Hezuo-managed Boat inventory", () => {
     expect(journal.boatCreateRecoverySnapshot().some((record) => record.botId === botId)).toBe(false);
   });
 
-  it("recognizes adopted legacy names when restoring their account credential", async () => {
-    const botId = "legacy-credential";
+  it("recognizes only canonical scoped names when restoring their account credential", async () => {
+    const botId = "credential-owner";
     expect(await boat.boatNameMatchesBot(botId, await boat.boatNameFor(botId))).toBe(true);
-    expect(await boat.boatNameMatchesBot(botId, legacyNameFor(botId))).toBe(true);
     expect(await boat.boatNameMatchesBot(botId, "provider-owned-boat")).toBe(false);
   });
 
@@ -358,13 +357,29 @@ describe("Hezuo-managed Boat inventory", () => {
 
   it("never hands a bot a sandbox Boat cancelled for want of a machine, or one in error", async () => {
     const botId = "terminal-owner";
-    boats = [{ id: "bx_456789ab", name: legacyNameFor(botId), state: "ready" }];
+    boats = [{ id: "bx_456789ab", name: await boat.boatNameFor(botId), state: "ready" }];
     await expect(boat.findBoat(cfg, botId)).resolves.toMatchObject({ id: "bx_456789ab" }); // caches the id
     // The direct read of the cached id, then the listing, both pass it over.
     boats[0]!.state = "cancelled";
     await expect(boat.findBoat(cfg, botId)).resolves.toBeNull();
     boats[0]!.state = "error";
     await expect(boat.findBoat(cfg, botId)).resolves.toBeNull();
+  });
+
+  it("does not reuse a cached Boat after its owner name changes", async () => {
+    const botId = "renamed-cached-owner";
+    const boxId = "bx_6789abcd";
+    boats = [{ id: boxId, name: await boat.boatNameFor(botId), state: "ready" }];
+    await expect(boat.findBoat(cfg, botId)).resolves.toMatchObject({ id: boxId });
+
+    boats[0]!.name = "provider-renamed-boat";
+    requests.length = 0;
+
+    await expect(boat.findBoat(cfg, botId)).resolves.toBeNull();
+    expect(requests.map(({ method, path }) => `${method} ${path}`)).toEqual([
+      `GET /api/v1/sandboxes/${boxId}`,
+      "GET /api/v1/sandboxes",
+    ]);
   });
 
   it("does not cache or use a malformed exact-name Boat identity", async () => {
@@ -374,26 +389,26 @@ describe("Hezuo-managed Boat inventory", () => {
     await expect(boat.findBoat(cfg, botId)).rejects.toThrow(/invalid cloud computer identity/i);
   });
 
-  it("shows current-install orphans but hides foreign and ownerless legacy Boats", async () => {
+  it("shows current-install orphans but hides foreign and unscoped Boats", async () => {
     const currentBotId = "scoped-owner";
-    const legacyBotId = "legacy-owner";
+    const secondBotId = "second-owner";
     const currentName = await boat.boatNameFor(currentBotId);
     const orphanName = await boat.boatNameFor("deleted-local-bot");
-    const currentScope = currentName.match(/^ogb-([a-f0-9]{12})-/)?.[1];
+    const currentScope = currentName.match(/^hezuo-([a-f0-9]{12})-/)?.[1];
     expect(currentScope).toBeTruthy();
     const foreignScope = currentScope === "000000000000" ? "111111111111" : "000000000000";
-    const foreignName = currentName.replace(/^ogb-[a-f0-9]{12}-/, `ogb-${foreignScope}-`);
-    const ownerlessLegacyName = "ogb-orphaned-abcdef";
+    const foreignName = currentName.replace(/^hezuo-[a-f0-9]{12}-/, `hezuo-${foreignScope}-`);
+    const foreignUnscopedName = "hezuo-orphaned-abcdef";
     boats = [
       { id: "bx_23456789", name: currentName, state: "ready" },
-      { id: "bx_abcdefgh", name: legacyNameFor(legacyBotId), state: "archived" },
+      { id: "bx_abcdefgh", name: await boat.boatNameFor(secondBotId), state: "archived" },
       { id: "bx_jkmnpqrs", name: orphanName, state: "idle" },
       { id: "bx_mnpqrstu", name: foreignName, state: "running" },
-      { id: "bx_npqrstuv", name: ownerlessLegacyName, state: "archived" },
+      { id: "bx_npqrstuv", name: foreignUnscopedName, state: "archived" },
     ];
     const owners = [
       { botId: currentBotId, name: "Current", inUse: false },
-      { botId: legacyBotId, name: "Legacy", inUse: false },
+      { botId: secondBotId, name: "Recorded", inUse: false },
     ];
 
     const inventory = await boat.listManagedBoats(cfg, owners);
@@ -401,16 +416,16 @@ describe("Hezuo-managed Boat inventory", () => {
     expect(inventory.instances).toHaveLength(3);
     expect(inventory.instances).toEqual(expect.arrayContaining([
       expect.objectContaining({ boxId: "bx_23456789", ownerBotId: currentBotId, orphaned: false }),
-      expect.objectContaining({ boxId: "bx_abcdefgh", ownerBotId: legacyBotId, orphaned: false }),
+      expect.objectContaining({ boxId: "bx_abcdefgh", ownerBotId: secondBotId, orphaned: false }),
       expect.objectContaining({ boxId: "bx_jkmnpqrs", ownerBotId: null, orphaned: true }),
     ]));
     expect(inventory.instances.some((instance) => instance.name === foreignName)).toBe(false);
-    expect(inventory.instances.some((instance) => instance.name === ownerlessLegacyName)).toBe(false);
+    expect(inventory.instances.some((instance) => instance.name === foreignUnscopedName)).toBe(false);
 
     requests.length = 0;
     await expect(boat.deleteManagedBoat(cfg, owners, "bx_mnpqrstu", foreignName)).rejects.toThrow(/no longer exists/);
     await expect(
-      boat.deleteManagedBoat(cfg, owners, "bx_npqrstuv", ownerlessLegacyName),
+      boat.deleteManagedBoat(cfg, owners, "bx_npqrstuv", foreignUnscopedName),
     ).rejects.toThrow(/no longer exists/);
     expect(requests.some((request) => request.method === "DELETE")).toBe(false);
   });
@@ -419,7 +434,7 @@ describe("Hezuo-managed Boat inventory", () => {
     const botId = "second-page-owner";
     pageResponses = new Map([
       ["", { sandboxes: [{ id: "foreign", name: "unmanaged", state: "ready" }], nextCursor: "page two/?=" }],
-      ["page two/?=", { sandboxes: [{ id: "bx_mnpqrstu", name: legacyNameFor(botId), state: "idle" }], nextCursor: null }],
+      ["page two/?=", { sandboxes: [{ id: "bx_mnpqrstu", name: await boat.boatNameFor(botId), state: "idle" }], nextCursor: null }],
     ]);
 
     const inventory = await boat.listManagedBoats(cfg, [{ botId, name: "Page two", inUse: false }]);
@@ -460,7 +475,7 @@ describe("Hezuo-managed Boat inventory", () => {
 
   it("revalidates ownership before sleep and surfaces a provider refusal", async () => {
     const botId = "sleeping-owner";
-    boats = [{ id: "bx_tuvwxyz2", name: legacyNameFor(botId), state: "ready" }];
+    boats = [{ id: "bx_tuvwxyz2", name: await boat.boatNameFor(botId), state: "ready" }];
     const owners = [{ botId, name: "Sleeper", inUse: false }];
 
     await boat.sleepManagedBoat(cfg, owners, "bx_tuvwxyz2");
@@ -476,7 +491,7 @@ describe("Hezuo-managed Boat inventory", () => {
     expect(requests.some((request) => request.path.endsWith("/resume"))).toBe(false);
     expect(requests.some((request) => request.path.endsWith("/desktop"))).toBe(false);
 
-    boats = [{ id: "bx_tuvwxyz2", name: legacyNameFor(botId), state: "provisioning" }];
+    boats = [{ id: "bx_tuvwxyz2", name: await boat.boatNameFor(botId), state: "provisioning" }];
     requests.length = 0;
     await expect(boat.sleepManagedBoat(cfg, owners, "bx_tuvwxyz2")).rejects.toThrow(/cannot sleep while it is provisioning/);
     expect(requests.every((request) => request.method === "GET")).toBe(true);
@@ -484,7 +499,7 @@ describe("Hezuo-managed Boat inventory", () => {
 
   it("requires fresh exact confirmation for deletion and clears a cached owner id", async () => {
     const botId = "delete-owner";
-    const managedName = legacyNameFor(botId);
+    const managedName = await boat.boatNameFor(botId);
     boats = [{ id: "bx_3456789a", name: managedName, state: "archived" }];
     const owners = [{ botId, name: "Disposable", inUse: false }];
     const journal = await import("./boat-create-idempotency.ts");
@@ -540,7 +555,7 @@ describe("Hezuo-managed Boat inventory", () => {
     ["retrying", ["pending", "blocked"]],
   ] as const)("finishes a delete whose purge is only blocked until Boat finishes it: %s after %j", async (stage, statuses) => {
     const botId = `self-finishing-${stage}-${statuses.length}`;
-    const managedName = legacyNameFor(botId);
+    const managedName = await boat.boatNameFor(botId);
     const boxId = "bx_456789ab";
     boats = [{ id: boxId, name: managedName, state: "archived" }];
     const owners = [{ botId, name: "Self-finishing", inUse: false }];
@@ -559,7 +574,7 @@ describe("Hezuo-managed Boat inventory", () => {
 
   it.each([[["pending", "blocked"]], [["blocked"]]] as const)("keeps the fence and says what to do when Boat keeps the data for a fork or named snapshot, after %j", async (statuses) => {
     const botId = `kept-delete-owner-${statuses.length}`;
-    const managedName = legacyNameFor(botId);
+    const managedName = await boat.boatNameFor(botId);
     const boxId = "bx_456789ab";
     boats = [{ id: boxId, name: managedName, state: "archived" }];
     const owners = [{ botId, name: "Kept", inUse: false }];
@@ -580,7 +595,7 @@ describe("Hezuo-managed Boat inventory", () => {
 
   it("keeps the fence when Boat blocks a delete without a documented stage", async () => {
     const botId = "blocked-delete-owner";
-    const managedName = legacyNameFor(botId);
+    const managedName = await boat.boatNameFor(botId);
     const boxId = "bx_456789ab";
     boats = [{ id: boxId, name: managedName, state: "archived" }];
     const owners = [{ botId, name: "Blocked", inUse: false }];
@@ -598,7 +613,7 @@ describe("Hezuo-managed Boat inventory", () => {
 
   it("reports an accepted background deletion as pending without discarding recovery", async () => {
     const botId = "pending-delete-owner";
-    const managedName = legacyNameFor(botId);
+    const managedName = await boat.boatNameFor(botId);
     const boxId = "bx_6789abcd";
     boats = [{ id: boxId, name: managedName, state: "archived" }];
     const owners = [{ botId, name: "Pending", inUse: false }];
@@ -678,7 +693,7 @@ describe("Hezuo-managed Boat inventory", () => {
 
   it("keeps a valid accepted deletion pending when direct confirmation is unavailable", async () => {
     const botId = "unavailable-delete-check";
-    const managedName = legacyNameFor(botId);
+    const managedName = await boat.boatNameFor(botId);
     const boxId = "bx_bcdefgh3";
     boats = [{ id: boxId, name: managedName, state: "archived" }];
     const owners = [{ botId, name: "Unavailable check", inUse: false }];
@@ -696,7 +711,7 @@ describe("Hezuo-managed Boat inventory", () => {
 
   it("rejects a malformed successful deletion envelope while the Boat still exists", async () => {
     const botId = "invalid-delete-receipt";
-    const managedName = legacyNameFor(botId);
+    const managedName = await boat.boatNameFor(botId);
     const boxId = "bx_789abcde";
     boats = [{ id: boxId, name: managedName, state: "archived" }];
     const owners = [{ botId, name: "Invalid receipt", inUse: false }];
@@ -713,7 +728,7 @@ describe("Hezuo-managed Boat inventory", () => {
 
   it("retires the exact receipt when the Boat disappears between revalidation and DELETE", async () => {
     const botId = "already-gone-owner";
-    const managedName = legacyNameFor(botId);
+    const managedName = await boat.boatNameFor(botId);
     const boxId = "bx_56789abc";
     boats = [{ id: boxId, name: managedName, state: "archived" }];
     const owners = [{ botId, name: "Gone", inUse: false }];
@@ -728,7 +743,7 @@ describe("Hezuo-managed Boat inventory", () => {
 
   it("bounds the direct read of a known Boat, so a stalled relay can't hold a turn's setup", async () => {
     const botId = "stalled-direct-read";
-    boats = [{ id: "bx_456789ab", name: legacyNameFor(botId), state: "ready" }];
+    boats = [{ id: "bx_456789ab", name: await boat.boatNameFor(botId), state: "ready" }];
     await expect(boat.findBoat(cfg, botId)).resolves.toMatchObject({ id: "bx_456789ab" }); // caches the id
     directHangs = true;
     requests.length = 0;
@@ -749,7 +764,7 @@ describe("Hezuo-managed Boat inventory", () => {
     pageResponses = new Map([
       ["", { sandboxes: [], nextCursor: "next" }],
       ["next", {
-        sandboxes: [{ id: "bx_npqrstuv", name: legacyNameFor(secondPageBot), state: "ready" }],
+        sandboxes: [{ id: "bx_npqrstuv", name: await boat.boatNameFor(secondPageBot), state: "ready" }],
         nextCursor: null,
       }],
     ]);
@@ -771,7 +786,7 @@ describe("Hezuo-managed Boat inventory", () => {
 
   it("does not mutate a missing or busy managed boat and reports delete failures", async () => {
     const botId = "busy-owner";
-    const managedName = legacyNameFor(botId);
+    const managedName = await boat.boatNameFor(botId);
     const owners = [{ botId, name: "Busy", inUse: true }];
 
     await expect(boat.deleteManagedBoat(cfg, owners, "bx_456789ab", managedName)).rejects.toThrow(/no longer exists/);

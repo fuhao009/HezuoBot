@@ -5,7 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const prefixName = "omb-linux-smoke-runtime-";
+const prefixName = "hezuo-linux-smoke-runtime-";
 const delay = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
 async function cleanupRuntime(directory) {
@@ -22,18 +22,18 @@ async function cleanupRuntime(directory) {
   }
   throw new Error(`[run-linux-package-smoke] could not clean released runtime ${directory}`);
 }
-const appImages = readdirSync(path.join(root, "release")).filter((name) => name.endsWith(".AppImage"));
+const appImages = readdirSync(path.join(root, "release", "product")).filter((name) => name.endsWith(".AppImage"));
 if (appImages.length !== 1) {
   throw new Error(`[run-linux-package-smoke] expected exactly one AppImage, found ${appImages.length}`);
 }
 const [appImage] = appImages;
 
 const executables = [
-  path.join(root, "release", "linux-unpacked", "hezuo"),
-  path.join(root, "release", appImage),
+  path.join(root, "release", "product", "linux-unpacked", "hezuobot"),
+  path.join(root, "release", "product", appImage),
 ];
-if (process.env.OMB_SMOKE_INSTALLED_DEB === "1") {
-  executables.push("/opt/Hezuo/hezuo");
+if (process.env.HEZUO_SMOKE_INSTALLED_DEB === "1") {
+  executables.push("/opt/HezuoBot/hezuobot");
 }
 
 for (const executable of executables) {
@@ -47,8 +47,8 @@ for (const executable of executables) {
       env: {
         ...process.env,
         XDG_RUNTIME_DIR: runtimeDirectory,
-        OMB_SMOKE_BUNDLED_CUA: "1",
-        OMB_SMOKE_EXECUTABLE: executable,
+        HEZUO_SMOKE_BUNDLED_CUA: "1",
+        HEZUO_SMOKE_EXECUTABLE: executable,
       },
       stdio: "inherit",
     },
@@ -76,9 +76,9 @@ if (process.exitCode === undefined) {
       env: {
         ...process.env,
         XDG_RUNTIME_DIR: runtimeDirectory,
-        OMB_SMOKE_BUNDLED_CUA: "1",
-        OMB_SMOKE_SIGNAL_SHUTDOWN: "1",
-        OMB_SMOKE_EXECUTABLE: path.join(root, "release", appImage),
+        HEZUO_SMOKE_BUNDLED_CUA: "1",
+        HEZUO_SMOKE_SIGNAL_SHUTDOWN: "1",
+        HEZUO_SMOKE_EXECUTABLE: path.join(root, "release", "product", appImage),
       },
       stdio: "inherit",
     },
@@ -105,8 +105,8 @@ if (process.exitCode === undefined) {
       env: {
         ...process.env,
         XDG_RUNTIME_DIR: runtimeDirectory,
-        OMB_SMOKE_HARD_DEATH: "1",
-        OMB_SMOKE_EXECUTABLE: path.join(root, "release", "linux-unpacked", "hezuo"),
+        HEZUO_SMOKE_HARD_DEATH: "1",
+        HEZUO_SMOKE_EXECUTABLE: path.join(root, "release", "product", "linux-unpacked", "hezuobot"),
       },
       stdio: "inherit",
     },
@@ -141,8 +141,8 @@ if (process.exitCode === undefined) for (const lane of [
       env: {
         ...process.env,
         XDG_RUNTIME_DIR: runtimeDirectory,
-        OMB_SMOKE_WAYLAND: lane.wayland ? "1" : "0",
-        OMB_SMOKE_LINUX_CUA_BLOCKED: lane.blocked ? "1" : "0",
+        HEZUO_SMOKE_WAYLAND: lane.wayland ? "1" : "0",
+        HEZUO_SMOKE_LINUX_CUA_BLOCKED: lane.blocked ? "1" : "0",
       },
       stdio: "inherit",
     },

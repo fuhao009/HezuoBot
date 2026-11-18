@@ -65,7 +65,7 @@ beforeAll(async () => {
   PORT = base;
   WEBHOOK_PORT = base + 1;
   BASE = `http://127.0.0.1:${PORT}`;
-  home = mkdtempSync(join(tmpdir(), "omb-shared-computer-gate-"));
+  home = mkdtempSync(join(tmpdir(), "hezuo-shared-computer-gate-"));
   mkdirSync(join(home, ".hezuo"), { recursive: true });
   // No `features` block at all: the shipped default.
   writeFileSync(join(home, ".hezuo", "config.json"), JSON.stringify({
@@ -78,9 +78,9 @@ beforeAll(async () => {
       ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}),
       HOME: home,
       USERPROFILE: home,
-      OMB_PORT: String(PORT),
-      OMB_WEBHOOK_PORT: String(WEBHOOK_PORT),
-      OMB_TEST_INTERNAL_CAPABILITY_KEY: TEST_CAPABILITY_KEY,
+      HEZUO_PORT: String(PORT),
+      HEZUO_WEBHOOK_PORT: String(WEBHOOK_PORT),
+      HEZUO_TEST_INTERNAL_CAPABILITY_KEY: TEST_CAPABILITY_KEY,
     },
     stdio: ["ignore", "pipe", "pipe"],
   });

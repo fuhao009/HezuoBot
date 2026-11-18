@@ -17,7 +17,7 @@ const LEASE_NAME = "hezuo-server.lease";
 const roots = [];
 
 function temporaryDirectory(name = "data") {
-  const root = mkdtempSync(path.join(tmpdir(), "omb-electron-lease-"));
+  const root = mkdtempSync(path.join(tmpdir(), "hezuo-electron-lease-"));
   roots.push(root);
   const dataDir = path.join(root, name);
   mkdirSync(dataDir, { recursive: true });
@@ -121,7 +121,7 @@ test("an invalid child capability fails closed without acquisition or secret log
     assert.equal(result.code, 0);
     assert.equal(result.stderr, "");
     assert.deepEqual(JSON.parse(result.stdout), {
-      error: "The Hezuo desktop lease delegation is invalid; refusing to start to protect its state.",
+      error: "The HezuoBot desktop lease delegation is invalid; refusing to start to protect its state.",
       consumed: true,
     });
     assert.equal(result.stdout.includes(invalidCapability), false);
@@ -361,18 +361,13 @@ test("a foreign-host reaper fails closed and identifies its preserved recovery r
   assert.deepEqual(JSON.parse(readFileSync(reaperPath, "utf8")), reaper);
 });
 
-test("legacy data is moved before lease creation", () => {
-  const root = mkdtempSync(path.join(tmpdir(), "omb-electron-legacy-"));
-  roots.push(root);
-  const legacyDataDir = path.join(root, ".opengrokbot");
-  const dataDir = path.join(root, ".hezuo");
-  mkdirSync(legacyDataDir);
-  writeFileSync(path.join(legacyDataDir, "keep-me.txt"), "kept");
+test("canonical data is preserved during lease creation", () => {
+  const { dataDir } = temporaryDirectory();
+  writeFileSync(path.join(dataDir, "keep-me.txt"), "kept");
 
-  const lease = acquireDataDirLease(dataDir, { legacyDataDir });
+  const lease = acquireDataDirLease(dataDir);
   try {
     assert.equal(readFileSync(path.join(dataDir, "keep-me.txt"), "utf8"), "kept");
-    assert.throws(() => readFileSync(path.join(legacyDataDir, "keep-me.txt")), /ENOENT/);
   } finally {
     lease.release();
   }

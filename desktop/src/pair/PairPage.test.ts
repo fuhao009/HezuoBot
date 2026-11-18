@@ -26,8 +26,8 @@ it("in the desktop app, a code the link carried connects at once; a browser stil
   expect(pairsAutomatically(null, true)).toBe(false);
 });
 
-it("opening My Cloud from the app needs no click and no code to type", async () => {
-  vi.stubGlobal("window", { ogb: { workspaces: {} } });
+it("opening a server pairing link in the app needs no click or code entry", async () => {
+  vi.stubGlobal("window", { hezuo: { workspaces: {} } });
   f.pair.mockResolvedValue({ ok: true });
   const html = render(code);
   expect(html).not.toContain("Pairing code"); expect(html).not.toContain("<form");
@@ -37,7 +37,7 @@ it("opening My Cloud from the app needs no click and no code to type", async () 
 });
 
 it("a code that no longer works falls back to the form, with the reason", async () => {
-  vi.stubGlobal("window", { ogb: { workspaces: {} } });
+  vi.stubGlobal("window", { hezuo: { workspaces: {} } });
   f.pair.mockResolvedValue({ ok: false, error: "That pairing code has expired." });
   render(code); f.effects[0](); await flush();
   expect(replaced).toEqual([]);
@@ -50,19 +50,18 @@ it("a browser keeps the code in the form for the person to confirm", () => {
   f.effects[0]?.(); expect(f.pair).not.toHaveBeenCalled();
 });
 
-it("Cloud instructions identify the connection action and settings destination", () => {
-  const cloud = pairIntro({ mode: "code", sent: false, email: "", cloudHome: true });
-  expect(cloud).toContain(en["cloudHome.connect"]);
-  expect(cloud).toContain(`Settings → ${en["settings.section.cloudAccount"]}`);
-});
-
-it("email confirmation identifies the address receiving the code", () => {
-  expect(pairIntro({ mode: "email", sent: true, email: "a@b.test", cloudHome: false })).toContain("a@b.test");
+it("explains one-time local code pairing without email login", () => {
+  expect(pairIntro()).toContain("pairing code shown on the server");
+  expect(pairIntro()).toContain("expire after five minutes");
+  vi.stubGlobal("window", {});
+  const html = render(null);
+  expect(html).not.toContain("signin-email");
+  expect(html).not.toContain("Sign in with your email");
 });
 
 it("a team's Cloud is called by the team's name, a person's own Cloud My Cloud", () => {
   const descriptor = (capabilities: Record<string, unknown>) => ({ environmentId: "e", label: "Acme Labs", platform: "linux", version: "1", capabilities: { remoteSessions: true as const, selfUpdate: "operator" as const, ...capabilities } });
-  expect(pairTitle(descriptor({ cloudHome: true, cloudTeam: true }), "code")).toBe("Acme Labs");
-  expect(pairTitle(descriptor({ cloudHome: true }), "code")).toBe(en["cloudSetup.myCloud"]);
-  expect(pairTitle(descriptor({}), "email")).toContain("Acme Labs");
+  expect(pairTitle(descriptor({ cloudHome: true, cloudTeam: true }))).toBe("Acme Labs");
+  expect(pairTitle(descriptor({ cloudHome: true }))).toBe(en["cloudSetup.myCloud"]);
+  expect(pairTitle(descriptor({}))).toBe("Connect to Acme Labs");
 });

@@ -5,7 +5,7 @@ import { afterAll, describe, expect, it } from "vitest";
 
 import { folderToFollow, inMyFolderCwd, sharedProjectFolder, validateBotCwd } from "./bot-cwd.ts";
 
-const dir = mkdtempSync(join(tmpdir(), "omb-cwd-"));
+const dir = mkdtempSync(join(tmpdir(), "hezuo-cwd-"));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
 describe("validateBotCwd", () => {
@@ -36,8 +36,8 @@ describe("validateBotCwd", () => {
 });
 
 describe("sharedProjectFolder", () => {
-  const data = join(dir, "omb-data");
-  const project = join(dir, "omb-data-site");
+  const data = join(dir, "hezuo-data");
+  const project = join(dir, "hezuo-data-site");
   mkdirSync(join(data, "task-workspaces", "bot", "thread"), { recursive: true });
   mkdirSync(project);
 
@@ -55,8 +55,8 @@ describe("sharedProjectFolder", () => {
 });
 
 describe("inMyFolderCwd", () => {
-  const data = join(dir, "omb-data");
-  const project = join(dir, "omb-data-site");
+  const data = join(dir, "hezuo-data");
+  const project = join(dir, "hezuo-data-site");
   const privateFolder = join(data, "task-workspaces", "bot", "thread");
 
   it("shares the sender's project folder outside a room unless asked not to", () => {
@@ -74,8 +74,8 @@ describe("inMyFolderCwd", () => {
 });
 
 describe("folderToFollow", () => {
-  const own = join(dir, "omb-data", "task-workspaces", "bot", "thread");
-  const bot = { id: "bot", cwd: join(dir, "omb-data-site") };
+  const own = join(dir, "hezuo-data", "task-workspaces", "bot", "thread");
+  const bot = { id: "bot", cwd: join(dir, "hezuo-data-site") };
   const folders = { worksInFolders: true, keepsPrivateFolder: false };
 
   it("moves a thread from its own folder to the working folder its bot has been given", () => {
@@ -86,7 +86,7 @@ describe("folderToFollow", () => {
     expect(folderToFollow({ id: "bot" }, "thread", own, folders)).toBeUndefined();
     expect(folderToFollow(bot, "thread", join(dir, "chosen"), folders)).toBeUndefined();
     expect(folderToFollow(bot, "thread", bot.cwd, folders)).toBeUndefined();
-    expect(folderToFollow(bot, "thread", join(dir, "omb-data", "task-workspaces", "bot", "other-thread"), folders)).toBeUndefined();
+    expect(folderToFollow(bot, "thread", join(dir, "hezuo-data", "task-workspaces", "bot", "other-thread"), folders)).toBeUndefined();
     expect(folderToFollow(bot, "thread", null, folders)).toBeUndefined();
     expect(folderToFollow(bot, "thread", undefined, folders)).toBeUndefined();
   });

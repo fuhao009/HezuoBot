@@ -1,51 +1,67 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { setLocale } from "@/lib/i18n";
 import type { AppSettingsSection } from "@/state/store";
+import type * as StoreModule from "@/state/store";
 import { SettingsModal } from "./SettingsModal";
 
-const fixture = vi.hoisted(() => ({ section: "cloudAccount" as AppSettingsSection, config: undefined as { cloudHome?: boolean } | undefined, advanced: false }));
+const fixture = vi.hoisted(() => ({ section: "usage" as AppSettingsSection, config: undefined as { cloudHome?: boolean } | undefined, advanced: false }));
 vi.mock("@/lib/interface-mode", () => ({ useAdvancedMode: () => fixture.advanced, setAdvancedMode: vi.fn() }));
 vi.mock("./DesktopCapabilities", () => ({ useDesktopCapabilities: () => ({ capabilities: {} }) }));
+vi.mock("@/lib/use-owner-or-admin", () => ({ useOwnerOrAdmin: () => true }));
 vi.mock("@/state/store", async (importOriginal) => ({
-  ...await importOriginal<typeof import("@/state/store")>(),
+  ...await importOriginal<typeof StoreModule>(),
   api: vi.fn(),
   useStore: () => ({ state: { appSettingsSection: fixture.section, config: fixture.config }, dispatch: vi.fn() }),
 }));
-vi.mock("./CloudAccountSettings", () => ({
-  CloudAccountSettings: ({ cloudHome, onAddCloud }: { cloudHome?: boolean; onAddCloud?: () => void }) => `CLOUD_PLAN_MARKER${cloudHome ? " home" : ""}${onAddCloud ? " offer" : ""}`,
-}));
+vi.mock("./CloudAccountSettings", () => ({ CloudAccountSettings: () => "RETIRED_CLOUD_PLAN_MARKER" }));
+vi.mock("./UsageSection", () => ({ UsageSection: () => "USAGE_DETAILS_MARKER" }));
+vi.mock("./PlanUsage", () => ({ PlanUsageSummary: () => "USAGE_SUMMARY_MARKER" }));
 
 const plan = { state: vi.fn(), manage: vi.fn() };
 beforeEach(() => {
-  fixture.section = "cloudAccount"; fixture.config = undefined;
+  vi.clearAllMocks();
+  fixture.section = "usage";
+  fixture.config = undefined;
+  setLocale("en");
   vi.stubGlobal("document", { documentElement: { dataset: {} } });
 });
-afterEach(() => { vi.unstubAllGlobals(); });
+afterEach(() => { vi.unstubAllGlobals(); setLocale("en"); });
 const render = () => renderToStaticMarkup(createElement(SettingsModal));
 
-describe.each(["Simple", "Advanced"] as const)("%s Settings → OMB Cloud on a server open in the app's window", (mode) => {
+// The Cloud account page was retired; a stale bridge must not bring it back.
+// Usage remains reachable in both modes, including on a person's Cloud home.
+describe.each(["Simple", "Advanced"] as const)("%s Settings with legacy Cloud bridges", (mode) => {
   beforeEach(() => { fixture.advanced = mode === "Advanced"; });
-  const reachable = () => fixture.advanced ? 'data-settings-section="cloudAccount"' : 'data-settings-block="cloudAccount"';
-  it("is not offered on a server that is not an OMB Cloud home", () => {
-    vi.stubGlobal("window", { ogb: { cloudPlan: plan } });
+  it.each([
+    { name: "a server without a Cloud home", cloudHome: false, local: false },
+    { name: "the person's Cloud home", cloudHome: true, local: false },
+    { name: "the local desktop account bridge", cloudHome: false, local: true },
+  ])("keeps usage available without the retired Cloud page on $name", ({ cloudHome, local }) => {
+    vi.stubGlobal("window", { hezuo: { cloudPlan: plan, ...(local ? { cloudAccount: {} } : {}) } });
+    fixture.config = { cloudHome };
     const html = render();
-    expect(html).not.toContain("CLOUD_PLAN_MARKER"); expect(html).not.toContain(reachable());
-  });
-  it("shows the plan, read only, on the person's own Cloud", () => {
-    vi.stubGlobal("window", { ogb: { cloudPlan: plan } });
-    fixture.config = { cloudHome: true };
-    const html = render();
-    expect(html).toContain("CLOUD_PLAN_MARKER home"); expect(html).toContain(reachable());
-    expect(html).toContain(fixture.advanced ? 'value="cloudAccount"' : 'data-settings-page="billing"');
-  });
-  it("is the full account section in the app on this computer", () => {
-    vi.stubGlobal("window", { ogb: { cloudAccount: {}, cloudPlan: plan } });
-    const html = render();
-    expect(html).toContain("CLOUD_PLAN_MARKER");
-    expect(html).not.toContain("CLOUD_PLAN_MARKER home");
-    expect(html).toContain(reachable());
-    // Simple's plan row above the card already carries the offer, so the card does not repeat it.
-    expect(html.includes("CLOUD_PLAN_MARKER offer")).toBe(fixture.advanced);
+    expect(html).toContain("USAGE_DETAILS_MARKER");
+    expect(html).not.toContain("RETIRED_CLOUD_PLAN_MARKER");
+    expect(html).not.toContain('value="cloudAccount"');
+    expect(html).not.toContain('data-settings-section="cloudAccount"');
+    expect(html).not.toContain('data-settings-block="cloudAccount"');
+    if (fixture.advanced) {
+      expect(html).toContain('data-settings-section="usage" aria-current="page"');
+      expect(html).toContain('<option value="usage" selected="">');
+    } else {
+      expect(html).toContain('data-settings-page="billing" aria-current="page"');
+      expect(html).toContain('<option value="billing" selected="">');
+      expect(html).toContain("Usage &amp; billing");
+      expect(html).toContain("USAGE_SUMMARY_MARKER");
+      const limits = html.indexOf("See all limits");
+      expect(limits).toBeGreaterThan(-1);
+      expect(html.indexOf("USAGE_SUMMARY_MARKER")).toBeLessThan(limits);
+      expect(html).toMatch(/data-settings-disclosure="billing-limits"[\s\S]*?aria-expanded="false"/);
+      expect(html).toMatch(/<div[^>]*hidden=""[^>]*>USAGE_DETAILS_MARKER<\/div>/);
+    }
+    expect(plan.state).not.toHaveBeenCalled();
+    expect(plan.manage).not.toHaveBeenCalled();
   });
 });

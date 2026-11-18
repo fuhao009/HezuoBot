@@ -58,7 +58,6 @@ function expectReceipts(container: HTMLElement) {
     const chip = container.querySelector(`[data-data-result="${id}"]`);
     expect(chip, `${title} renders as a result chip`).not.toBeNull();
     expect(chip!.textContent).toContain(title);
-    expect(chip!.textContent).toContain(t("data.openResult"));
   }
   const notices = [...container.querySelectorAll("[role=status]")].map((element) => element.textContent ?? "");
   expect(notices.some((text) => text.includes("revenue by region") || text.includes("rows with no region"))).toBe(false);

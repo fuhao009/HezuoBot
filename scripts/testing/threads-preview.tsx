@@ -7,10 +7,10 @@ import { applySkinChoice, readSkinChoice } from "../../desktop/src/lib/skins";
 import "../../desktop/src/styles.css";
 
 // This entry point is served only by the disposable verification launcher.
-// The voice-latency harness opts in with ?ombVoiceProbe=1; the recorder in
+// The voice-latency harness opts in with ?hezuoVoiceProbe=1; the recorder in
 // desktop/src/lib/voice-latency-probe stays inert without this sink.
-if (new URLSearchParams(location.search).has("ombVoiceProbe")) {
-  (window as typeof window & { __ombVoiceProbe?: unknown[] }).__ombVoiceProbe = [];
+if (new URLSearchParams(location.search).has("hezuoVoiceProbe")) {
+  (window as typeof window & { __hezuoVoiceProbe?: unknown[] }).__hezuoVoiceProbe = [];
 }
 setAnalyticsEnabled(false);
 // ?onboarding=1 plays a brand-new install, and a new install opens in Simple mode.

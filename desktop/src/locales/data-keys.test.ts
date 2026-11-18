@@ -1,13 +1,13 @@
 // A data.* key is read as a literal t("data.…") or map value, or through a template on its parent (t(`data.view.${mode}`)).
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, URL as NodeURL } from "node:url";
 
 import { expect, it } from "vitest";
 
 import en from "./en.json";
 
-const root = fileURLToPath(new URL("..", import.meta.url));
+const roots = ["../", "../../../packages/shared/"].map((path) => fileURLToPath(new NodeURL(path, import.meta.url)));
 function sources(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
     const path = join(dir, name);
@@ -17,7 +17,7 @@ function sources(dir: string): string[] {
 }
 
 it("keeps no Data string that nothing reads", () => {
-  const code = sources(root).join("\n");
+  const code = roots.flatMap(sources).join("\n");
   const unread = Object.keys(en).filter((key) => key.startsWith("data.")).filter((key) => {
     const parent = key.slice(0, key.lastIndexOf(".") + 1);
     return !code.includes(`"${key}"`) && !code.includes(`\`${parent}\${`);

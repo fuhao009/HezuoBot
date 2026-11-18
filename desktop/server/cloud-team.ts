@@ -10,7 +10,7 @@ export const TEAM_ROLES: readonly TeamRole[] = ["owner", "admin", "member"];
 export interface CloudTeam {
   id: string;
   name: string;
-  /** The team's default language from the Admin (OMB_CLOUD_TEAM_LANGUAGE), used while this server sets none. */
+  /** The team's default language from the Admin (HEZUO_CLOUD_TEAM_LANGUAGE), used while this server sets none. */
   language?: string;
 }
 
@@ -60,7 +60,7 @@ export function parseMemberClaim(body: Record<string, unknown>, team: CloudTeam)
   return { ok: true, member: { email: email.trim().toLowerCase(), role } };
 }
 
-/** A member's own connection (a Composio share, an MCP sign-in, HighLevel) has no path into a team. */
+/** A member's own connection (a Composio share or an MCP sign-in) has no path into a team. */
 export function personalConnectionRefusal(team: Pick<CloudTeam, "name">, what = "it"): string {
   return `Personal connections never enter ${team.name}. Ask an admin to connect ${what} for ${team.name}.`;
 }

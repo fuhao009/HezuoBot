@@ -58,6 +58,4 @@ The fake engine answers the model steps with scripted JSON, so these tests
 prove the plumbing, not the quality of what a real model captures or judges
 contradictory. Check that by hand with a real Claude bot: switch upkeep on,
 mention a preference in passing, wait two minutes, and read the Memory panel.
-The `live-reply-*` scenarios of the live tier ([evals](../../evals/README.md))
-grade a real model's replies to "remember", a research question, "Plan my
-week.", a routine and a dead link with the `reply-habits-v1` judge.
+The live-tier evals have been retired and are not available in this checkout.

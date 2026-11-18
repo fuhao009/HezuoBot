@@ -121,7 +121,7 @@ describe.skipIf(process.platform === "win32")("Muse Code's process", () => {
   });
 
   const fakeMuse = () => {
-    root = mkdtempSync(join(tmpdir(), "omb-muse-launch-"));
+    root = mkdtempSync(join(tmpdir(), "hezuo-muse-launch-"));
     const log = join(root, "launches.jsonl");
     writeFileSync(join(root, "fake-muse.mjs"), FAKE_MUSE_SERVE);
     const cli = join(root, "muse");

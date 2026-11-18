@@ -31,7 +31,7 @@ describe("custom MCP registry", () => {
   });
 
   it("refuses harness-owned environment names in stored and renderer entries", () => {
-    for (const key of ["OMB_HARNESS_URL", "OGB_BOX_TOKEN"]) {
+    for (const key of ["HEZUO_HARNESS_URL", "OGB_BOX_TOKEN"]) {
       expect(parseStoredMcpServer("notes", { command: "notes-mcp", env: { [key]: "bad" } })).toEqual({
         ok: false,
         error: `Environment variable “${key}” is reserved by Hezuo.`,
@@ -212,7 +212,7 @@ describe("parseMcpServersImport", () => {
     });
     expect(parseMcpServersImport('{"mcpServers": {"web": {"url": "x.example/mcp"}}}')).toMatchObject({ ok: false, error: expect.stringMatching(/full address/) });
     expect(parseMcpServersImport('{"mcpServers": {"computer": {"command": "x"}}}')).toMatchObject({ ok: false, error: expect.stringMatching(/reserved/i) });
-    expect(parseMcpServersImport('{"mcpServers": {"ok": {"command": "x", "env": {"OMB_TOKEN": "1"}}}}')).toMatchObject({ ok: false });
+    expect(parseMcpServersImport('{"mcpServers": {"ok": {"command": "x", "env": {"HEZUO_TOKEN": "1"}}}}')).toMatchObject({ ok: false });
     expect(parseMcpServersImport("not json")).toMatchObject({ ok: false, error: expect.stringMatching(/JSON/i) });
     expect(parseMcpServersImport("[]")).toMatchObject({ ok: false });
   });
@@ -331,7 +331,7 @@ describe("a server's result size limit", () => {
 });
 
 describe("a server of another computer's", () => {
-  const MAC = { environmentId: "env-desktop-1", label: "Milind's MacBook" };
+  const MAC = { environmentId: "env-desktop-1", label: "Alex's MacBook" };
 
   it("keeps the computer it runs on, which an edit keeps unless it says null, and lists it", () => {
     const stored = parseStoredMcpServer("notes", { command: "/usr/local/bin/notes-mcp", runsOn: MAC });

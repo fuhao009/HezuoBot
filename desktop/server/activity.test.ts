@@ -26,8 +26,6 @@ describe("describeTool", () => {
     expect(describeTool("GMAIL_SEND_EMAIL")).toEqual({ app: "Gmail", label: "Send email" });
     expect(describeTool("mcp__composio__GITHUB_CREATE_AN_ISSUE")).toEqual({ app: "GitHub", label: "Create an issue" });
     expect(describeTool("GOOGLESHEETS_BATCH_UPDATE")).toEqual({ app: "Google Sheets", label: "Batch update" });
-    expect(describeTool("mcp__highlevel__HIGHLEVEL_ADD_NOTE")).toEqual({ app: "HighLevel", label: "Add note" });
-    expect(describeTool("HIGHLEVEL_UPDATE_CONTACT")).toEqual({ app: "HighLevel", label: "Update contact" });
     expect(describeTool("mcp__device__PHONE_CREATE_EVENT")).toEqual({ app: "Phone", label: "Create event" });
   });
 
@@ -67,7 +65,7 @@ let dataDir: string;
 let eventsDir: string;
 
 beforeEach(() => {
-  dataDir = mkdtempSync(join(tmpdir(), "omb-activity-"));
+  dataDir = mkdtempSync(join(tmpdir(), "hezuo-activity-"));
   eventsDir = join(dataDir, "events");
   mkdirSync(eventsDir);
 });

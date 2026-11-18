@@ -170,7 +170,6 @@ shows who talks to whom, not who owes what.
 - [ ] Run; expect FAIL.
 - [ ] Implement the board: four columns, each card showing owner avatar, title, who delegated it, deadline, artifact count, and reviewer. Clicking a card opens its thread.
 - [ ] Add a delegation timeline view — who delegated what to whom, in order — from `parentId` and `createdAt`. This is the community's "timeline showing who delegated what to whom", and it is a rendering of data Task 1 already stores.
-- [ ] Add `/api/work-items` to the companion allowlist as a read verb only, so the phone can see the board and cannot mutate it.
 - [ ] Run the focused test, `pnpm typecheck`, `pnpm check:contrast`.
 - [ ] Commit `feat(work): the delegation task board`.
 

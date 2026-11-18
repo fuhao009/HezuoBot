@@ -11,11 +11,11 @@ export { addressClass, ownAddresses, type AddressClass };
 export type EgressHost = "desktop" | "server" | "cloud";
 
 /** `home-network` and `port` come from the person's own computer when My Cloud's browsing goes out through it. */
-export type Refusal = "omb" | "this-computer" | "local-network" | "link-local" | "metadata" | "reserved" | "rebinding" | "reddit" | "home-network" | "port";
+export type Refusal = "hezuo" | "this-computer" | "local-network" | "link-local" | "metadata" | "reserved" | "rebinding" | "reddit" | "home-network" | "port";
 
 /** How a refusal reads in the page-health line. */
 export const REFUSAL_TEXT: Record<Refusal, string> = {
-  omb: "Hezuo's own service",
+  hezuo: "Hezuo's own service",
   "this-computer": "a service on this computer that no bot started",
   "local-network": "the local network",
   "link-local": "a link-local address",
@@ -113,7 +113,7 @@ export async function refusalFor(
     // On the desktop these come from the person's own proxy: the local network, unless this computer holds the address.
     if (kind === "reserved" && rules.host === "desktop" && listed(FAKE_IP, address)) {
       // The proxy picks the real destination, which may be this computer: never let it reach Hezuo's own ports.
-      if (rules.ownPort(port)) return "omb";
+      if (rules.ownPort(port)) return "hezuo";
       kind = listed(own, address) ? "this-machine" : "private";
     }
     if (kind === "public") continue;
@@ -122,12 +122,12 @@ export async function refusalFor(
       if (rules.host === "desktop" ? rules.localNetwork : rules.host === "server" && rules.allowed(address, port)) continue;
       // The owner's switch opens the local network, but never Hezuo's own ports through it (a Docker host's gateway).
       if (rules.host === "server" && rules.localNetwork) {
-        if (rules.ownPort(port)) return "omb";
+        if (rules.ownPort(port)) return "hezuo";
         continue;
       }
       return "local-network";
     }
-    if (rules.ownPort(port)) return "omb";
+    if (rules.ownPort(port)) return "hezuo";
     // Desktop dev servers are reached by name or address, never through a public name that points here.
     if (rules.host === "desktop") {
       if (namesThisMachine(host)) continue;

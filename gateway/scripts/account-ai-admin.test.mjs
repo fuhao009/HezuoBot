@@ -137,7 +137,7 @@ describe("signedInOperator", () => {
     await expect(signedInOperator(
       { origin: "https://gateway.test", operatorEmail: "op@example.com" },
       io,
-      { client, environment: { OMB_OPERATOR_PASSWORD: "from the environment" } },
+      { client, environment: { HEZUO_OPERATOR_PASSWORD: "from the environment" } },
     )).resolves.toMatchObject({ token: "t".repeat(32) });
     expect(client.calls).toEqual([
       ["authMethods"],
@@ -164,13 +164,13 @@ describe("signedInOperator", () => {
     expect(written.join("")).toContain("asking for an emailed code instead");
   });
 
-  it("never accepts a token from argv and prefers OMB_OPERATOR_TOKEN", async () => {
+  it("never accepts a token from argv and prefers HEZUO_OPERATOR_TOKEN", async () => {
     const client = clientStub({ methodResults: { emailCode: true } });
     const io = { stdin: process.stdin, stdout: { write() { return true; } }, stderr: { write() { return true; } } };
     await expect(signedInOperator(
       { origin: "https://gateway.test" },
       io,
-      { client, environment: { OMB_OPERATOR_TOKEN: "s".repeat(40) } },
+      { client, environment: { HEZUO_OPERATOR_TOKEN: "s".repeat(40) } },
     )).resolves.toMatchObject({ token: "s".repeat(40) });
     expect(client.calls).toEqual([]);
   });
@@ -187,6 +187,6 @@ describe("run argument handling", () => {
     let help = "";
     await run(["--help"], { stdout: { write(chunk) { help += chunk; return true; } }, stderr: { write() { return true; } } });
     expect(help).toContain("--password");
-    expect(help).toContain("OMB_OPERATOR_PASSWORD");
+    expect(help).toContain("HEZUO_OPERATOR_PASSWORD");
   });
 });

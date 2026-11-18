@@ -7,7 +7,7 @@ export function createEmbeddedBrowserSurfaceManager({ owner, createNativeView, c
   let binding = null;
   let disposed = false;
   let shield = null;
-  let fallback = null;
+  const windows = new Map();
   let stopping = false;
   let activeView = null;
   const hosts = new Map();
@@ -18,20 +18,14 @@ export function createEmbeddedBrowserSurfaceManager({ owner, createNativeView, c
     host.contentView.addChildView(view);
     hosts.set(view, host);
   };
-  const fallbackHost = () => {
-    if (!fallback && createFallbackWindow) {
-      fallback = createFallbackWindow();
-      const current = fallback;
-      current.on("resize", () => apply());
-      current.on("closed", () => {
-        if (fallback !== current) return;
-        fallback = null;
-        stopping = true;
-        for (const [view, host] of hosts) if (host === current && !view.webContents.isDestroyed()) view.webContents.close({ waitForBeforeUnload: false });
-        if (!disposed) onFallbackClose();
-      });
-    }
-    return fallback;
+  const closeWindow = (entry) => {
+    entry.window.hide();
+    entry.binding.visible = false;
+    entry.view?.setVisible(false);
+    for (const [view, host] of hosts) if (host === entry.window) { view.setVisible(false); move(view, owner); }
+    entry.window.destroy();
+    windows.delete(entry.binding.surfaceId);
+    onFallbackClose(entry.binding);
   };
   const ensureShield = () => {
     if (shield) return shield;
@@ -54,23 +48,33 @@ export function createEmbeddedBrowserSurfaceManager({ owner, createNativeView, c
   const apply = () => {
     hide();
     if (disposed || stopping || owner.isDestroyed()) return;
-    const host = binding ? owner : fallbackHost();
-    const view = binding ? profiles.get(binding.profileKey)?.active : activeView;
-    if (!host || !view || view.webContents.isDestroyed()) return;
-    if (binding && (binding.hidden || !binding.visible || !binding.bounds)) { fallback?.hide(); return; }
+    for (const entry of windows.values()) {
+      const view = profiles.get(entry.binding.profileKey)?.active;
+      entry.view = view;
+      if (!view || entry.binding.hidden || !entry.binding.interactive) { entry.window.hide(); continue; }
+      const [width, height] = entry.window.getContentSize();
+      move(view, entry.window);
+      view.setBounds({ x: 0, y: 0, width, height });
+      view.setVisible(true);
+    }
+    const host = owner;
+    const view = binding ? profiles.get(binding.profileKey)?.active : null;
+    if (!view || view.webContents.isDestroyed() || [...windows.values()].some(entry => entry.view === view)) return;
+    if (binding.hidden || !binding.visible || !binding.bounds) return;
     const [width, height] = host.getContentSize();
     const bounds = binding?.bounds ?? { x: 0, y: 0, width, height };
     move(view, host);
     view.setBounds(bounds);
     view.setVisible(true);
-    const guard = ensureShield();
-    move(guard, host);
-    guard.setBounds(bounds);
-    host.contentView.removeChildView(guard);
-    host.contentView.addChildView(guard);
-    guard.setVisible(binding?.interactive !== true);
-    if (binding?.interactive !== true && view.webContents.isFocused()) guard.webContents.focus();
-    if (!binding) fallback?.show(); else fallback?.hide();
+    {
+      const guard = ensureShield();
+      move(guard, host);
+      guard.setBounds(bounds);
+      host.contentView.removeChildView(guard);
+      host.contentView.addChildView(guard);
+      guard.setVisible(binding?.interactive !== true);
+      if (binding?.interactive !== true && view.webContents.isFocused()) guard.webContents.focus();
+    }
     publish();
   };
   const normalizeBounds = (bounds) => {
@@ -94,7 +98,7 @@ export function createEmbeddedBrowserSurfaceManager({ owner, createNativeView, c
     move(view, owner);
     activeView = view;
     view.webContents.on("focus", () => {
-      if (!binding?.interactive && binding?.visible && profiles.get(binding.profileKey)?.active === view) ensureShield().webContents.focus();
+      if (!binding?.interactive && binding?.visible && profiles.get(binding.profileKey)?.active === view && ![...windows.values()].some(entry => entry.view === view)) ensureShield().webContents.focus();
     });
     view.webContents.on("destroyed", () => {
       views.delete(view);
@@ -115,6 +119,33 @@ export function createEmbeddedBrowserSurfaceManager({ owner, createNativeView, c
     if (!view.webContents.isDestroyed()) view.webContents.close({ waitForBeforeUnload: false });
   };
   return {
+    takeover(input, title) {
+      if (disposed || !input || input.hidden || !input.interactive || !createFallbackWindow) return false;
+      let entry = windows.get(input.surfaceId);
+      if (!entry) {
+        const window = createFallbackWindow(title);
+        entry = { window, binding: input, view: null };
+        windows.set(input.surfaceId, entry);
+        window.on("resize", apply);
+        window.on("close", event => { if (!disposed) { event.preventDefault(); closeWindow(entry); } });
+      }
+      apply();
+      entry.window.show();
+      entry.window.focus();
+      entry.view?.webContents.focus();
+      return true;
+    },
+    updateTakeover(input) {
+      const entry = windows.get(input.surfaceId);
+      if (!entry || entry.binding.revision !== input.revision) return;
+      entry.binding = input;
+      if (input.hidden || !input.interactive) closeWindow(entry);
+      apply();
+    },
+    closeTakeover(input) {
+      const entry = windows.get(input.surfaceId);
+      if (entry && entry.binding.revision === input.revision) closeWindow(entry);
+    },
     async createView({ profileKey, session, viewport, onPopup }) {
       if (!session) throw new Error("Isolated browser session required");
       const make = () => {
@@ -174,11 +205,6 @@ export function createEmbeddedBrowserSurfaceManager({ owner, createNativeView, c
     },
     detach(input) {
       if (!matches(input)) return;
-      if (binding.hidden) {
-        // Do not turn a confidential viewer revocation into an unbound public window.
-        stopping = true;
-        fallback?.hide();
-      }
       hide(); publish("closed"); binding = null;
       apply();
     },
@@ -196,8 +222,8 @@ export function createEmbeddedBrowserSurfaceManager({ owner, createNativeView, c
         shield = null;
       }
       activeView = null;
-      const oldFallback = fallback; fallback = null;
-      oldFallback?.destroy();
+      for (const entry of windows.values()) entry.window.destroy();
+      windows.clear();
       stopping = false;
     },
     async dispose() { disposed = true; await this.closeAll(); },

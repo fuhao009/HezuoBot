@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -10,9 +9,7 @@ describe("cloud computer lifecycle", () => {
   const botId = "browser-session-test";
 
   beforeAll(async () => {
-    const hash = createHash("sha256").update(botId).digest("hex").slice(0, 6);
-    const prefix = botId.slice(0, 8).toLowerCase().replace(/[^a-z0-9]/g, "");
-    const machineName = `ogb-${prefix}-${hash}`;
+    let machineName = "";
     api = createServer((req, res) => {
       const url = new URL(req.url ?? "/", "http://boat.test");
       let body = "";
@@ -34,9 +31,11 @@ describe("cloud computer lifecycle", () => {
     });
     await new Promise<void>((resolve) => api.listen(0, "127.0.0.1", resolve));
     const port = (api.address() as any).port;
-    vi.stubEnv("OMB_BOAT_API", `http://127.0.0.1:${port}/api/v1`);
+    vi.stubEnv("HEZUO_BOAT_API", `http://127.0.0.1:${port}/api/v1`);
     vi.resetModules();
-    ({ execOnBoat, sleepBoat } = await import("./boat.ts"));
+    const boat = await import("./boat.ts");
+    ({ execOnBoat, sleepBoat } = boat);
+    machineName = await boat.boatNameFor(botId);
   });
 
   afterAll(async () => {

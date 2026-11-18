@@ -36,7 +36,6 @@ export interface McpChatDeps {
   threadLanguage(threadId: string): string | undefined;
   answerCardNode(threadId: string, messageId: string, text: string): boolean;
   fullAccessForSource(botId: string, threadId: string): boolean;
-  cloudGuestDriven(threadId: string): boolean;
   liveTurnByThread: ReadonlyMap<string, string>;
   broadcast(payload: Record<string, unknown>): void;
   publicOrigins(): ReadonlyArray<string | null | undefined>;
@@ -46,7 +45,7 @@ export interface McpChatDeps {
 const mcpServerUrl = (server: object) => ("url" in server && typeof server.url === "string" ? server.url : undefined);
 
 export function createMcpChat(deps: McpChatDeps) {
-  const { store, cfg, mcpOAuth, teamConnections, mcpServersHost, managedPolicy, threadLanguage, answerCardNode, fullAccessForSource, cloudGuestDriven, liveTurnByThread, broadcast } = deps;
+  const { store, cfg, mcpOAuth, teamConnections, mcpServersHost, managedPolicy, threadLanguage, answerCardNode, fullAccessForSource, liveTurnByThread, broadcast } = deps;
   const mcpRequests = new McpRequestService({
     store, teamCloud: deps.teamCloud, language: threadLanguage,
     apply: async (request, fields) => {
@@ -84,7 +83,6 @@ export function createMcpChat(deps: McpChatDeps) {
     return {
       sender, threadId,
       fullAccess: () => fullAccessForSource(sender.id, threadId),
-      guestDriven: () => cloudGuestDriven(threadId),
       teamAdmin: () => teamConnections.actsForAdmin(threadId, generation),
       canUse: (name) => canUseMcpServer(sender.toolScope, name),
       config: deps.mcpConfig(), cfg: () => cfg, personal: () => teamConnections.personMcp(),

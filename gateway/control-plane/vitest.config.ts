@@ -19,14 +19,18 @@ export default defineConfig({
       miniflare: {
         bindings: {
           BETTER_AUTH_SECRET: TEST_AUTH_SECRET,
+          BETTER_AUTH_URL: "https://auth.hezuo.test",
+          EMAIL_FROM: "noreply@gateway.example.test",
           CLOUDFLARE_API_TOKEN: TEST_CLOUDFLARE_TOKEN,
+          // Explicit fixture only; production must configure its own suffix.
+          COMPANION_HOST_SUFFIX: "gateway.example.test",
           // The suite starts from the primary account alone; the account
           // tests add accounts themselves.
           CLOUDFLARE_ENDPOINT_ACCOUNTS: "",
           TEST_PRODUCTION_ENDPOINT_ACCOUNTS: JSON.stringify(productionAccounts),
           ALLOWED_ORIGINS: "https://app.hezuo.test",
           // Production starts in observe (wrangler.jsonc); the suite exercises reclaiming.
-          OMB_TUNNEL_RECLAIM: "on",
+          HEZUO_TUNNEL_RECLAIM: "on",
           TEST_MIGRATIONS: await readD1Migrations(`${root}migrations`),
         },
         // An empty database for migration tests that need data written by an

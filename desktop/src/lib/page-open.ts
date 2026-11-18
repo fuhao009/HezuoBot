@@ -1,19 +1,21 @@
 import { useCallback, useEffect, useRef, type MouseEvent } from "react";
 import { PAGE_ID } from "../../../packages/shared/published-page";
 import type { Bot } from "@/state/store";
-import { useOptionalStoreRef } from "@/state/store-ref";
 import { openExternalLink } from "./app-links";
 import { browserAvailable, builtInBrowserEnabled, type FeatureFlagConfig } from "./feature-flags";
 
-export const PAGES_DOMAIN = "mausbot.page";
+const HTTPS_DNS_ORIGIN = /^https:\/\/((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?)\/?$/i;
 
-/** A link to a page a bot published: https://<page id>.mausbot.page/… Never an app, chat or prompt link. */
+/** A published page lives on a single page-ID subdomain of the configured hosting origin. */
 export function isPublishedPageUrl(value: string | null | undefined): value is string {
-  if (typeof value !== "string") return false;
-  let url: URL;
-  try { url = new URL(value); } catch { return false; }
-  if (url.protocol !== "https:" || url.username || url.password || url.port) return false;
-  const host = url.hostname.toLowerCase(), suffix = `.${PAGES_DOMAIN}`;
+  const origin = import.meta.env.VITE_HEZUO_PAGES_ORIGIN;
+  const domain = typeof origin === "string" && origin === origin.trim()
+    ? HTTPS_DNS_ORIGIN.exec(origin)?.[1]?.toLowerCase()
+    : undefined;
+  if (!domain || typeof value !== "string") return false;
+  const host = /^https:\/\/([a-z0-9.-]+)(?=[/?#]|$)/i.exec(value)?.[1]?.toLowerCase();
+  if (!host || /[\s\\]/.test(value)) return false;
+  const suffix = `.${domain}`;
   return host.endsWith(suffix) && PAGE_ID.test(host.slice(0, -suffix.length));
 }
 
@@ -68,19 +70,9 @@ export function usePanelPage(botId: string, open: (page: PanelPage) => void): vo
   }, [botId]);
 }
 
-/** Opens a link the way a published page's Open does: a page in the bot's browser panel when the desktop app has one,
- * anything else outside the chat. It never sends a message, starts a turn or opens a chat. */
 export function usePageOpener(): (url: string) => void {
-  // Outside the app's store (a message drawn on its own) there is no panel: the page opens outside the chat.
-  const store = useOptionalStoreRef();
-  const latest = useRef(store);
-  latest.current = store;
   return useCallback((url: string) => {
-    const app = latest.current, state = app?.state();
-    const botId = app && state ? pagePanelBot(url, { selectedId: state.selectedId, bots: state.bots ?? [], groups: state.groups ?? [], config: state.config, desktop: window.ogb }) : null;
-    if (!app || !botId) { void openExternalLink(url).catch(() => {}); return; }
-    requestPanelPage(botId, url);
-    app.dispatch({ type: "toggleComputer", open: true });
+    void openExternalLink(url).catch(() => {});
   }, []);
 }
 

@@ -34,7 +34,7 @@ function record(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function printable(value: unknown, max: number): value is string {
-  return typeof value === "string" && value.trim().length > 0 && value.length <= max && !/[\x00-\x1f\x7f]/.test(value);
+  return typeof value === "string" && value.trim().length > 0 && value.length <= max && Array.from(value).every(char => char.charCodeAt(0) >= 0x20 && char.charCodeAt(0) !== 0x7f);
 }
 /** Operators are trusted to select internal HTTPS upstreams. This is not an
  * SSRF sandbox: hostname filtering cannot prevent DNS rebinding. */

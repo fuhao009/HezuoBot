@@ -2,8 +2,6 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** `hezuo serve` — a daemon that runs the harness, the companion sidecar, the webhook receiver, and the managed tunnel with no Electron and no desktop session, so routines and webhooks keep running when the laptop is closed, and the desktop and phone become clients that can list more than one machine.
-
 **Architecture:** Almost nothing new. `desktop/server/index.ts` is already a standalone process (`pnpm dev:server`) and the companion is already a separate process. The always-on stack under `desktop/electron/` is already dependency-injected — `secure-credentials.mjs`, `control-plane-client.mjs`, `managed-companion-tunnel.mjs`, and `companion-origin-gateway.mjs` take their I/O as parameters and do not import `electron`. Only `desktop/electron/companion.mjs` does. So this plan extracts a shared supervisor those two shells both drive, adds a file-backed credential store for the headless case, and teaches the clients that a machine is a thing you pick.
 
 **Tech Stack:** TypeScript, Node 24, Vitest, systemd/launchd unit files.
@@ -146,7 +144,7 @@ imports `electron`.
 - [ ] Write a failing API test that `/api/machine` reports the adapter's capabilities verbatim and carries no credential, no tunnel hostname, and no installation secret.
 - [ ] Write a failing test in `desktop/companion/test/routes.test.ts` that `GET /api/machine` is allowlisted for paired devices and that `POST` to it is refused — the companion is default-deny per method and path, and a new route is closed until someone opens it deliberately.
 - [ ] Run; expect FAIL.
-- [ ] Implement. `name` defaults to the OS hostname and is overridable by `OMB_MACHINE_NAME`, because three VPS boxes all called `localhost` is not a roster.
+- [ ] Implement. `name` defaults to the OS hostname and is overridable by `HEZUO_MACHINE_NAME`, because three VPS boxes all called `localhost` is not a roster.
 - [ ] Run; expect PASS.
 - [ ] Commit `feat(headless): expose machine identity and capabilities`.
 
@@ -192,29 +190,12 @@ imports `electron`.
 - [ ] Write the launchd plist for a Mac mini left running, with `KeepAlive` and `RunAtLoad`.
 - [ ] Write `docs/headless.md`: install, register the installation, the agent CLIs the box needs installed and logged in, the capability table for a headless host, the credential-at-rest tradeoff from Task 1 stated plainly, and the firewall guidance — the companion port must not be exposed directly; use the managed tunnel or a tailnet.
 - [ ] Update the README Status line that currently says webhook triggers use a local receiver rather than an always-on hosted relay. It is about to be less true; say exactly how much less.
-- [ ] Verify by hand on a real Ubuntu box: install, `systemctl start`, confirm a routine fires with no session attached, close the laptop, confirm the phone still reaches it.
 - [ ] Commit `docs(headless): service units and the headless guide`.
 
 ---
 
 ## Self-review
 
-**Coverage.** The community's "always-on and distributed" list: routines and webhooks
-continue when the laptop is closed (Tasks 1–3, 7); desktop and phone become thin clients
-(already true, extended by Task 6); bots on several machines appear in one roster
-(Task 6); health and presence visible centrally (Tasks 4, 6).
-**Two items are not covered and should not pretend to be**: "each bot can run where its
-work makes the most sense" and "jobs can move between local, VPS, VM, and cloud workers".
-Bot-to-machine pinning and job migration need a scheduler that can move a task's
-provider session between hosts — and provider sessions are host-local by construction
-(`resumeCursors` are a specific CLI's session ids on a specific disk). That is a real
-plan of its own, and it comes after this one, not inside it.
-
 **Type consistency.** `HostAdapter` and `HostCapabilities` (Task 1) are consumed by
 Tasks 2, 4, 5, and 6. `SupervisorStatus` (Task 2) is what Task 3 logs. `/api/machine`'s
 payload (Task 4) is what Task 6 reduces.
-
-**The riskiest task is 5,** not 1–3. Tasks 1–4 are additive; Task 5 rewires a shipped
-desktop path that a paired phone depends on. It has its own regression test for the
-port-reuse property, and it should be the last thing merged and the first thing manually
-verified on a packaged build.

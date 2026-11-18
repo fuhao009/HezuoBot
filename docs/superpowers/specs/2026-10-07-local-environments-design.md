@@ -2,14 +2,8 @@
 
 ## Summary
 
-One desktop installation can be running only one configuration at a time: the
-bots, providers, groups, routines and history under `~/.hezuo`. Users who
-work on several unrelated projects (for example a ham-radio bot team and a
-mobile-app bot team) want completely separate teams, model choices, MCP servers
-and histories, and want to switch between them at the start of a work session.
-
 Every piece of that isolation already exists in code. `DATA_DIR` resolves once
-at server boot from `OMB_DATA_DIR` (`desktop/server/config.ts:963`), and every state
+at server boot from `HEZUO_DATA_DIR` (`desktop/server/config.ts:963`), and every state
 file derives from it. The desktop shell already has an "environments" registry
 (`desktop/electron/environments.cjs`, `DesktopWorkspaceSwitcher.tsx`) that switches
 between "This computer" and paired remote servers — but exactly one local
@@ -36,8 +30,6 @@ at a time, with a ~15 s in-app restart. The server binary is unchanged.
   a restart is the mechanism).
 - Copying or cloning an existing environment into a new one (the copy
   installation feature covers moving setups; a guided copy is a fast follow).
-- Per-environment sync, cloud storage, or mobile/companion per-environment
-  pairing (v1: companion keeps pairing to whichever environment is active).
 - Multi-tenancy or sharing: environments are local and single-user, like today.
 
 ## Terminology
@@ -91,7 +83,7 @@ wired thinly from `main.mjs`).
    re-acquire the old lease, restart the old child, tell the user.
 4. Acquire the lease on the target (a held lease means the environment runs
    elsewhere → abort the same way).
-5. Fork the server child with `OMB_DATA_DIR` set to the target (the launch env
+5. Fork the server child with `HEZUO_DATA_DIR` set to the target (the launch env
    is already rebuilt per `startServerOn` call); health-probe as at boot.
 6. Health OK → persist `activeId`, reload the window to the local origin.
    Health fails → kill the child, re-acquire the old lease, restart the old
@@ -129,7 +121,7 @@ confirm.
 
 ## Server changes
 
-None. `OMB_DATA_DIR` already isolates everything, `environment-id` is
+None. `HEZUO_DATA_DIR` already isolates everything, `environment-id` is
 per-directory already, and the CLI attach check (`desktop/server/cli.ts:367`) already
 refuses to attach across directories.
 
@@ -142,14 +134,14 @@ refuses to attach across directories.
   e2e-style test booting two disposable data directories in sequence via
   `launchVerificationServer`; renderer tests for the switcher list and the
   settings form.
-- Docs trio per `CONTRIBUTING.md`: this spec, `docs/plans/local-environments.md`,
+- Historical docs trio (the community contribution guide has been removed): this spec, `docs/plans/local-environments.md`,
   and `docs/verification/local-environments.md`.
 
 ## Upstream integration
 
 Proposed issue: "Switch between multiple local environments (separate bots,
 providers and settings on one machine)". Prior art to cite in the issue:
-`OMB_DATA_DIR` + `--data-dir`, the environments switcher, fleet (server-side
+`HEZUO_DATA_DIR` + `--data-dir`, the environments switcher, fleet (server-side
 multi-workspace), `workspace-backup.ts`. Fleet proves the model; this gives
 desktop users the same capability without systemd.
 

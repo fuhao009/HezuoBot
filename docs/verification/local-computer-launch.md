@@ -3,7 +3,7 @@
 The host CUA gate must run as a headless Node process even inside a packaged
 Electron app. Without `ELECTRON_RUN_AS_NODE=1`, spawning `process.execPath`
 can launch another desktop instance; its single-instance handler then shows
-and focuses the existing OMB window instead of answering MCP requests.
+and focuses the existing HezuoBot window instead of answering MCP requests.
 
 Run the isolated regression:
 
@@ -47,7 +47,7 @@ outside this narrow change; the active macOS launch/status calls are asynchronou
 Reference: OpenClaw's [macOS host coordinator](https://github.com/openclaw/openclaw/blob/7e1b9a63cf64fa5e77b92a7f77e8fccba7b61812/apps/macos/Sources/OpenClaw/CuaDriverHostCoordinator.swift)
 keeps the daemon owned by the desktop host, and its
 [window action adapter](https://github.com/openclaw/openclaw/blob/7e1b9a63cf64fa5e77b92a7f77e8fccba7b61812/extensions/cua-computer/src/window-actions.ts)
-distinguishes window delivery from full-desktop input. OMB retains its existing
+distinguishes window delivery from full-desktop input. HezuoBot retains its existing
 CUA driver, permission broker, and human-control gate rather than importing
 OpenClaw's application-specific gateway or unrestricted authorization policy.
 
@@ -107,6 +107,9 @@ Smart App Control still need a person's PC.
 
 ### When a Cloud can't use this computer
 
+Historical Cloud behavior only: the lending end-to-end fixture is retired.
+The retained component and host checks below do not replace that workflow.
+
 The icon's menu says what the person's own Clouds can't use and why, with the
 one fix ("Screen control isn't running on this PC" and Start screen control).
 A Cloud's bot that needs the computer then calls `ask_for_computer`: one card
@@ -118,12 +121,11 @@ the person's own Cloud, never a Team Cloud.
 node --test desktop/electron/screen-status.node-test.mjs desktop/electron/computer-asks.node-test.mjs
 pnpm exec vitest run desktop/electron/capabilities.test.mjs desktop/server/computer-asks.test.ts \
   desktop/server/host/computer-asks-host.test.ts packages/shared/computer-ask.test.ts desktop/src/components/ComputerAskCard.test.ts
-pnpm exec vitest run desktop/server/cloud-lending.e2e.test.ts -t "paused, the PC still hears"
 ```
 
-The last one boots a real Cloud home and lends to it through the real
-connector: paused, the computer hears the bot's ask, Turn on on the card
-resumes it, and the bot's waiting call returns the computer.
+The retired Cloud lending fixture formerly checked that a paused computer
+heard the bot's ask, Turn on resumed lending, and the waiting call returned
+the computer. This is not a current executable end-to-end check.
 
 `node --experimental-strip-types scripts/verify-windows-lend.ts --shots <dir>`
 photographs the taskbar icon's menu as the real module builds it, the card in
@@ -190,4 +192,4 @@ apps on an unlocked Mac. Check focus throughout the action, not only afterward:
 AX click, pixel click, typing, scroll, covered windows, other Spaces, and actual
 user takeover. Keep permissions and the host control gate enabled. Repeat through
 the packaged embedded daemon, including signing and supported Mac architectures.
-Do not use the operator's OMB data or authenticated browser profiles as fixtures.
+Do not use the operator's HezuoBot data or authenticated browser profiles as fixtures.

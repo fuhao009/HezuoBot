@@ -4,7 +4,6 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { DATA_DIR } from "./config.ts";
 import { ownerOnlyConversation } from "./cloud-lending.ts";
-import { stampOwner } from "./cloud-owner-lines.ts";
 import {
   DREAM_CONVERSATION_BYTES, DREAM_MARKER, DREAM_TOTAL_BYTES, MAX_IDEAS, MAX_LEARNED,
   dreamConversations, dreamPrompt, parseDream, type DreamConversation, type DreamSource,
@@ -68,7 +67,7 @@ describe("the chats a dream reads", () => {
     expect(dreamConversations(source({ a: { askedAt: 10, path: [replied("Hello!")] } }), "bot", 0)).toEqual([]);
   });
 
-  it("keeps both owner-only conversations after their move to My Cloud stamps the owner", () => {
+  it("keeps owner-only conversations with explicit sender identities", () => {
     const owner = { person: "p_owner", name: "Amit" };
     const threads: Record<string, { askedAt: number; path: Message[] }> = {
       a: { askedAt: 200, path: [{ id: "a1", at: 200, role: "user", kind: "text", text: "Shorter please" }] },
@@ -79,7 +78,7 @@ describe("the chats a dream reads", () => {
       { threadId: "a", lines: [{ by: "person", text: "Shorter please" }] },
     ];
     expect(dreamConversations(source(threads), "bot", 100)).toEqual(expected);
-    for (const thread of Object.values(threads)) thread.path = stampOwner(thread.path, owner);
+    for (const thread of Object.values(threads)) thread.path = thread.path.map((row) => ({ ...row, sender: { id: owner.person, name: owner.name } }));
     const ownerPerson = (person: string | undefined) => person === owner.person;
     const after = dreamConversations(source(threads), "bot", 100,
       (id) => ownerOnlyConversation(threads[id]!.path, ownerPerson, () => undefined),

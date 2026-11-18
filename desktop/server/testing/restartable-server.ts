@@ -1,12 +1,12 @@
 // A real fake-engine server in a temporary home that can be stopped and started again on the same data and port, so a
-// test can prove what survives a restart. Same environment as control-omb's launch: no user data, no developer CLIs.
+// test can prove what survives a restart. Same environment as control-hezuo's launch: no user data, no developer CLIs.
 import { spawn, type ChildProcess } from "node:child_process";
 import { closeSync, mkdirSync, mkdtempSync, openSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { verificationServerArgs, verificationServerEnvironment } from "../../../scripts/control-omb.ts";
+import { verificationServerArgs, verificationServerEnvironment } from "../../../scripts/control-hezuo.ts";
 import { removeTempDir, waitForExit } from "./cleanup.ts";
 import { freePortBlock } from "./ports.ts";
 
@@ -30,7 +30,7 @@ export interface RestartableServer {
 export async function launchRestartableServer(options: { scripted?: boolean; dataDirRoot?: string } = {}): Promise<RestartableServer> {
   const port = await freePortBlock([0, 1]);
   // Native browser daemons use UNIX sockets, and a macOS temp home can exceed their path limit.
-  const dataDir = mkdtempSync(join(options.dataDirRoot ?? tmpdir(), "omb-restartable-"));
+  const dataDir = mkdtempSync(join(options.dataDirRoot ?? tmpdir(), "hezuo-restartable-"));
   mkdirSync(join(dataDir, "tmp"), { recursive: true });
   const planPath = join(dataDir, "room-plan.json");
   if (options.scripted) writeFileSync(planPath, "{}");

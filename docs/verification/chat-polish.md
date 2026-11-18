@@ -38,7 +38,7 @@ No personal provider account, real credentials, or user workspace is used.
 
 ```sh
 pnpm exec vitest run desktop/src/components/AttachmentGallery.test.ts desktop/src/components/AttachmentPreview.test.ts desktop/src/components/ToolActivity.test.ts desktop/src/components/SettingsPrimitives.test.ts desktop/src/components/ShortcutHint.test.ts desktop/server/message-file.test.ts scripts/testing/verification-docs.test.ts
-pnpm exec vitest run desktop/server/tool-summary.test.ts desktop/server/control-omb.test.ts desktop/server/drivers/claude.test.ts desktop/server/drivers/codex.test.ts desktop/server/drivers/pi.test.ts desktop/server/drivers/acp/acp.test.ts
+pnpm exec vitest run desktop/server/tool-summary.test.ts desktop/server/control-hezuo.test.ts desktop/server/drivers/claude.test.ts desktop/server/drivers/codex.test.ts desktop/server/drivers/pi.test.ts desktop/server/drivers/acp/acp.test.ts
 pnpm typecheck
 pnpm lint
 pnpm check:contrast
