@@ -20,6 +20,15 @@
     "third_party/**",
     "desktop/electron/resources/**",
     "server/core-engine/**",
-    "desktop/server/core-engine/**"
+    "desktop/server/core-engine/**",
+    "desktop/electron/embedded-browser-cdp.mjs",
+    "desktop/electron/bot-test-api.mjs",
+    "desktop/electron/gateway-companion-tunnel.mjs",
+    "scripts/verify-real-native-browser.mjs",
+    "scripts/verify-desktop-only.mjs",
+    "scripts/verify-gateway-admin.mjs",
+    "gateway/control-plane/src/task-billing.ts",
+    "gateway/control-plane/src/channel-store.ts",
+    "desktop/server/browser/embedded-backend.ts"
   ]
 }
