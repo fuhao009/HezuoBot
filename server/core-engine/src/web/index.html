@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; font-src 'none'; object-src 'none'; base-uri 'none'; form-action 'self'">
+  <title>HezuoBot · Conversation</title>
+  <link rel="stylesheet" href="./style.css">
+  <script src="./app.js" defer></script>
+</head>
+<body>
+  <main class="chat">
+    <header class="header">
+      <div>
+        <h1>HezuoBot</h1>
+        <p class="subtitle">Core · 一个 Bot，一个会话</p>
+      </div>
+      <button id="reset" type="button" disabled>Reset conversation</button>
+      <dl class="metadata" aria-label="Connection details">
+        <div><dt>Model</dt><dd id="model">—</dd></div>
+        <div><dt>Backend</dt><dd id="backend">—</dd></div>
+        <div id="web-model-row" hidden><dt>Web model</dt><dd id="web-model">—</dd></div>
+        <div id="analysis-model-row" hidden><dt>Analysis model</dt><dd id="analysis-model">—</dd></div>
+      </dl>
+      <div class="scenario-picker">
+        <label for="scenario">运行场景</label>
+        <select id="scenario" aria-describedby="scenario-hint" disabled>
+          <option value="auto" selected>自动（默认）</option>
+          <option value="web">网页</option>
+          <option value="native">原生应用</option>
+          <option value="visual">视觉桌面</option>
+          <option value="mixed">混合</option>
+          <option value="general">通用</option>
+        </select>
+        <p id="scenario-hint" class="hint">空闲时可调整，下一条消息生效，不清除记录。当前桌面 AX/CUA 后端固定，选择场景不会切换后端；Reset 后恢复自动。</p>
+      </div>
+      <p id="execution" class="execution" role="status" aria-live="polite">当前场景：待运行 · 暂无执行状态</p>
+      <p id="flow" class="flow" role="status" aria-live="polite">流程：准备</p>
+      <p id="model-timing" class="model-timing" role="status" aria-live="polite">模型时间：暂无数据</p>
+      <p id="recovery" class="hint recovery" hidden></p>
+    </header>
+
+    <section id="messages" class="messages" role="log" aria-label="Conversation" aria-live="polite" aria-relevant="additions text" aria-busy="false">
+      <p id="empty" class="empty">Start a conversation below.</p>
+    </section>
+
+    <footer class="footer">
+      <p id="status" class="status" role="status" aria-live="polite">Connecting…</p>
+      <p id="error" class="error" role="alert" hidden></p>
+      <form id="composer" class="composer">
+        <label for="message">Your message</label>
+        <textarea id="message" name="message" rows="3" maxlength="32000" placeholder="输入消息…" aria-describedby="keyboard lifecycle" required></textarea>
+        <div class="composer-actions">
+          <span id="keyboard">Enter to send · Shift+Enter for a new line</span>
+          <div class="buttons">
+            <button id="pause" type="button" disabled>Pause Computer Use</button>
+            <button id="cancel" class="danger" type="button" disabled>停止</button>
+            <button id="send" class="primary" type="submit" disabled>Send</button>
+          </div>
+        </div>
+      </form>
+      <p id="lifecycle" class="hint">Stop ends only the current run, keeps conversation history, and lets you send another message afterwards. Actions already performed cannot be undone. If an older session is closed, export or copy your history before Reset: Reset closes the browser and clears all messages.</p>
+      <p class="hint">Computer Use 可按要求打开公网登录/注册页、填写普通非秘密文字。尚无安全凭据输入通道：手动输入密码/key/token 前，先等当前任务结束，点击 Pause 并确认已暂停；不要发到聊天。暂停后本会话不再截图或输入，不支持登录后安全恢复。自定义敏感字段无法可靠识别；不要在暂停前填写秘密。注册提交、购买、删除需明确授权。</p>
+      <noscript><p class="error">JavaScript is required to connect. Your message cannot be sent without it.</p></noscript>
+    </footer>
+  </main>
+</body>
+</html>
