@@ -1,0 +1,21 @@
+{
+  "name": "hezuobot-core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=24.16.0"
+  },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning src/cli.ts",
+    "web": "sh scripts/web.sh",
+    "test": "node --disable-warning=ExperimentalWarning --test test/*.test.ts",
+    "check": "node --check src/cli.ts && node --check src/core.ts && node --check src/config.ts && node --check src/scenarios.ts && node --check src/execution-flow.ts && node --check src/agent-desktop.ts && node --check src/screenshots.ts && node --check src/computer-use.ts && node --check src/tools.ts && node --check src/browser.ts && node --check src/browser-network.ts && node --check src/openai-chat-protocol.ts && node --check src/chat-repeat-guard.ts && node --check test/core.test.ts && node --check test/scenarios.test.ts && node --check test/core-performance.test.ts && node --check test/execution-flow.test.ts && node --check test/browser.test.ts && node --check test/browser-network.test.ts && node --check test/live-browser.ts && node --check src/web.ts && node --check src/web-server.ts && node --check src/web/app.js && node --check test/web.test.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.29.0",
+    "@trycua/cua-driver": "0.38.0",
+    "playwright": "^1.65.1"
+  }
+}

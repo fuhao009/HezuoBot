@@ -1,0 +1,43 @@
+OpenMausBot
+Copyright 2026 Milind Soni and OpenMausBot contributors
+OpenMausBot was relicensed from the MIT License to the Apache License,
+Version 2.0, with the consent of all contributors whose copyright was
+incorporated before the transition.
+
+HezuoBot-Core reuses src/openai-chat-protocol.ts and src/chat-repeat-guard.ts
+from HezuoBot's desktop/server/drivers/ without modification.
+The independent core conversation loop adapts the structured Chat Completions
+request, assistant tool-call replay and tool-result roundtrip of
+HezuoBot's desktop/server/drivers/openai-chat.ts. Configuration, CLI entry,
+restricted tools and isolated tests are new implementations.
+Only the relevant upstream attribution is retained; desktop, gateway, browser,
+provider catalogs and their unrelated bundled third-party code are not included.
+
+Browser error category vocabulary is adapted from HezuoBot
+desktop/server/browser/cdp/errors.ts, which follows T3 Code
+apps/server/src/preview/ServerBrowserPage.ts:
+https://github.com/pingdotgg/t3code
+Copyright (c) 2026 T3 Tools Inc. (MIT)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+Popup lifecycle design references (no Orca source copied):
+https://github.com/stablyai/orca
+https://playwright.dev/docs/pages#handling-popups
+https://playwright.dev/docs/actionability
