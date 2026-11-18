@@ -27,7 +27,7 @@ const enabled = process.env.OMB_UI_E2E === "1";
     preview = await mountPreview(fixture, { entry: "/scripts/testing/threads-preview.tsx", route: "/__cline.html", title: "Cline verification", logLevel: "warn" });
     await browser("open", preview.previewUrl);
     for (const advanced of [false, true]) {
-      await evaluate(`localStorage.setItem('omb-advanced-mode', '${advanced ? "1" : "0"}'); location.reload(); true`);
+      await evaluate(`localStorage.setItem('hezuo-advanced-mode', '${advanced ? "1" : "0"}'); location.reload(); true`);
       await expect.poll(() => evaluate("document.querySelector('textarea[aria-label=\"Message Cline specialist\"]') !== null"), { timeout: 15_000 }).toBe(true);
       await evaluate("document.querySelector('button[data-tour=\"model\"]').click(); true");
       await expect.poll(() => evaluate("document.querySelector('[data-model-picker-content]') !== null")).toBe(true);

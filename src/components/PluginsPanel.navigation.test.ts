@@ -63,7 +63,7 @@ vi.mock("./PostizCard", () => ({
 }));
 import { HOSTED_MCP_APPS } from "@/lib/hosted-mcp-apps";
 import { APPS_PREVIEW_COUNT, PluginsPanel, USED_BY_AVATAR_SIZE, botsUsingService } from "./PluginsPanel";
-import { FACE_BOX } from "./cursor-face-data";
+import { botShape } from "@/lib/bot-figure";
 import { MASCOT_BODIES } from "../../shared/mascot-bodies";
 
 const CARDS = 0;
@@ -627,22 +627,14 @@ describe("Apps pop-up", () => {
     }
   });
 
-  it("draws them small enough that no mascot body reaches the ring", () => {
-    // CursorAvatar's viewBox is the face box plus 15 units on every side.
-    const box = FACE_BOX + 30;
-    const centre = FACE_BOX / 2;
+  it("draws them small enough that no body reaches the ring", () => {
     for (const body of Object.values(MASCOT_BODIES)) {
-      const d = body.body.match(/ d="([^"]+)"/)![1]!;
-      expect(d.replace(/[-\d.\s]/g, ""), body.id).toMatch(/^[MCZ]+$/);
-      const [x, y, scale] = body.fit.match(/-?\d*\.?\d+/g)!.map(Number) as [number, number, number];
-      const numbers = d.match(/-?\d*\.?\d+/g)!.map(Number);
-      // A cubic stays inside its control points' hull and distance from the centre is convex, so the farthest control
-      // point bounds the outline.
+      const { centre, polar } = botShape(body.shape);
       let reach = 0;
-      for (let i = 0; i + 1 < numbers.length; i += 2) {
-        reach = Math.max(reach, Math.hypot(x + numbers[i]! * scale - centre, y + numbers[i + 1]! * scale - centre));
+      for (const [angle, radius] of polar) {
+        reach = Math.max(reach, Math.hypot(centre[0] + radius * Math.cos(angle) - 50, centre[1] + radius * Math.sin(angle) - 50));
       }
-      expect((reach / box) * USED_BY_AVATAR_SIZE, body.id).toBeLessThan(10);
+      expect((reach / 100) * USED_BY_AVATAR_SIZE, body.id).toBeLessThan(10);
     }
   });
 });

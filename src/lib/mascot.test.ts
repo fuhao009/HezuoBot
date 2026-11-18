@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { t } from "./i18n";
-import { CHROME_GRADIENT, colorSwatch, HEZUO_COLOR_LABEL, HEZUO_COLOR_NAMES, HEZUO_COLORS, stateForBot } from "./mascot";
+import { CHROME_GRADIENT, colorSwatch, HEZUO_COLOR_LABEL, HEZUO_COLOR_NAMES, HEZUO_COLORS, HEZUO_GRADIENTS, stateForBot } from "./mascot";
 
 describe("stateForBot", () => {
   it("still alerts on a failed tool call when a digest receipt follows it", () => {
@@ -57,6 +57,6 @@ describe("chrome", () => {
     expect(swatch.startsWith("radial-gradient(")).toBe(true);
     expect(swatch).not.toContain("repeating");
     for (const tone of CHROME_GRADIENT) expect(swatch).toContain(tone);
-    expect(colorSwatch("blue")).toBe(HEZUO_COLORS.blue);
+    expect(colorSwatch("blue")).toBe(`linear-gradient(210deg, ${HEZUO_GRADIENTS.blue[0]}, ${HEZUO_GRADIENTS.blue[1]} 45%, ${HEZUO_GRADIENTS.blue[2]})`);
   });
 });

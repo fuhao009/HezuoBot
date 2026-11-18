@@ -173,12 +173,12 @@ export function RoomHeader({
           </div>
           <div data-roomhead-controls className="flex shrink-0 items-center">
             <button
-              ref={membersTriggerRef}
               type="button"
               data-room-faces
-              onClick={onOpenMembers}
-              title={t("room.members.manage")}
-              aria-label={membersLabel}
+              onClick={(event) => openRoomPanel(group.id, event.currentTarget)}
+              title={t("room.panel.open")}
+              aria-label={t("room.panel.openAria", { name: group.name })}
+              aria-haspopup="dialog"
               style={headerNoDragStyle}
               className="flex items-center rounded-full py-0.5 pl-1 pr-1.5 hover:bg-raised/60"
             >

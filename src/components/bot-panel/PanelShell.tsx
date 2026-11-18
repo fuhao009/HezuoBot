@@ -1,17 +1,15 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import { Settings, X } from "lucide-react";
+import { X } from "lucide-react";
 
 import { cn } from "@/lib/cn";
 import { t } from "@/lib/i18n";
 import type { Bot, BotSettingsSection } from "@/state/store";
-import { ChatShareMenu } from "@/components/ChatMoreMenu";
 import { useCaptionChrome } from "../DesktopCapabilities";
+import { SoulField } from "../SoulField";
 import type { useBotSettingsDerived } from "../bot-settings/useBotSettingsDerived";
+import { ActsChoice } from "./ActsChoice";
 import { AvatarEditorCard } from "./AvatarEditorCard";
-import { ComputerTab } from "./ComputerTab";
-import { DetailsTab } from "./DetailsTab";
-import { LibraryTab } from "./LibraryTab";
-import { PANEL_TABS, PAGES, TAB_LABEL, type PanelTab, type PanelTarget, type SimplePageId } from "./page-registry";
+import { PAGES, type PanelTab, type PanelTarget, type SimplePageId } from "./page-registry";
 import { PageBody, pageSurfaceCls } from "./pages";
 import { linkTarget, usePanelLink, type PanelLink } from "./panel-link";
 import { PanelHero } from "./PanelHero";
@@ -50,7 +48,6 @@ export function BotPanel({ bot, derived, linkedSection, onClose }: {
     setEditingInstructions(Boolean(target.editInstructions));
     scrollTop();
   };
-  const openTab = (next: PanelTab) => go({ tab: next });
   const openPage = (next: SimplePageId) => {
     setStack((current) => [...current, next]);
     setEditorOpen(false);
@@ -92,23 +89,11 @@ export function BotPanel({ bot, derived, linkedSection, onClose }: {
     event.stopPropagation();
   };
 
-  const backLabel = stack.length > 1 ? t(PAGES[stack[stack.length - 2]!].title, { name: bot.name }) : t(TAB_LABEL[tab]);
+  const backLabel = stack.length > 1 ? t(PAGES[stack[stack.length - 2]!].title, { name: bot.name }) : bot.name;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" onKeyDown={onKeyDown}>
       <div {...dragProps} className="flex h-[50px] shrink-0 items-start justify-end gap-2.5 px-[13px] pt-[13px]">
-        <ChatShareMenu bot={bot} className={roundButtonCls} />
-        <button
-          type="button"
-          data-panel-gear
-          aria-label={t("botPanel.page.settings")}
-          title={t("botPanel.page.settings")}
-          aria-current={page === "settings" ? "page" : undefined}
-          onClick={() => go({ tab: "details", page: "settings" })}
-          className={roundButtonCls}
-        >
-          <Settings size={16} className="pointer-events-none" />
-        </button>
         <button type="button" onClick={onClose} aria-label={t("botSettings.simple.close")} className={roundButtonCls}>
           <X size={16} className="pointer-events-none" />
         </button>
@@ -132,32 +117,16 @@ export function BotPanel({ bot, derived, linkedSection, onClose }: {
                 </>
               )}
             </div>
-            <div
-              role="tablist"
-              aria-label={t("botSettings.simple.tabs")}
-              className="sticky top-0 z-[1] -mx-4 mt-[15px] flex justify-center gap-0.5 bg-app px-4 pb-2.5 pt-1 after:pointer-events-none after:absolute after:inset-x-0 after:top-full after:h-3 after:bg-linear-to-b after:from-app after:to-transparent"
-            >
-              {PANEL_TABS.map((id) => (
-                <button
-                  key={id}
-                  type="button"
-                  role="tab"
-                  aria-selected={tab === id}
-                  data-panel-tab={id}
-                  onClick={() => openTab(id)}
-                  className={cn(
-                    "h-[26px] min-w-0 shrink truncate rounded-full px-2 text-[13px] leading-[18px] transition-colors",
-                    tab === id ? "bg-ink/[0.07] text-ink" : "text-ink-secondary hover:text-ink",
-                  )}
-                >
-                  {t(TAB_LABEL[id])}
-                </button>
-              ))}
+            <div className="mt-5" data-panel-prompt>
+              <SoulField
+                bot={bot}
+                onPatch={derived.patch}
+                simple={{ label: t("botSettings.simple.instructions"), placeholder: t("botSettings.simple.instructionsPlaceholder", { name: bot.name }) }}
+              />
             </div>
-            <div role="tabpanel">
-              {tab === "details" && <DetailsTab bot={bot} derived={derived} onOpen={openPage} />}
-              {tab === "library" && <LibraryTab bot={bot} onOpen={openPage} />}
-              {tab === "computer" && <ComputerTab bot={bot} derived={derived} onOpen={openPage} />}
+            <div className="mt-5 flex flex-col gap-1.5" data-panel-acts>
+              <span className="text-[12px] text-ink-secondary">{t("botSettings.simple.beforeActs", { name: bot.name })}</span>
+              <ActsChoice bot={bot} derived={derived} />
             </div>
           </>
         ) : (

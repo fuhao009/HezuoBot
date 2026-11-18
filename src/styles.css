@@ -139,53 +139,53 @@
   --animate-sent-border: sent-border 1.2s ease-out forwards;
 
   /* Defaults = Midnight. Kept here so the app is never unstyled. */
-  --color-app: #121212;
-  --color-panel: #0e0e0e;
-  --color-raised: #202020;
-  --color-raised-hover: #2c2c2c;
+  --color-app: #0c0c0d;
+  --color-panel: #141415;
+  --color-raised: #29292c;
+  --color-raised-hover: #323236;
   /* the composer pill. Every skin but Daylight paints it in `raised`; there
      it is the page colour with a hairline ring, so it needs a tone (and a
      ring, transparent everywhere else) of its own. */
-  --color-composer: #1f1f1f;
-  --color-composer-ring: #2a2a2a;
+  --color-composer: #1a1a1c;
+  --color-composer-ring: #f5f5f717;
   /* popover and right-click menus. Same story as the composer: every skin
      but Daylight paints them in `card`, which there is the bot's bubble and
      a shade too grey for a menu. */
-  --color-menu: #1f1f1f;
-  --color-menu-hover: #f5f5f50f;
-  --color-menu-active: #f5f5f514;
-  --color-card: #1f1f1f;
-  --color-inset: #1b1b1b;
+  --color-menu: #1a1a1c;
+  --color-menu-hover: #f5f5f70f;
+  --color-menu-active: #f5f5f714;
+  --color-card: #1a1a1c;
+  --color-inset: #141415;
   /* a control ON a card. The dark skins take their `raised` value, so this
      is a no-op for them; the light skins need a tone of their own, because
      there `raised` is pure white and a card is too. */
-  --color-control: #282828;
-  --color-hairline: #383838;
+  --color-control: #29292c;
+  --color-hairline: #3a3a3c;
   /* the 0.5px line where two panes meet: the sidebar and the chat */
   --color-edge: color-mix(in srgb, var(--color-ink) 8%, transparent);
   /* the window's frame: its top bar and the rail of places, around the
      app's pane (the sidebar and the chat). The app's own colour a step darker, so it
      stays in the skin's family: --frame-shade of black. */
   --color-frame: color-mix(in oklab, var(--color-app), black var(--frame-shade));
-  --color-ink: #f5f5f5;
-  --color-ink-secondary: #f5f5f5a8;
+  --color-ink: #f5f5f7;
+  --color-ink-secondary: #f5f5f7a8;
   /* quiet text: timestamps, hints, placeholders, calendar hours. It used to
      be `text-ink-secondary/70`, which fades an ink already tuned close to
      AA and landed at 2.2–4:1. Each skin sets this to the quietest ink that
      still clears 4.5:1 on every text surface, raised-hover included; on the
      light skins that leaves little room below the secondary ink, so there
      size carries the hierarchy. Measured by pnpm check:contrast. */
-  --color-ink-tertiary: #f5f5f591;
-  --color-accent: #1084fe;
-  --color-accent-border: #459ffe;
+  --color-ink-tertiary: #f5f5f791;
+  --color-accent: #0071e3;
+  --color-accent-border: #2997ff;
   /* the ring a keyboard user follows; sits on the accent so focus reads as
      "the app is talking to you", not as a browser default */
-  --color-focus: #459ffe;
-  --color-accent-text: #7fc0ff;
-  --color-bubble-user: #5a5a5a;
-  --color-success: #38d591;
+  --color-focus: #2997ff;
+  --color-accent-text: #2997ff;
+  --color-bubble-user: #29292c;
+  --color-success: #30d158;
   --color-danger: #ff5667;
-  --color-warning: #ff9800;
+  --color-warning: #ff9f0a;
 
   --font-sans: "Geist Variable", -apple-system, BlinkMacSystemFont,
     "Segoe UI", system-ui, sans-serif;
@@ -251,48 +251,47 @@
 }
 
 /* ── Midnight ──────────────────────────────────────────────────────────────
-   The upstream palette, pixel-sampled from the real Grok app. Repeated here
-   (rather than relying on the `@theme` defaults) so that a `[data-skin]`
-   subtree can switch *back* to it — the picker needs that.
+   The dark default. Repeated here (rather than relying on the `@theme`
+   defaults) so that a `[data-skin]` subtree can switch back to it.
 
-   Two upstream contrast gaps are preserved deliberately, because this skin's
-   job is to be the original: white on the accent fill measures 3.65:1 and
-   white on the danger fill 3.32:1, both short of AA for the 13–15px labels
-   they carry. Atelier and Foundry fix this via --color-accent-ink.
+   White on the danger fill measures 3.1:1, short of AA for the 13–15px
+   labels it carries.
    ───────────────────────────────────────────────────────────────────────── */
 [data-skin="midnight"] {
   --code-color-scheme: dark;
-  --color-app: #121212;
-  --color-panel: #0e0e0e;
-  --color-raised: #202020;
-  --color-raised-hover: #2c2c2c;
-  --color-composer: #1f1f1f;
-  --color-composer-ring: #2a2a2a;
-  --color-card: #1f1f1f;
-  --color-menu: #1f1f1f;    /* = card: unchanged */
-  --color-menu-hover: #f5f5f50f;
-  --color-menu-active: #f5f5f514;
-  --color-inset: #1b1b1b;
-  --color-control: #282828;
-  --color-hairline: #383838;
-  --color-ink: #f5f5f5;
-  --color-ink-secondary: #f5f5f5a8;
-  --color-ink-tertiary: #f5f5f591;
-  --color-accent: #1084fe;
-  --color-accent-border: #459ffe;
-  --color-accent-text: #7fc0ff;
+  --frame-shade: 60%;
+  --color-app: #0c0c0d;
+  --color-panel: #141415;
+  --color-raised: #29292c;
+  --color-raised-hover: #323236;
+  --color-composer: #1a1a1c;
+  --color-composer-ring: #f5f5f717;
+  --color-card: #1a1a1c;
+  --color-menu: #1a1a1c;    /* = card: unchanged */
+  --color-menu-hover: #f5f5f70f;
+  --color-menu-active: #f5f5f714;
+  --color-inset: #141415;
+  --color-control: #29292c;
+  --color-hairline: #3a3a3c;
+  --color-ink: #f5f5f7;
+  --color-ink-secondary: #f5f5f7a8;
+  --color-ink-tertiary: #f5f5f791;
+  --color-accent: #0071e3;
+  --color-accent-border: #2997ff;
+  --color-accent-text: #2997ff;
+  --color-focus: #2997ff;
   --color-accent-ink: #ffffff;
-  --color-bubble-user: #5a5a5a;
-  --color-bubble-user-ink: #f5f5f5;   /* = ink: unchanged */
-  --color-success: #38d591;
+  --color-bubble-user: #29292c;
+  --color-bubble-user-ink: #f5f5f7;   /* = ink: unchanged */
+  --color-success: #30d158;
   --color-danger: #ff5667;
   --color-danger-ink: #ffffff;
   --color-success-ink: #072114;
-  --color-warning: #ff9800;
-  --color-scrollbar: #3d3d3d;
-  --color-hezuo-line: #f5f5f5;
+  --color-warning: #ff9f0a;
+  --color-scrollbar: #3a3a3c;
+  --color-hezuo-line: #f5f5f7;
 
-  --color-edge: #f5f5f50f;
+  --color-edge: #f5f5f70f;
 
   --font-sans: "Geist Variable", -apple-system, BlinkMacSystemFont,
     "Segoe UI", system-ui, sans-serif;
@@ -312,7 +311,7 @@
   --identity-blue: #377FE6;
   --identity-red: #D94B52;
   --identity-orange: #E78531;
-  --identity-purple: #8d69ce;
+  --identity-purple: #8b65cd;
   --identity-cyan: #0EA5C6;
   --identity-pink: #D84F8B;
   --identity-yellow: #D8A729;
@@ -412,6 +411,7 @@
    ───────────────────────────────────────────────────────────────────────── */
 [data-skin="foundry"] {
   --code-color-scheme: dark;
+  --frame-shade: 30%;
   --color-app: #100e0b;           /* deepest ground, warm black */
   --color-panel: #171410;         /* sidebar */
   --color-raised: #262019;        /* raised means warmer, not just lighter */
@@ -558,6 +558,7 @@
    ───────────────────────────────────────────────────────────────────────── */
 [data-skin="graphite"] {
   --code-color-scheme: dark;
+  --frame-shade: 30%;
   --color-app: #111214;
   --color-panel: #181a1d;
   --color-raised: #2a2d32;
@@ -682,6 +683,7 @@
    ───────────────────────────────────────────────────────────────────────── */
 [data-skin="dusk"] {
   --code-color-scheme: dark;
+  --frame-shade: 30%;
   --color-app: #121014;
   --color-panel: #19161c;
   --color-raised: #2b2630;
@@ -738,61 +740,51 @@
 }
 
 /* ── Daylight ─────────────────────────────────────────────────────────────
-   Midnight's twin in light: near-white chrome, a neutral sidebar, white
-   floating surfaces and translucent ink for text and hairlines, so every
-   step is the same #1c1c1c ink at a different strength.
+   The light default: a white page, a grey sidebar, white floating surfaces
+   and one ink at different strengths for text and hairlines.
 
-   Its structural quirk is the user's own bubble: ink on a near-white page,
-   the one place a light skin carries inverted ink. That is what
-   --color-bubble-user-ink exists for — see the rule at the bottom of the
-   file. The surfaces are a short ladder: page #fcfcfc, sidebar and the
-   window's frame #f5f5f5, selected row #e4e4e4, a bot's message #efefef,
-   and white for the composer and menus.
-
-   Where a measured value misses AA its nearest passing step is used: the
-   tertiary ink is stronger than its 56%, and the accent, danger, success
-   and warning fills are their deeper tones, so white and their text clear
-   4.5:1 (pnpm check:contrast).
+   The user's own bubble is ink on the white page, the one place a light
+   skin carries inverted ink; --color-bubble-user-ink exists for it.
    ───────────────────────────────────────────────────────────────────────── */
 [data-skin="daylight"] {
   --code-color-scheme: light;
   --frame-shade: 6%;
-  --color-app: #fcfcfc;           /* the thread */
-  --color-panel: #f5f5f5;         /* sidebar */
+  --color-app: #ffffff;           /* the thread */
+  --color-panel: #f5f5f7;         /* sidebar */
   --color-frame: var(--color-panel);
-  --color-raised: #e4e4e4;        /* the sidebar's selected row: 8% ink on the panel */
-  --color-raised-hover: #d8d8d8;
-  --color-card: #efefef;          /* what a bot says: 6% ink on the page */
-  --color-inset: #e9e9e9;         /* the search field */
-  --color-control: #e3e3e3;       /* a chip on a card */
+  --color-raised: #e3e3e8;        /* the sidebar's selected row: 8% ink on the panel */
+  --color-raised-hover: #d9d9de;
+  --color-card: #f5f5f7;          /* what a bot says: 6% ink on the page */
+  --color-inset: #ebebf0;         /* the search field */
+  --color-control: #e3e3e8;       /* a chip on a card */
   /* 24% ink: whole, the firm line; at /50, the 12% line between surfaces. */
-  --color-hairline: #1c1c1c3d;
-  --color-edge: #1c1c1c14;
+  --color-hairline: #1d1d1f33;
+  --color-edge: #1d1d1f14;
 
-  --color-ink: #1c1c1c;
-  --color-ink-secondary: #1c1c1cad;
-  --color-ink-tertiary: #1c1c1ca6;
+  --color-ink: #1d1d1f;
+  --color-ink-secondary: #1d1d1fad;
+  --color-ink-tertiary: #1d1d1fa6;
 
-  --color-accent: #126fd4;
-  --color-accent-border: #1680f3;
-  --color-accent-text: #0b69cc;
-  --color-focus: #0b6dd3;
+  --color-accent: #0071e3;
+  --color-accent-border: #2997ff;
+  --color-accent-text: #0058b0;
+  --color-focus: #0071e3;
   --color-accent-ink: #ffffff;
   --color-composer: #ffffff;
-  --color-composer-ring: #1c1c1c1f;
+  --color-composer-ring: #1d1d1f1f;
   --color-menu: #ffffff;
-  --color-menu-hover: #1c1c1c0f;
-  --color-menu-active: #1c1c1c14;
-  --color-bubble-user: #1c1c1c;   /* your own messages, inverted */
-  --color-bubble-user-ink: #fcfcfc;
+  --color-menu-hover: #1d1d1f0f;
+  --color-menu-active: #1d1d1f14;
+  --color-bubble-user: #1d1d1f;   /* your own messages, inverted */
+  --color-bubble-user-ink: #ffffff;
 
-  --color-success: #007a44;
+  --color-success: #15803a;
   --color-danger: #cd2834;
   --color-danger-ink: #ffffff;
   --color-success-ink: #ffffff;
-  --color-warning: #9c5b00;
-  --color-scrollbar: #c4c4c4;
-  --color-hezuo-line: #5f5f5f;
+  --color-warning: #a35f00;
+  --color-scrollbar: #c7c7cc;
+  --color-hezuo-line: #6e6e73;
 
   --font-sans: "Geist Variable", -apple-system, BlinkMacSystemFont,
     "Segoe UI", system-ui, sans-serif;
@@ -804,18 +796,18 @@
   --radius-2xl: 14px;
   --radius-3xl: 16px;
   --radius-4xl: 18px;
-  --identity-green: #00864c;
-  --identity-blue: #2271e3;
-  --identity-red: #d63a42;
-  --identity-orange: #b35e15;
+  --identity-green: #00884e;
+  --identity-blue: #2573e4;
+  --identity-red: #d63f47;
+  --identity-orange: #b65f15;
   --identity-purple: #8057C8;
-  --identity-cyan: #0b7f99;
-  --identity-pink: #d2357a;
-  --identity-yellow: #91701b;
-  --identity-teal: #018375;
-  --identity-coral: #d83920;
-  --identity-silver: #6e7580;
-  --identity-chrome: #697688;
+  --identity-cyan: #0b819b;
+  --identity-pink: #d3397d;
+  --identity-yellow: #93721b;
+  --identity-teal: #018577;
+  --identity-coral: #db3a20;
+  --identity-silver: #707782;
+  --identity-chrome: #6b778a;
   --shadow-float: 0 4px 12px -1px rgb(28 28 28 / 0.08), 0 2px 4px -2px rgb(28 28 28 / 0.06);
 }
 
@@ -950,6 +942,7 @@
 
 [data-skin="halloween"] {
   --code-color-scheme: dark;
+  --frame-shade: 30%;
   --color-app: #110d16;
   --color-panel: #17121e;
   --color-raised: #262030;
@@ -1017,16 +1010,26 @@
   box-shadow: 0 10px 20px -3px rgb(28 28 28 / 0.1), 0 4px 6px -4px rgb(28 28 28 / 0.1);
 }
 
-/* In Midnight and Daylight a primary action is a neutral pill: white on dark, black on light. Unlayered, so it wins
-   over the accent fill a call site may still carry. */
-:root:is([data-skin="midnight"], [data-skin="daylight"]) .ui-button-primary {
+/* A primary action is a white pill in Midnight and the accent fill in Daylight. Unlayered, so it wins over the fill a
+   call site may still carry. */
+:root[data-skin="midnight"] .ui-button-primary {
   border-color: transparent;
   background: var(--color-ink);
   color: var(--color-app);
 }
-:root:is([data-skin="midnight"], [data-skin="daylight"]) .ui-button-primary:not(:disabled):is(:hover, :active) {
+:root[data-skin="midnight"] .ui-button-primary:not(:disabled):is(:hover, :active) {
   background: color-mix(in srgb, var(--color-ink) 88.5%, var(--color-app));
   color: var(--color-app);
+  filter: none;
+}
+:root[data-skin="daylight"] .ui-button-primary {
+  border-color: transparent;
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+}
+:root[data-skin="daylight"] .ui-button-primary:not(:disabled):is(:hover, :active) {
+  background: var(--color-accent-text);
+  color: var(--color-accent-ink);
   filter: none;
 }
 :root:is([data-skin="midnight"], [data-skin="daylight"]) .ui-button-primary:disabled {
@@ -2613,19 +2616,19 @@ html[data-cloud-intent-morph] [data-tour="composer"] { view-transition-name: clo
    Stop at a nested skin so the picker previews retain their own palettes. */
 @scope ([data-skin="daylight"]) to ([data-skin]) {
   .bg-bubble-user {
-    --color-ink: #fcfcfc;
-    --color-ink-secondary: #c4c4c4;
-    --color-ink-tertiary: #aaaaaa;
-    --color-panel: #111111;
-    --color-inset: #191919;
-    --color-raised: #2f2f2f;
-    --color-raised-hover: #3d3d3d;
-    --color-control: #2f2f2f;
-    --color-hairline: #666666;
-    --color-accent: #7fc0ff;
-    --color-accent-text: #7fc0ff;
+    --color-ink: #f5f5f7;
+    --color-ink-secondary: #c7c7cc;
+    --color-ink-tertiary: #a1a1a6;
+    --color-panel: #141415;
+    --color-inset: #1a1a1c;
+    --color-raised: #29292c;
+    --color-raised-hover: #323236;
+    --color-control: #29292c;
+    --color-hairline: #636366;
+    --color-accent: #2997ff;
+    --color-accent-text: #2997ff;
     --color-accent-ink: #070707;
-    --color-focus: #7fc0ff;
+    --color-focus: #2997ff;
     --color-danger: #ff7788;
     --color-danger-ink: #070707;
     --color-success: #63b58a;
@@ -2989,7 +2992,7 @@ button:disabled.bg-danger {
   /* The window's frame keeps the desktop ground at any width: the rail of places is a page 36px wide beside a full
      page, and both draw the frame's top bar or rail in one colour. */
   :is([data-skin="midnight"]) {
-    --color-frame: color-mix(in oklab, #121212, black var(--frame-shade));
+    --color-frame: color-mix(in oklab, #0c0c0d, black var(--frame-shade));
     --color-app: #141414;
     --color-panel: #1c1c1e;
     --color-raised: #2c2c2e;

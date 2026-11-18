@@ -107,73 +107,47 @@ describe("bot menu bulk reads", () => {
     draw(); expect(button()).toBeUndefined();
   });
 
-  it("offers Simple mode one toggle: Mark as read while anything is unread, Mark as unread once nothing is", async () => {
+  it("offers Simple mode no read toggle", () => {
     mode.advanced = false;
-    const fetch = vi.fn(async (_url: unknown, init?: RequestInit) => response(JSON.parse(String(init?.body)).threadId));
-    vi.stubGlobal("fetch", fetch); draw();
-    expect(button("Mark as unread")).toBeUndefined();
-    flushSync(() => button("Mark as read").click());
-    await expect.poll(() => onClose.mock.calls.length).toBe(1);
-    expect(state.bots[0]!.tasks!.every((task) => !task.unread)).toBe(true);
     draw();
     expect(button("Mark as read")).toBeUndefined();
-    flushSync(() => button("Mark as unread").click());
-    expect(state.bots[0]!.unread).toBe(true);
+    expect(button("Mark as unread")).toBeUndefined();
   });
 });
 
 describe("Simple mode's bot menu", () => {
   const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
   const sheet = () => document.querySelector<HTMLElement>('[data-bot-menu][aria-label="Actions for Reviewer"]')!;
-  const more = () => document.querySelector<HTMLElement>("[data-bot-menu-more]")!;
-  const flyout = () => document.querySelector('[role="menu"][aria-label="More"]');
+  const move = () => document.querySelector<HTMLElement>("[data-bot-menu-move]")!;
+  const flyout = () => document.querySelector('[role="menu"][aria-label="Move to department"]');
   const point = (target: Element, y: number) => target.dispatchEvent(new MouseEvent("pointerover", { bubbles: true, clientX: 60, clientY: y }));
   beforeEach(() => { mode.advanced = false; });
 
-  it("leads with Pin, Move and Mark as read, then the thread items, then Rename, then Copy conversation ID and More, and ends with Archive and Delete", () => {
+  it("is Pin, Move and Rename, then Archive and Delete", () => {
     draw();
-    expect([...sheet().querySelectorAll("button")].map((node) => node.textContent)).toEqual([
-      "Pin", "Move to department", "Mark as read", "New thread", "View threads", "Rename", "Copy conversation ID", "More", "Archive", "Delete",
-    ]);
     expect([...sheet().children].map((node) => node.getAttribute("role") === "separator" ? "|" : node.textContent)).toEqual([
-      "Pin", "Move to department", "Mark as read", "|", "New thread", "View threads", "|", "Rename", "|", "Copy conversation ID", "More", "|", "Archive", "Delete",
+      "Pin", "Move to department", "Rename", "|", "Archive", "Delete",
     ]);
     flushSync(() => button("Rename").click());
     expect(onRename).toHaveBeenCalledWith(bot.id);
   });
 
-  it("offers Delete all conversations only with two or more, last and in danger, and asks with its count", () => {
-    draw();
-    flushSync(() => more().click());
-    const deleteAll = [...flyout()!.querySelectorAll("button")].at(-1)!;
-    expect(deleteAll.textContent).toBe("Delete all conversations…");
-    expect(deleteAll.className).toContain("text-danger");
-    flushSync(() => deleteAll.click());
-    expect(document.body.textContent).toContain("Delete all conversations (3)?");
-    state = { ...state, bots: [{ ...structuredClone(bot), tasks: [bot.tasks![0]!] }] };
-    menu = { botId: bot.id, x: 50, y: 50 };
-    draw();
-    flushSync(() => more().click());
-    expect([...flyout()!.querySelectorAll("button")].map((node) => node.textContent)).not.toContain("Delete all conversations…");
-  });
-
-  it("opens More only after the pointer rests on it, closes it when a sibling row takes the pointer, and opens it at once on a click", async () => {
+  it("opens Move only after the pointer rests on it, closes it when a sibling row takes the pointer, and opens it at once on a click", async () => {
     draw();
     const pin = button("Pin");
-    point(more(), 200);
+    point(move(), 200);
     await wait(100);
     expect(flyout()).toBeNull();
     point(pin, 80);
     await wait(400);
     expect(flyout()).toBeNull();
-    point(more(), 200);
+    point(move(), 200);
     await wait(320);
     expect(flyout()).not.toBeNull();
-    expect([...flyout()!.querySelectorAll("button")].map((node) => node.textContent)).toEqual(["Edit profile", "Make Chief of Staff", "Duplicate", "Delete all conversations…"]);
     point(pin, 80);
     await wait(20);
     expect(flyout()).toBeNull();
-    flushSync(() => more().click());
+    flushSync(() => move().click());
     await wait(20);
     expect(flyout()).not.toBeNull();
   });

@@ -67,7 +67,7 @@ import { useAdvancedMode } from "@/lib/interface-mode";
 import { Select } from "./Select";
 import { SavedStepsRow } from "./SavedStepsRow";
 import { BrowserProfilesRow, ColorUserBubblesRow, AdvancedModeRow, ExperimentalFeaturesRow, LanguageRow, NewBotEffortRow, PinnedCirclesRow, ReplayTourRow, RunCardRow, FollowUpRow, SendKeyRow, ShowThreadsRow, ToolCallsRow, UniversalPinsRow, UpdatesRow } from "./AppSettingsRows";
-import { SIMPLE_ADVANCED_ONLY, SimpleAiPage, SimpleBillingPage, SimpleComputerPage, SimpleGeneralPage, SimpleLooksPage, SimpleUpdatesPage, type Disclose, type SimpleDisclosureId } from "./SettingsSimplePages";
+import { SimpleAiPage, SimpleBillingPage, SimpleGeneralPage, SimpleUpdatesPage, type Disclose, type SimpleDisclosureId } from "./SettingsSimplePages";
 import { ProductAccountSettings } from "./ProductAccountSettings";
 import { isProductWorkspace } from "@/lib/product-workspace";
 import type { KeySectionId } from "./keys/key-catalog";
@@ -123,20 +123,20 @@ export type SimpleSettingsPage = {
 };
 
 export const SIMPLE_PAGES: SimpleSettingsPage[] = [
-  { id: "general", labelKey: "settings.section.general", icon: Settings, sections: ["general", "appearance", "people", "import", "organization", "activity"],
-    keywords: ["account", "theme", "looks", "open at login", "startup", "analytics", "advanced mode"] },
+  { id: "general", labelKey: "settings.section.general", icon: Settings, sections: ["general", "appearance", "organization"],
+    keywords: ["account", "theme", "open at login", "startup", "analytics"] },
   { id: "account", labelKey: "product.accountSection", icon: Coins, sections: ["account"],
     keywords: ["account", "balance", "credit", "charges", "ledger", "review", "email", "sign out", "models", "prices"] },
-  { id: "botAccess", labelKey: "settings.simple.page.permissions", icon: Users, sections: ["botAccess"] },
   { id: "ai", labelKey: "settings.group.ai", icon: Sparkles, sections: ["engines", "connections"] },
-  { id: "computer", labelKey: "settings.simple.page.computer", icon: Monitor, sections: ["companion", "desktopWorkspaces", "computer"] },
-  { id: "vault", labelKey: "settings.simple.page.vault", icon: LockKeyhole, sections: ["logins"], keywords: ["vault", "passwords", "credentials", "1password"] },
   { id: "billing", labelKey: "settings.simple.page.billing", icon: ChartNoAxesColumn, sections: ["usage", "cloudAccount"], keywords: ["billing", "included", "allowance", "cloud hours", "voice"] },
   { id: "updates", labelKey: "settings.simple.page.updates", icon: CloudDownload, sections: ["updates"],
     keywords: ["update", "version", "release", "product updates", "newsletter", "email updates", "welcome", "tour", "diagnostics", "logs", "support"] },
 ];
 
-export const SIMPLE_HIDDEN_SECTIONS: readonly AppSettingsSection[] = ["backups", "experimental", "workspaces", "skills", "decisionModel"];
+export const SIMPLE_HIDDEN_SECTIONS: readonly AppSettingsSection[] = [
+  "backups", "experimental", "workspaces", "skills", "decisionModel",
+  "companion", "desktopWorkspaces", "computer", "logins", "import", "people", "botAccess", "activity",
+];
 
 /** Pages a managed account has no use for: its AI is the account's, its Cloud and servers belong to no one here, and
  * its provider keys and model providers would only offer a setup the server refuses. */
@@ -147,8 +147,6 @@ export const PRODUCT_HIDDEN_SECTIONS: readonly AppSettingsSection[] = [
 
 export const SIMPLE_FOLDED: Partial<Record<AppSettingsSection, SimpleDisclosureId>> = {
   connections: "ai-keys",
-  remote: "computer-elsewhere",
-  desktopWorkspaces: "computer-elsewhere",
 };
 
 export function simpleSettingsPages(
@@ -270,13 +268,11 @@ export function SettingsModal() {
     const open = q !== "" || (folds[id] ?? SIMPLE_FOLDED[requested] === id);
     return { id, open, onToggle: () => setFolds((current) => ({ ...current, [id]: !open })) };
   };
-  const [looks, setLooks] = useState(false);
   const [reveal, setReveal] = useState<string | null>(null);
-  const advancedMatches = advanced || !q ? [] : SIMPLE_ADVANCED_ONLY.filter((key) => t(key).toLowerCase().includes(q));
   const keyResults = remoteActive || !availableSections.some((entry) => entry.id === "connections") ? [] : keySearchResults(q, productKeySections);
   const keyResultButtons = (className: string) => keyResults.map((entry) => (
     <button key={entry.id} type="button" data-settings-key-result={entry.id} className={className}
-      onClick={() => { setQuery(""); setLooks(false); dispatch(openKeyResult(entry)); }}>
+      onClick={() => { setQuery(""); dispatch(openKeyResult(entry)); }}>
       <span>{t(entry.labelKey)} <span className="text-ink-secondary">· {t(keySection(entry).titleKey)}</span></span>
     </button>
   ));
@@ -479,11 +475,8 @@ export function SettingsModal() {
   const renderSimplePage = (page: SimpleSettingsPage) => {
     const has = (id: AppSettingsSection) => page.sections.includes(id);
     switch (page.id) {
-      case "general": return looks
-        ? <SimpleLooksPage onBack={() => { setLooks(false); setReveal("appearance"); }} />
-        : <SimpleGeneralPage has={has} peopleOpen={section === "people"} onLooks={() => setLooks(true)} />;
+      case "general": return <SimpleGeneralPage has={has} />;
       case "ai": return <SimpleAiPage has={has} disclose={disclose} connections={renderSection("connections")} />;
-      case "computer": return <SimpleComputerPage has={has} remoteAccess={remoteAccess} servers={renderSection("desktopWorkspaces")} disclose={disclose} />;
       case "billing": return productManaged
         ? has("usage") && (
           <SettingsDisclosureRow title={t("product.localUsage")} {...disclose("billing-limits")}>
@@ -492,7 +485,7 @@ export function SettingsModal() {
           </SettingsDisclosureRow>
         )
         : <SimpleBillingPage has={has} disclose={disclose} cloudAccount={renderSection("cloudAccount")} />;
-      case "updates": return <SimpleUpdatesPage remoteActive={remoteActive} productManaged={productManaged} />;
+      case "updates": return <SimpleUpdatesPage productManaged={productManaged} />;
       default:
         return page.sections.map((id) => <section key={id} data-settings-block={id} className="flex scroll-mt-4 flex-col gap-4">{renderSection(id)}</section>);
     }
@@ -520,8 +513,7 @@ export function SettingsModal() {
   );
 
   if (!advanced) {
-    const looksOpen = looks && currentPage?.id === "general";
-    const goTo = (id: AppSettingsSection) => { setLooks(false); openSection(id); };
+    const goTo = (id: AppSettingsSection) => openSection(id);
     return (
       <div
         className="glass-popup-frame"
@@ -547,7 +539,7 @@ export function SettingsModal() {
               "mb-2 flex h-8 shrink-0 items-center gap-2 rounded-lg bg-ink/[0.05] px-[9px] text-[13px] focus-within:ring-2 focus-within:ring-focus/60",
               "w-full min-w-0 bg-transparent text-[13px] text-ink placeholder:text-ink-secondary focus:outline-none",
             )}
-            {visiblePages.length === 0 && advancedMatches.length === 0 && keyResults.length === 0 && (
+            {visiblePages.length === 0 && keyResults.length === 0 && (
               <div className="px-[9px] py-3 text-[13px] leading-[18px] text-ink-secondary">{t("settings.noMatch", { query: query.trim() })}</div>
             )}
             {visiblePages.map((page) => {
@@ -570,17 +562,6 @@ export function SettingsModal() {
                 </button>
               );
             })}
-            {advancedMatches.map((key) => (
-              <button
-                key={key}
-                type="button"
-                data-settings-advanced-only={key}
-                onClick={() => { setQuery(""); goTo("general"); setReveal("advanced-mode"); }}
-                className="flex min-h-8 shrink-0 cursor-pointer items-center rounded-lg px-[9px] py-1.5 text-left text-[13px] leading-[18px] text-ink transition-colors hover:bg-ink/[0.06] motion-reduce:transition-none"
-              >
-                <span>{t(key)} <span className="text-ink-secondary">· {t("settings.simple.advanced")}</span></span>
-              </button>
-            ))}
             {keyResultButtons("flex min-h-8 shrink-0 cursor-pointer items-center rounded-lg px-[9px] py-1.5 text-left text-[13px] leading-[18px] text-ink transition-colors hover:bg-ink/[0.06] motion-reduce:transition-none")}
           </nav>
 
@@ -600,7 +581,7 @@ export function SettingsModal() {
                 ))}
               </Select>
               <h2 className="hidden truncate text-[17px] font-medium leading-6 tracking-[-0.008em] text-ink sm:block">
-                {looksOpen ? t("settings.simple.page.looks") : currentPage ? t(currentPage.labelKey) : null}
+                {currentPage ? t(currentPage.labelKey) : null}
               </h2>
             </header>
             <button

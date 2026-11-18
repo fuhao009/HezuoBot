@@ -49,7 +49,7 @@ const { values } = parseArgs({
 const only = new Set((values.only ?? PHASES.join(",")).split(",").map((phase) => phase.trim()).filter(Boolean));
 for (const phase of only) if (!(PHASES as readonly string[]).includes(phase)) throw new Error(`unknown phase ${phase}; phases: ${PHASES.join(", ")}`);
 const IDLE_MS = Number(values["idle-seconds"]) * 1000;
-const STORAGE = { "omb-analytics-opt-out": "1", "omb-email-gate": "skipped", "omb-simple-mode-prompt": "1", "omb-advanced-mode": values.advanced ? "1" : "0" };
+const STORAGE = { "omb-analytics-opt-out": "1", "omb-email-gate": "skipped", "omb-simple-mode-prompt": "1", "hezuo-advanced-mode": values.advanced ? "1" : "0" };
 const log = (line: string) => process.stderr.write(`bench-desktop: ${line}\n`);
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const round = (value: number, digits = 1) => Math.round(value * 10 ** digits) / 10 ** digits;
@@ -224,7 +224,7 @@ const HEAVY: Record<string, RegExp> = {
   duckdb: /node_modules\/@duckdb\//,
   analytics: /node_modules\/(posthog-js|@posthog)\//,
   locales: /\/src\/locales\//,
-  mascot: /\/src\/(lib\/mascot|components\/(CursorAvatar|CarvedAvatar|Avatar|mascot))/i,
+  mascot: /\/src\/(lib\/(mascot|bot-figure)|components\/(BotFigure|Avatar|mascot|bot-states))/i,
 };
 const packageOf = (id: string) => {
   const at = id.lastIndexOf("/node_modules/");

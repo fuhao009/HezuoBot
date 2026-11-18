@@ -91,11 +91,10 @@ afterEach(() => {
 });
 
 describe("the phone composer", () => {
-  it("shows only the + and the pill in Simple mode, with an inverse voice button", () => {
+  it("shows only the pill in Simple mode", () => {
     render({ bot });
-    expect(plus()).not.toBeNull();
-    expect(fixture.call).toMatchObject({ placement: "composer", inverse: true });
-    expect(fixture.call?.fill).toBeUndefined();
+    expect(plus()).toBeNull();
+    expect(fixture.call).toBeNull();
   });
 
   it("moves Advanced mode's row of buttons into the +", () => {

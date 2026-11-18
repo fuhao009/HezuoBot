@@ -4,7 +4,6 @@ import { z } from "zod";
 
 import { DEFAULT_MASCOT_BODY, MASCOT_BODY_IDS } from "./mascot-bodies.ts";
 import { HALLOWEEN_BODY_IDS, type HalloweenBodyId } from "./halloween-bodies.ts";
-import type { HezuoColor } from "./wire.ts";
 
 export const BOT_BODY_IDS = [...MASCOT_BODY_IDS, ...HALLOWEEN_BODY_IDS] as const;
 
@@ -21,16 +20,12 @@ export function isHalloweenBody(value: unknown): value is HalloweenBodyId {
   return (HALLOWEEN_BODY_IDS as readonly unknown[]).includes(value);
 }
 
-/** The costume each bot colour wears when "Dress my bots up" is on with the Halloween skin. */
-export const COSTUME_FOR_COLOR: Record<Exclude<HezuoColor, "silver" | "chrome">, HalloweenBodyId> = {
-  orange: "pumpkin",
-  purple: "ghost",
-  teal: "witch",
-  red: "bat",
-  blue: "cat",
-  cyan: "skull",
-  green: "monster",
-  yellow: "mummy",
-  coral: "vampire",
-  pink: "spider",
-};
+/** The body a bot wears: the one chosen for it, else one of the catalog fixed by its id, so bots that never chose
+ * still look different from each other. */
+export function bodyOfBot(bot: { id?: string; mascotBody?: BotBodyId | null }): BotBodyId {
+  if (bot.mascotBody) return bot.mascotBody;
+  if (!bot.id) return DEFAULT_MASCOT_BODY;
+  let hash = 0;
+  for (const char of bot.id) hash = (hash * 31 + char.codePointAt(0)!) >>> 0;
+  return MASCOT_BODY_IDS[hash % MASCOT_BODY_IDS.length]!;
+}

@@ -84,7 +84,8 @@ const section = (id: string) => render().find((node) => node.props["data-sidebar
 };
 const headers = () => render().filter((node) => node.type === SidebarSectionHeader).map((node) => node.props as unknown as HeaderProps);
 const header = (name: string) => headers().find((props) => props.name === name)!;
-const actions = () => fixture.dispatch.mock.calls.map(([action]) => action as Action);
+const dispatched = () => fixture.dispatch.mock.calls.map(([action]) => action as Action);
+const actions = () => dispatched().filter((action) => action.type !== "followSectionRoom");
 
 function transfer() {
   const data = new Map<string, string>();
@@ -181,6 +182,7 @@ describe("dragging a bot", () => {
     expect(naming.label).toBe("New department name");
     expect(listed()).toEqual(["bea", "dodo", "echo", "atlas", "cleo"]);
     naming.onCommit("  ");
+    expect(dispatched()[0]).toEqual({ type: "followSectionRoom", botIds: ["atlas", "cleo"], section: "New department" });
     expect(actions()).toEqual([
       { type: "updateBot", botId: "atlas", patch: { section: "New department" } },
       { type: "updateBot", botId: "cleo", patch: { section: "New department" } },

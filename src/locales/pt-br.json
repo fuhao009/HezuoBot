@@ -1368,7 +1368,6 @@
   "settings.newBotEffort.aria": "Esforço para novos bots",
   "settings.newBotEffort.error": "Não foi possível salvar o esforço para novos bots.",
   "settings.toolCalls.title": "Chamadas de ferramenta",
-  "settings.toolCalls.subtitle": "Mostre na transcrição cada ferramenta que um bot usa. Desligado por padrão — o mascote já mostra que o trabalho está acontecendo.",
   "settings.toolCalls.show": "Mostrar chamadas de ferramenta",
   "settings.toolCalls.detail": "Etiquetas com o nome de Bash, busca e outras ferramentas. Erros e mensagens entre bots continuam aparecendo.",
   "settings.toolCalls.aria": "Mostrar chamadas de ferramenta no chat",
@@ -5724,7 +5723,6 @@
   "botOverview.preference.local": "este computador",
   "botOverview.preference.browser": "somente navegador",
   "botIdentity.avatar": "Avatar",
-  "botIdentity.resetMascot": "Redefinir mascote",
   "botIdentity.uploadImage": "Enviar imagem",
   "botIdentity.removeAvatar": "Remover imagem de avatar personalizada",
   "botIdentity.removeImage": "Remover imagem personalizada",
@@ -5782,7 +5780,6 @@
   "hezuoWelcome.notNow": "Agora não",
   "hezuoWelcome.notNowHint": "{name} fica fora da barra lateral. Ative quando quiser em Configurações → Geral.",
   "botIdentity.body": "Corpo",
-  "botIdentity.crop.mascot": "Mascote",
   "botIdentity.crop.circle": "Círculo",
   "botIdentity.crop.rounded": "Arredondado",
   "botIdentity.crop.square": "Quadrado",
@@ -6342,5 +6339,8 @@
   "botAccess.overview.botCount.other": "{count} bots",
   "botAccess.overview.noBotsForPerson": "{name} ainda não tem bots.",
   "botAccess.overview.allPeople": "Todas as pessoas",
-  "botAccess.overview.toastRemoved": "{bot}: {name} removido"
+  "botAccess.overview.toastRemoved": "{bot}: {name} removido",
+  "botIdentity.resetMascot": "Redefinir avatar",
+  "botIdentity.crop.mascot": "Figura",
+  "settings.toolCalls.subtitle": "Mostra na conversa cada ferramenta que um bot executa. Desativado por padrão, pois o avatar já mostra que há trabalho em andamento."
 }

@@ -77,31 +77,31 @@ describe("the header's right side", () => {
     return { markup, controls: markup.slice(markup.indexOf("data-chathead-controls"), markup.indexOf("role=\"log\"")) };
   };
 
-  it("keeps the model picker and the bot's computer in view in Simple mode, with ⋯ left to the bot panel", () => {
+  it("keeps only the name pill in the Simple header, leaving the model, the computer and ⋯ to Advanced", () => {
     fixture.advanced = false;
     try {
       const { markup, controls } = header();
-      expect(controls).toContain("data-test-model-control");
-      expect(fixture.model).toMatchObject({ threadId: "selected" });
-      const computer = controls.match(/<button[^>]*data-tour="computer"[^>]*>/)?.[0] ?? "";
-      expect(computer.split(" ")).toEqual(expect.arrayContaining(["rounded-full", "size-8"]));
+      expect(markup).toContain("data-chathead-pill");
+      expect(controls).not.toMatch(/<(button|a|span)[\s>]/);
+      expect(markup).not.toContain("data-test-model-control");
+      expect(fixture.model).toBeNull();
+      expect(markup).not.toContain('data-tour="computer"');
+      expect(markup).not.toContain("data-product-work-entry");
       expect(markup).not.toContain('data-testid="chat-more"');
       expect(fixture.menus.find((menu) => menu.ariaLabel === "More")).toBeUndefined();
-      expect(markup).toContain("data-chathead-pill");
     } finally {
       fixture.advanced = true;
     }
   });
 
-  it("keeps the model, the computer and ⋯ in a remote client's Simple header, whose settings panel has no room for them", () => {
+  it("gives a remote client's Simple header ⋯ alone, without the model or the computer", () => {
     fixture.advanced = false;
     window.ogb = { remoteClient: { active: true } } as NonNullable<Window["ogb"]>;
     try {
       const { markup } = header();
-      // The host checks the model against its own catalog, so a paired desktop can change it like the phone can.
-      expect(markup).toContain("data-test-model-control");
-      expect(fixture.model).toMatchObject({ bot: { id: "bot" }, threadId: "selected" });
-      expect(markup).toContain('data-tour="computer"');
+      expect(markup).not.toContain("data-test-model-control");
+      expect(fixture.model).toBeNull();
+      expect(markup).not.toContain('data-tour="computer"');
       expect(markup).toContain('data-testid="chat-more"');
       const more = fixture.menus.find((menu) => menu.ariaLabel === "More")!;
       expect(more.items.map((item) => item.key)).toEqual(["find", "new-thread", "copy", "download"]);
@@ -331,16 +331,19 @@ describe("thread control placement", () => {
     fixture.advanced = true;
   });
 
-  it.each([true, false])("calls from the composer beside dictation, not the header (advanced %s)", (advanced) => {
+  it.each([true, false])("calls from the composer beside dictation in Advanced only, never from the header (advanced %s)", (advanced) => {
     fixture.advanced = advanced;
-    const markup = renderToStaticMarkup(createElement(ChatView, { bot }));
-    const header = markup.slice(markup.indexOf("data-chathead-controls"), markup.indexOf("data-composer-row"));
-    expect(header).not.toContain("data-call-button");
-    expect(markup).not.toContain('data-call-button="header"');
-    const actions = markup.slice(markup.indexOf("data-composer-actions"));
-    expect(actions).toContain('data-call-button="composer"');
-    expect(markup.match(/data-call-button=/g)).toHaveLength(1);
-    fixture.advanced = true;
+    try {
+      const markup = renderToStaticMarkup(createElement(ChatView, { bot }));
+      const header = markup.slice(markup.indexOf("data-chathead-controls"), markup.indexOf("data-composer-row"));
+      expect(header).not.toContain("data-call-button");
+      expect(markup).not.toContain('data-call-button="header"');
+      const actions = markup.slice(markup.indexOf("data-composer-actions"));
+      expect(actions.includes('data-call-button="composer"')).toBe(advanced);
+      expect(markup.match(/data-call-button=/g) ?? []).toHaveLength(advanced ? 1 : 0);
+    } finally {
+      fixture.advanced = true;
+    }
   });
 
   it("keeps the editor and its controls on one line, wrapping only in a narrow composer", () => {

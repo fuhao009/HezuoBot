@@ -66,7 +66,7 @@ async function createNewBot(section: string | undefined, bots: readonly Bot[], t
   }
 }
 
-/** New bot: a bot made at once from the New bot defaults, with its chat open and ready for the first message. */
+/** New bot: a bot made at once from the New bot defaults, with its chat open and its profile beside it for a name, a look and a prompt. */
 export async function makeNewBot(action: Extract<Action, { type: "newBot" }>, bots: readonly Bot[], dispatch: (action: Action) => void,
   showThreads: boolean, request: typeof api = api): Promise<void> {
   let made: Awaited<ReturnType<typeof createNewBot>>;
@@ -79,6 +79,7 @@ export async function makeNewBot(action: Extract<Action, { type: "newBot" }>, bo
     return;
   }
   announceNewBot(dispatch, made.bot, made.warnings, { preserveSelection: action.preserveSelection, showThreads, source: "blank" });
+  if (!action.preserveSelection) dispatch({ type: "toggleSettings", open: true, botId: made.bot.id });
   if (made.startsOnAsk) dispatch({ type: "notice", notice: { kind: "note", botName: null, text: t("newBot.startsOnAsk", { name: made.bot.name }) } });
   action.onCreated?.(made.bot);
 }

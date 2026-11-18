@@ -7,7 +7,6 @@ import { CALL_MODES, effectiveCallMode, setCallMode, useCallMode, type CallMode 
 import { callCapabilityHelp } from "@/lib/call-capability";
 import { firstSentence } from "@/lib/soul";
 import { currentTaskBot, useStore, type Bot } from "@/state/store";
-import type { ApprovalMode } from "../../../shared/approval-mode";
 import { BOT_PROFILE_LIMITS } from "../../../shared/bot-profile";
 import { ApprovalChip } from "../ComposerPlusMenu";
 import { useDesktopCapabilities } from "../DesktopCapabilities";
@@ -16,19 +15,12 @@ import { SoulField } from "../SoulField";
 import { useBotApps } from "../bot-settings/useBotApps";
 import type { useBotSettingsDerived } from "../bot-settings/useBotSettingsDerived";
 import { useThreadApproval } from "../thread-approval";
+import { ActsChoice } from "./ActsChoice";
 import { BackupAis } from "./BackupAis";
 import type { SimplePageId } from "./page-registry";
 import { buttonCls, Card, ColRow, NavRow, RowIcon, rowCls, RowText, Segmented, type SegmentOption } from "./rows";
 
 type Derived = ReturnType<typeof useBotSettingsDerived>;
-
-const ACTS_LABEL: Record<ApprovalMode, () => string> = {
-  ask: () => t("botSettings.simple.ask"),
-  full: () => t("botSettings.simple.justDoIt"),
-  auto: () => t("botSettings.simple.decide"),
-  edits: () => t("approvalMode.edits.label"),
-  custom: () => t("botPanel.acts.custom"),
-};
 
 export function SettingsPage({ bot, derived, onOpen, editingInstructions = false, onEditInstructions }: {
   bot: Bot;
@@ -37,31 +29,17 @@ export function SettingsPage({ bot, derived, onOpen, editingInstructions = false
   editingInstructions?: boolean;
   onEditInstructions?: (open: boolean) => void;
 }) {
-  const { dispatch, flushBotPatches } = useStore();
+  const { flushBotPatches } = useStore();
   const { capabilities, ready } = useDesktopCapabilities();
   const apps = useBotApps(bot);
   const approval = useThreadApproval(currentTaskBot(bot));
   const storedCallMode = useCallMode();
   const [jobDraft, setJobDraft] = useState<string | null>(null);
-  const { patch, approvalMode, engine } = derived;
+  const { patch } = derived;
   const name = bot.name;
   const commitJob = () => {
     if (jobDraft !== null && jobDraft.trim() !== bot.title.trim()) patch({ title: jobDraft.trim() });
     setJobDraft(null);
-  };
-
-  // Antigravity's old Auto still executes as Ask: show that without changing the saved mode or granting Full.
-  const displayedMode: ApprovalMode = engine?.driverKind === "antigravityAgent" && approvalMode === "auto" ? "ask" : approvalMode;
-  const actsOptions: SegmentOption<ApprovalMode>[] = [
-    { value: "ask", label: ACTS_LABEL.ask(), tooltip: t("botSettings.simple.askHint") },
-    { value: "full", label: ACTS_LABEL.full(), tooltip: t("botSettings.simple.fullHint") },
-    ...(displayedMode === "ask" || displayedMode === "full"
-      ? []
-      : [{ value: displayedMode, label: ACTS_LABEL[displayedMode](), disabled: true, tooltip: displayedMode === "custom" ? t("botPanel.acts.customHint") : undefined }]),
-  ];
-  const chooseActs = (mode: ApprovalMode) => {
-    if (mode === approvalMode || (mode !== "ask" && mode !== "full")) return;
-    dispatch({ type: "updateBot", botId: bot.id, patch: { approvalMode: mode, applyToAllThreads: true } });
   };
 
   // As the call button: where this device cannot listen in turns, a call is always Live.
@@ -124,13 +102,7 @@ export function SettingsPage({ bot, derived, onOpen, editingInstructions = false
             <RowText title={t("botSettings.simple.beforeActs", { name })} hint={bot.busy ? t("approvalMode.whileWorking") : undefined} />
           </div>
           <div className="pl-[38px]">
-            <Segmented
-              attr="data-approval-choice"
-              label={t("botSettings.simple.beforeActs", { name })}
-              value={displayedMode}
-              onChange={chooseActs}
-              options={actsOptions}
-            />
+            <ActsChoice bot={bot} derived={derived} />
           </div>
           {approval.choice && (
             <div data-panel-row="thread-approval" className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 pl-[38px]">

@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { BOT_BODY_IDS, COSTUME_FOR_COLOR, botBodyId, botBodySchema, isHalloweenBody } from "./bot-body.ts";
+import { BOT_BODY_IDS, botBodyId, botBodySchema, isHalloweenBody } from "./bot-body.ts";
 import { HALLOWEEN_BODY_IDS } from "./halloween-bodies.ts";
 import { MASCOT_BODY_IDS } from "./mascot-bodies.ts";
-import { HEZUO_COLOR_NAMES } from "./wire.ts";
 
 describe("bot bodies", () => {
   it("accepts every gradient body and every Halloween body", () => {
@@ -22,12 +21,5 @@ describe("bot bodies", () => {
     expect(isHalloweenBody("ghost")).toBe(true);
     expect(isHalloweenBody("cursor")).toBe(false);
     expect(isHalloweenBody(null)).toBe(false);
-  });
-
-  it("gives every bot colour but silver and chrome its own costume", () => {
-    const dressed = HEZUO_COLOR_NAMES.filter((color) => color !== "silver" && color !== "chrome");
-    expect(Object.keys(COSTUME_FOR_COLOR).sort()).toEqual([...dressed].sort());
-    expect(new Set(Object.values(COSTUME_FOR_COLOR)).size).toBe(dressed.length);
-    for (const body of Object.values(COSTUME_FOR_COLOR)) expect(isHalloweenBody(body)).toBe(true);
   });
 });

@@ -132,27 +132,24 @@ describe("what Hezuo says first", () => {
 });
 
 describe("in the chat (Simple mode)", () => {
-  it("draws its lines and follow-up as the chat's own bubbles, with chips for only what is missing", async () => {
+  it("draws its lines as the chat's own bubbles, with no follow-up and no chips once an AI works", async () => {
     f.services = { gmail: { connected: false } };
     await show(false, saved({ ai: "own", apps: [], bots: 0, routines: 0 }));
-    expect(lines()).toHaveLength(4);
-    expect(host.querySelector("[data-helper-followup]")?.textContent).toContain("nothing's waiting on you yet");
+    expect(lines()).toHaveLength(2);
+    expect(host.querySelector("[data-helper-followup]")).toBeNull();
     const first = host.querySelector<HTMLElement>('[data-helper-line="0"]')!;
     expect(first.dataset.chatBubble, "the chat's own Simple bubble").toBe("simple");
     expect(first.className).toContain(SIMPLE_BOT_BUBBLE);
-    expect(chips()).toEqual(["apps", "phone", "cloud"]);
-    expect([...host.querySelectorAll("[data-helper-step]")].map((node) => node.textContent)).toEqual(["Connect email & calendar", "Connect your phone", "Try Cloud"]);
-    expect(f.followups, "only a first run asks for a follow-up").toEqual([]);
+    expect(chips()).toEqual([]);
+    expect(f.followups, "only a first run with no AI of its own asks for a follow-up").toEqual([]);
   });
 
-  it("shows three chips at most, AI first, and one tapped makes room for the next", async () => {
+  it("follows up while no AI works, with the one chip to connect it", async () => {
     f.state = { ...f.state, instances: [claude(false)] };
     await show();
-    expect(lines()[3]).toBe(t("helperIntro.followup.noAi"));
-    expect(chips()).toEqual(["ai", "apps", "phone"]);
-    await act(async () => { host.querySelector<HTMLElement>('[data-helper-step="phone"]')!.click(); });
-    expect(f.dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: "toggleAppSettings", section: "companion" }));
-    expect(chips()).toEqual(["ai", "apps", "cloud"]);
+    expect(lines()[2]).toBe(t("helperIntro.followup.noAi"));
+    expect(host.querySelector("[data-helper-followup]")?.textContent).toBe(t("helperIntro.followup.noAi"));
+    expect(chips()).toEqual(["ai"]);
   });
 
   it("opens the Connect an AI dialog in place from its chip, not Settings", async () => {
@@ -167,31 +164,24 @@ describe("in the chat (Simple mode)", () => {
     f.state = { ...f.state, instances: [{ instanceId: "opencodeGo", driverKind: "opencodeGo", displayName: "OpenCode",
       snapshot: { state: "available", authenticated: true, freeFallback: true }, models: { default: "m", options: [] } }] };
     await show();
-    expect(lines()[3]).toContain("free backup model");
-    expect(chips()[0]).toBe("ai");
+    expect(lines()[2]).toContain("free backup model");
+    expect(chips()).toEqual(["ai"]);
   });
 
-  it("offers to bring in skills this computer has, looking only from its own window", async () => {
+  it("never offers apps, a phone, Cloud or skills this computer has", async () => {
     f.local = true;
     f.found = { skills: [{ name: "pdf", source: "claudeCode" }], tools: [] };
     await show();
-    expect(chips()).toEqual(["apps", "import", "phone"]);
-    expect(chipAction("import")).toEqual({ type: "toggleAppSettings", open: true, section: "import" });
+    expect(chips()).toEqual([]);
   });
 
-  it("drops the chips once the person has written, and no longer looks for skills", async () => {
+  it("drops the chip once the person has written, and no longer looks for skills", async () => {
     f.local = true;
-    await show(true, saved({ ai: "own", apps: [], bots: 0, routines: 0 }));
-    expect(lines()).toHaveLength(4);
+    f.state = { ...f.state, instances: [claude(false)] };
+    await show(true);
+    expect(lines()).toHaveLength(3);
     expect(chips()).toEqual([]);
     expect(f.detect).not.toHaveBeenCalled();
-  });
-
-  it("counts Try Cloud as the first run's Cloud moment, then opens Add a Cloud", async () => {
-    await show();
-    await act(async () => { host.querySelector<HTMLElement>('[data-helper-step="cloud"]')!.click(); });
-    expect(analytics.track).toHaveBeenCalledWith("onboarding_cloud", { action: "start_trial" });
-    expect(f.dispatch).toHaveBeenCalledWith({ type: "openCloudAdd", source: "app_onboarding" });
   });
 
   it("opens the app's own flow for each chip", () => {
@@ -208,32 +198,24 @@ describe("in the chat (Simple mode)", () => {
 });
 
 describe("as a first run lands in the chat", () => {
-  it("arrives part by part: three lines, the bot typing, its follow-up (written once by the server), then the chips", async () => {
+  it("arrives part by part: two lines, and nothing after them once an AI works", async () => {
     vi.useFakeTimers();
     f.bots = 2;
     stageIntro("hezuo");
     await show();
     expect(lines()).toEqual([]);
-    expect(f.followups, "asked for once its look around settles").toEqual([{ threadId: "t", ai: "own", apps: [] }]);
     await tick(INTRO_TIMING.first);
     expect(lines()).toHaveLength(1);
     await tick(INTRO_TIMING.line);
     expect(lines()).toHaveLength(2);
     await tick(INTRO_TIMING.line);
-    expect(lines()).toHaveLength(3);
-    expect(host.querySelector("[data-helper-typing]")).toBeNull();
     await tick(INTRO_TIMING.typing);
-    expect(host.querySelector("[data-helper-typing]")?.textContent).toContain("Typing…");
-    await tick(INTRO_TIMING.followup - 1);
-    expect(lines()).toHaveLength(3);
-    await tick(1);
-    expect(lines()[3], "the server's counts").toContain("You have 2 other bots and no routines");
     expect(host.querySelector("[data-helper-typing]")).toBeNull();
-    expect(chips()).toEqual([]);
+    await tick(INTRO_TIMING.followup);
     await tick(INTRO_TIMING.chips);
-    expect(chips()).toEqual(["apps", "phone", "cloud"]);
-    await show();
-    expect(f.followups, "never asked twice").toHaveLength(1);
+    expect(lines()).toHaveLength(2);
+    expect(chips()).toEqual([]);
+    expect(f.followups, "never asked for").toEqual([]);
   });
 
   it("with no AI shows no typing row, and follows up soon after the last line", async () => {
@@ -241,23 +223,27 @@ describe("as a first run lands in the chat", () => {
     f.state = { ...f.state, instances: [claude(false)] };
     stageIntro("hezuo");
     await show();
+    expect(f.followups, "asked for once its look around settles").toEqual([{ threadId: "t", ai: "none", apps: [] }]);
     await tick(INTRO_TIMING.first);
     await tick(INTRO_TIMING.line);
     await tick(INTRO_TIMING.line);
-    expect(lines()).toHaveLength(3);
+    expect(lines()).toHaveLength(2);
     await tick(INTRO_TIMING.noAi);
     expect(host.querySelector("[data-helper-typing]")).toBeNull();
-    expect(lines()[3]).toBe(t("helperIntro.followup.noAi"));
+    expect(lines()[2]).toBe(t("helperIntro.followup.noAi"));
+    await show();
+    expect(f.followups, "never asked twice").toHaveLength(1);
   });
 
   it("shows everything at once with reduced motion, and says what it saw itself when the server can't save it", async () => {
     f.reduced = true;
     f.saves = false;
+    f.state = { ...f.state, instances: [claude(false)] };
     stageIntro("hezuo");
     await show();
     expect(f.followups).toHaveLength(1);
-    expect(lines()).toHaveLength(4);
-    expect(chips()).toEqual(["apps", "phone", "cloud"]);
+    expect(lines()).toHaveLength(3);
+    expect(chips()).toEqual(["ai"]);
   });
 });
 

@@ -9,7 +9,9 @@ import {
   type BotAvatarProps,
   type HezuoAvatarProps,
 } from "./Avatar";
-import { MASCOT_BODIES } from "../../shared/mascot-bodies";
+import { botShape, figureFrame, poseWeights, STILL } from "@/lib/bot-figure";
+import { HALLOWEEN_BODIES } from "../../shared/halloween-bodies";
+import { MASCOT_BODIES, type BotShapeKind } from "../../shared/mascot-bodies";
 
 const render = (props: Partial<HezuoAvatarProps>) =>
   renderToStaticMarkup(createElement(HezuoAvatar, { color: "green", animated: false, ...props }));
@@ -19,28 +21,32 @@ const renderBot = (bot: Partial<BotAvatarProps["bot"]>) =>
     createElement(BotAvatar, { bot: { color: "green", ...bot }, animated: false }),
   );
 
+const outlineOf = (kind: BotShapeKind) => figureFrame(botShape(kind), poseWeights("idle"), STILL).outline;
+
 describe("HezuoAvatar body", () => {
-  it("wears the cursor when no body is given", () => {
-    expect(render({})).toContain(MASCOT_BODIES.cursor.fit);
+  it("wears the default body when none is given", () => {
+    expect(render({})).toContain(outlineOf(MASCOT_BODIES.cursor.shape));
   });
 
   it("wears the body it is given", () => {
-    const markup = render({ bodyId: "star" });
-    expect(markup).toContain(MASCOT_BODIES.star.fit);
+    expect(render({ bodyId: "star" })).toContain(outlineOf(MASCOT_BODIES.star.shape));
   });
 
-  it("falls back to the cursor for an unknown body", () => {
+  it("wears a Halloween costume as its shape", () => {
+    expect(render({ bodyId: "ghost" })).toContain(outlineOf(HALLOWEEN_BODIES.ghost.shape));
+  });
+
+  it("falls back to the default body for an unknown one", () => {
     // SAFETY: "hexagram" is deliberately not a MascotBodyId, to exercise the runtime fallback for persisted or streamed
     // data.
     expect(render({ bodyId: "hexagram" as HezuoAvatarProps["bodyId"] })).toContain(
-      MASCOT_BODIES.cursor.fit,
+      outlineOf(MASCOT_BODIES.cursor.shape),
     );
   });
 
   it("paints the body with the per-bot gradient, never a flat black fill", () => {
     const markup = render({ bodyId: "circle" });
     expect(markup).not.toContain('fill="#000000"');
-    expect(markup).not.toContain("{{GRADIENT}}");
     expect(markup).toContain("url(#");
   });
 });
@@ -60,8 +66,8 @@ describe("mascot facial feature colors", () => {
 
   it("keeps default inks when an override is reset or comes from an older profile", () => {
     expect(renderBot({ color: "chrome", mascotFaceColor: null })).toContain('stroke="#1E2833"');
-    expect(renderBot({ mascotBody: "pumpkin" })).toContain('stroke="#0d0a10"');
-    expect(renderBot({})).toContain('stroke="#ffffff"');
+    expect(renderBot({ mascotBody: "pumpkin" })).toContain('stroke="#0d1b26"');
+    expect(renderBot({})).toContain('stroke="#0d1b26"');
   });
 
   it("does not paint features over an uploaded image", () => {

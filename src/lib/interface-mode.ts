@@ -1,8 +1,6 @@
 import { useSyncExternalStore } from "react";
 
-import { hasPriorRun } from "./prior-run";
-
-export const ADVANCED_MODE_KEY = "omb-advanced-mode";
+export const ADVANCED_MODE_KEY = "hezuo-advanced-mode";
 
 let sessionChoice: boolean | undefined;
 const listeners = new Set<() => void>();
@@ -18,20 +16,9 @@ function storage(): Storage | undefined {
 export function readAdvancedMode(): boolean {
   if (sessionChoice !== undefined) return sessionChoice;
   try {
-    const store = storage();
-    const stored = store?.getItem(ADVANCED_MODE_KEY);
-    if (stored === "1") return true;
-    if (stored === "0") return false;
-    return hasPriorRun(store);
+    return storage()?.getItem(ADVANCED_MODE_KEY) === "1";
   } catch {
     return false;
-  }
-}
-
-export function settleAdvancedModeDefault(): void {
-  try {
-    if (storage()?.getItem(ADVANCED_MODE_KEY) == null) setAdvancedMode(readAdvancedMode());
-  } catch {
   }
 }
 

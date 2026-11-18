@@ -732,7 +732,7 @@ const MessagesList = memo(function MessagesList({
             {newDay && <DaySeparator at={m.at} today={today} simple={simple} />}
             {divider}
             {m.automation && <AutomationCaption message={m} line={m.automation} botId={botId} />}{m.inbox && <InboxCaption message={m} />}
-            {row}{m.inbox?.answers && <InboxAnswers message={m} />}{m.inbox && <InboxCardSlot threadId={threadId} messageId={m.id} />}{m.setupOffer && <SetupOffer botId={botId} threadId={threadId} message={m} transcript={transcript} />}{m.savedSteps && <SavedStepsChip botId={botId} message={m} />}
+            {row}{m.inbox?.answers && <InboxAnswers message={m} />}{m.inbox && <InboxCardSlot threadId={threadId} messageId={m.id} />}{!simple && m.setupOffer && <SetupOffer botId={botId} threadId={threadId} message={m} transcript={transcript} />}{m.savedSteps && <SavedStepsChip botId={botId} message={m} />}
           </div>
         );
       })}
@@ -1044,8 +1044,8 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
           )}
           <ThreadContextWarning bot={bot} messages={messages} />
           {!product && <EngineLimitNotice engine={bot.modelSelection?.instanceId} />}
-          {!phone && !product && <ModelPicker key={bot.threadId} bot={bot} threadId={bot.threadId} />}
-          {product && <button
+          {advanced && !phone && !product && <ModelPicker key={bot.threadId} bot={bot} threadId={bot.threadId} />}
+          {advanced && product && <button
             type="button"
             data-product-work-entry="tasks"
             aria-pressed={state.activityOpen}
@@ -1058,8 +1058,8 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
           >
             <ListChecks size={18} aria-hidden="true" />
           </button>}
-          <LiveCallChip currentBotId={bot.id} onOpen={(botId, threadId) => openThread(dispatch, { botId, threadId }, state, showThreads)} />
-          {!phoneMenu && <button
+          {advanced && <LiveCallChip currentBotId={bot.id} onOpen={(botId, threadId) => openThread(dispatch, { botId, threadId }, state, showThreads)} />}
+          {advanced && !phoneMenu && <button
             data-tour="computer"
             data-product-work-entry="computer"
             aria-pressed={product ? state.computerOpen : undefined}
@@ -1189,7 +1189,6 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
                 state={toolInFlight ? "working" : "thinking"}
                 size={advanced ? 36 : 28}
                 forward={false}
-                lookAround={1}
                 trackPointer={false}
               />
             }

@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-// The Room panel in a real DOM, where effects run and focus moves: each row's value and write, its pages and Escape.
+// The Room panel in a real DOM, where effects run and focus moves: its instructions and Escape.
 import { createElement } from "react";
 import { flushSync } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
@@ -70,8 +70,6 @@ const type = (field: HTMLTextAreaElement, value: string) => {
   Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(field, value);
   flushSync(() => field.dispatchEvent(new Event("input", { bubbles: true })));
 };
-const rowValue = (selector: string) => $(selector)?.querySelector("span.truncate")?.textContent ?? null;
-const page = () => $("[data-panel-page-view]")?.getAttribute("data-panel-page-view") ?? null;
 const patches = () => fixture.dispatch.mock.calls.map(([action]) => action).filter((action) => action.type === "patchGroup");
 
 beforeEach(() => {
@@ -95,77 +93,18 @@ afterEach(() => {
 });
 
 describe("the Room panel's card", () => {
-  it("shows the room's faces, name and description, then who responds, the folder, the instructions and the members", () => {
+  it("shows the room's faces, name and description, then its instructions and nothing else", () => {
     render(room());
     expect($("#room-panel-title")?.textContent).toBe("Desk HQ");
     expect($("[data-room-panel]")?.textContent).toContain("The recruiting desk");
-    expect(rowValue('[data-panel-page="responder"]')).toBe("Desk Manager");
-    expect(rowValue('[data-panel-page="folder"]')).toBe("Its own folder");
     expect($('[data-panel-edit="instructions"]')?.textContent).toContain("Hand out the work here.");
     expect($('[data-panel-edit="instructions"]')?.textContent).not.toContain("Keep it short.");
-    expect(rowValue('[data-panel-row="members"]')).toBe("4");
-    expect($('[data-testid="room-more"]')).not.toBeNull();
+    for (const gone of ['[data-panel-page="responder"]', '[data-panel-page="folder"]', '[data-panel-row="members"]', '[data-testid="room-more"]']) expect($(gone), gone).toBeNull();
   });
 
-  it("names each way a room can answer, and the folder by its last part", () => {
-    render(room({ defaultResponder: { kind: "auto", fallbackBotId: "lead" }, cwd: "/Users/ada/code/recruiting/" }));
-    expect(rowValue('[data-panel-page="responder"]')).toBe("Hezuo decides");
-    expect(rowValue('[data-panel-page="folder"]')).toBe("recruiting");
-    render(room({ defaultResponder: { kind: "everyone" } }));
-    expect(rowValue('[data-panel-page="responder"]')).toBe("Everyone");
-    render(room({ defaultResponder: { kind: "mentions" }, bulletin: "" }));
-    expect(rowValue('[data-panel-page="responder"]')).toBe("Only who I @mention");
+  it("asks for instructions while the room has none", () => {
+    render(room({ bulletin: "" }));
     expect($('[data-panel-edit="instructions"]')?.textContent).toContain("Tell the bots what this room is for");
-  });
-});
-
-describe("Who responds", () => {
-  it("lists each member, then Hezuo choosing, everyone and mentions only, and writes what the header picker writes", async () => {
-    render(room());
-    click($('[data-panel-page="responder"]'));
-    await settle();
-    expect(page()).toBe("responder");
-    const choices = [...document.querySelectorAll("[data-panel-choice]")].map((row) => [row.getAttribute("data-panel-choice"), row.textContent, row.getAttribute("aria-checked")]);
-    expect(choices).toEqual([
-      ["member:lead", "Desk Manager", "true"],
-      ["member:bench", "Vendor Bench", "false"],
-      ["member:paper", "Paperwork", "false"],
-      ["member:match", "Matcher", "false"],
-      ["auto", "Let Hezuo choose", "false"],
-      ["everyone", "Everyone", "false"],
-      ["mentions", "Only who I @mention", "false"],
-    ]);
-    click($('[data-panel-choice="auto"]'));
-    click($('[data-panel-choice="member:bench"]'));
-    click($('[data-panel-choice="everyone"]'));
-    click($('[data-panel-choice="mentions"]'));
-    click($('[data-panel-choice="member:lead"]'));
-    expect(patches()).toEqual([
-      { type: "patchGroup", groupId: "desk", patch: { defaultResponder: { kind: "auto", fallbackBotId: "lead" } } },
-      { type: "patchGroup", groupId: "desk", patch: { defaultResponder: { kind: "member", botId: "bench" } } },
-      { type: "patchGroup", groupId: "desk", patch: { defaultResponder: { kind: "everyone" } } },
-      { type: "patchGroup", groupId: "desk", patch: { defaultResponder: { kind: "mentions" } } },
-    ]);
-  });
-
-  it("says who answers instead while Jev is off", async () => {
-    fixture.config = jev(false);
-    render(room({ defaultResponder: { kind: "auto", fallbackBotId: "paper" } }));
-    click($('[data-panel-page="responder"]'));
-    await settle();
-    expect($('[data-panel-choice="auto"]')?.textContent).toBe("Let Hezuo chooseJev is off, so plain messages go to Paperwork; @mentions override this");
-    expect($('[data-panel-choice="auto"]')?.getAttribute("aria-checked")).toBe("true");
-  });
-});
-
-describe("Working folder", () => {
-  it("opens a page with the room's folder picker", async () => {
-    render(room());
-    click($('[data-panel-page="folder"]'));
-    await settle();
-    expect(page()).toBe("folder");
-    expect($("[data-room-working-folder]")).not.toBeNull();
-    expect($('[data-panel-page-view="folder"] h3')?.textContent).toBe("Working folder");
   });
 });
 
@@ -210,27 +149,11 @@ describe("Instructions", () => {
   });
 });
 
-describe("Members", () => {
-  it("opens Manage members", () => {
-    render(room());
-    click($('[data-panel-row="members"]'));
-    expect($('[role="dialog"][aria-label="Manage members of Desk HQ"]')).not.toBeNull();
-  });
-});
-
 describe("Escape", () => {
-  it("leaves a page first, then closes the panel and hands focus back to the room's name", async () => {
+  it("closes the panel and hands focus back to the room's name", async () => {
     render(room());
     await settle();
-    click($('[data-panel-page="responder"]'));
-    await settle();
-    expect(document.activeElement?.hasAttribute("data-panel-back")).toBe(true);
-    press(document.activeElement, "Escape");
-    await settle();
-    expect(page()).toBeNull();
-    expect(seen.open).toBe("desk");
-    expect(document.activeElement?.getAttribute("data-panel-page")).toBe("responder");
-    press(document.activeElement, "Escape");
+    press($("[data-room-panel]"), "Escape");
     await settle();
     expect(seen.open).toBeNull();
     expect(document.activeElement).toBe(opener);

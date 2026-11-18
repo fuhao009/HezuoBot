@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { Check, ClipboardCopy, FolderPlus, Pencil, TextQuote, Trash2, X } from "lucide-react";
 import { useStore } from "@/state/store";
 import { cn } from "@/lib/cn";
+import { useAdvancedMode } from "@/lib/interface-mode";
 import { t } from "@/lib/i18n";
 import { copyText } from "@/lib/copy-text";
 import { nextRename } from "@/lib/rename";
@@ -24,6 +25,7 @@ export function RoomContextMenu({
   const motion = useHeldMenuMotion(menu);
   const shown = motion.value;
   const { state, dispatch } = useStore();
+  const advanced = useAdvancedMode();
   const remoteClient = window.ogb?.remoteClient?.active === true;
   const group = shown ? state.groups.find((g) => g.id === shown.groupId) : undefined;
   const [renaming, setRenaming] = useState(false);
@@ -174,7 +176,7 @@ export function RoomContextMenu({
           {isBotChat ? t("sidebar.room.renameChat") : t("sidebar.room.renameChannel")}
         </button>
       ))}
-      {!remoteClient && !renaming && !isBotChat && (
+      {advanced && !remoteClient && !renaming && !isBotChat && (
         <button
           role="menuitem"
           onClick={() => {
@@ -187,7 +189,7 @@ export function RoomContextMenu({
           {t("sidebar.room.setDescription")}
         </button>
       )}
-      {!remoteClient && !isBotChat && (
+      {advanced && !remoteClient && !isBotChat && (
         <button
           role="menuitem"
           onClick={() => {
@@ -200,7 +202,7 @@ export function RoomContextMenu({
           {t("sidebar.section.moveToContext")}
         </button>
       )}
-      <button
+      {advanced && <button
         role="menuitem"
         onClick={() => {
           void copyText(group.threadId);
@@ -210,7 +212,7 @@ export function RoomContextMenu({
       >
         <ClipboardCopy size={16} className="text-ink-secondary" />
         {t("sidebar.copyConversationId")}
-      </button>
+      </button>}
       {!remoteClient && <button
         role="menuitem"
         onClick={() => {

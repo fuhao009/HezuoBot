@@ -1,29 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import { createPortal } from "react-dom";
-import { ChevronRight, FileText, Folder, MessagesSquare, Users, X } from "lucide-react";
+import { useEffect, useMemo, useRef, type KeyboardEvent } from "react";
+import { ChevronRight, FileText, X } from "lucide-react";
 
 import { cn } from "@/lib/cn";
 import { t } from "@/lib/i18n";
 import { closeRoomPanel } from "@/lib/room-panel";
-import { responderShortLabel } from "@/lib/room-responder";
-import type { LocaleKey } from "@/locales";
 import { useStore, type Bot, type Group } from "@/state/store";
 import { BotAvatar } from "../Avatar";
 import { useCaptionChrome } from "../DesktopCapabilities";
-import { ManageMembersPanel } from "../ManageMembersPanel";
 import { useBulletinEditor } from "../RoomBulletin";
-import { RoomMoreMenu } from "../RoomMoreMenu";
-import { RoomWorkingFolder, roomWorkingFolder } from "../RoomWorkingFolder";
-import { buttonCls, Card, ColRow, NavRow, PageHeader, roundButtonCls, rowCls, RowText } from "../bot-panel/rows";
+import { buttonCls, Card, ColRow, roundButtonCls, rowCls, RowText } from "../bot-panel/rows";
 import { sidePanelCls } from "../bot-panel/side-panel";
-import { ResponderPage } from "./ResponderPage";
-
-type RoomPage = "responder" | "folder";
-
-const PAGES: Record<RoomPage, { title: LocaleKey; intro: LocaleKey }> = {
-  responder: { title: "room.panel.whoResponds", intro: "room.panel.responder.intro" },
-  folder: { title: "room.folder.title", intro: "room.folder.detail" },
-};
 
 function RoomHero({ group, members }: { group: Group; members: Bot[] }) {
   return (
@@ -116,38 +102,11 @@ function InstructionsRow({ group }: { group: Group }) {
 export function RoomPanel({ group, overlay = false }: { group: Group; overlay?: boolean }) {
   const { state } = useStore();
   const { dragProps } = useCaptionChrome();
-  const [page, setPage] = useState<RoomPage | null>(null);
-  const [membersOpen, setMembersOpen] = useState(false);
   const dialogRef = useRef<HTMLElement>(null);
-  const bodyRef = useRef<HTMLDivElement>(null);
-  const membersRowRef = useRef<HTMLButtonElement>(null);
-  const leftPage = useRef<RoomPage | null>(null);
   const members = useMemo(
     () => group.memberIds.map((id) => state.bots.find((bot) => bot.id === id)).filter((bot): bot is Bot => Boolean(bot)),
     [group.memberIds, state.bots],
   );
-  const folder = roomWorkingFolder(group);
-  const closeMembers = useCallback(() => setMembersOpen(false), []);
-
-  const openPage = (next: RoomPage) => {
-    setPage(next);
-    bodyRef.current?.scrollTo({ top: 0 });
-  };
-  const back = () => {
-    leftPage.current = page;
-    setPage(null);
-  };
-
-  // The row or Back button that was pressed is gone with the view it sat in: focus moves to its counterpart, so the
-  // next Escape still lands in the panel.
-  useEffect(() => {
-    if (page !== null) {
-      bodyRef.current?.querySelector<HTMLElement>("[data-panel-back]")?.focus();
-    } else if (leftPage.current) {
-      bodyRef.current?.querySelector<HTMLElement>(`[data-panel-page="${leftPage.current}"]`)?.focus();
-      leftPage.current = null;
-    }
-  }, [page]);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -162,77 +121,27 @@ export function RoomPanel({ group, overlay = false }: { group: Group; overlay?: 
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
-    if (event.key !== "Escape" || event.defaultPrevented || page === null) return;
-    event.preventDefault();
-    event.stopPropagation();
-    back();
-  };
-
   return (
-    <>
-      <aside
-        ref={dialogRef}
-        role="dialog"
-        aria-labelledby="room-panel-title"
-        tabIndex={-1}
-        data-room-panel
-        onKeyDown={onKeyDown}
-        className={sidePanelCls(overlay, true)}
-      >
-        <div {...dragProps} className="flex h-[52px] shrink-0 items-center justify-end gap-2 px-3.5">
-          <RoomMoreMenu group={group} />
-          <button type="button" onClick={() => closeRoomPanel({ refocus: true })} aria-label={t("botSettings.simple.close")} className={roundButtonCls}>
-            <X size={16} className="pointer-events-none" />
-          </button>
-        </div>
+    <aside
+      ref={dialogRef}
+      role="dialog"
+      aria-labelledby="room-panel-title"
+      tabIndex={-1}
+      data-room-panel
+      className={sidePanelCls(overlay, true)}
+    >
+      <div {...dragProps} className="flex h-[52px] shrink-0 items-center justify-end gap-2 px-3.5">
+        <button type="button" onClick={() => closeRoomPanel({ refocus: true })} aria-label={t("botSettings.simple.close")} className={roundButtonCls}>
+          <X size={16} className="pointer-events-none" />
+        </button>
+      </div>
 
-        <div ref={bodyRef} className="@container relative min-h-0 flex-1 overflow-y-auto px-5 pb-7">
-          {page === null ? (
-            <>
-              <RoomHero group={group} members={members} />
-              <Card>
-                <NavRow
-                  data-panel-page="responder"
-                  icon={MessagesSquare}
-                  title={t("room.panel.whoResponds")}
-                  value={responderShortLabel(group, members)}
-                  onClick={() => openPage("responder")}
-                />
-                <NavRow
-                  data-panel-page="folder"
-                  icon={Folder}
-                  title={t("room.folder.title")}
-                  value={folder?.name ?? t("room.panel.folder.own")}
-                  tooltip={folder?.path}
-                  onClick={() => openPage("folder")}
-                />
-                <InstructionsRow group={group} />
-                <NavRow
-                  ref={membersRowRef}
-                  data-panel-row="members"
-                  icon={Users}
-                  title={t("room.panel.members")}
-                  value={String(members.length)}
-                  onClick={() => setMembersOpen(true)}
-                />
-              </Card>
-            </>
-          ) : (
-            <div data-panel-page-view={page}>
-              <span id="room-panel-title" className="sr-only">{group.name}</span>
-              <PageHeader back={group.name} title={t(PAGES[page].title)} intro={t(PAGES[page].intro)} onBack={back} />
-              <div className="mt-4 flex flex-col gap-3">
-                {page === "responder" ? <ResponderPage group={group} members={members} /> : <RoomWorkingFolder group={group} heading={false} />}
-              </div>
-            </div>
-          )}
-        </div>
-      </aside>
-      {membersOpen && createPortal(
-        <ManageMembersPanel group={group} onClose={closeMembers} triggerRef={membersRowRef} />,
-        document.body,
-      )}
-    </>
+      <div className="@container relative min-h-0 flex-1 overflow-y-auto px-5 pb-7">
+        <RoomHero group={group} members={members} />
+        <Card>
+          <InstructionsRow group={group} />
+        </Card>
+      </div>
+    </aside>
   );
 }

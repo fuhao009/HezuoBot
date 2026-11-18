@@ -31,25 +31,20 @@ afterEach(() => {
 });
 
 describe("interface mode", () => {
-  it("defaults a fresh install to Simple and stores that once", async () => {
-    const { readAdvancedMode, settleAdvancedModeDefault, ADVANCED_MODE_KEY } = await fresh();
-    expect(readAdvancedMode()).toBe(false);
-    settleAdvancedModeDefault();
-    local.setItem("omb-skin", "midnight");
-    expect(local.getItem(ADVANCED_MODE_KEY)).toBe("0");
+  it("is Simple on a fresh install and on one that ran before", async () => {
+    expect((await fresh()).readAdvancedMode()).toBe(false);
+    local.setItem("omb-skin", "lagoon");
     expect((await fresh()).readAdvancedMode()).toBe(false);
   });
 
-  it("defaults an existing install to Advanced so an update hides nothing", async () => {
-    local.setItem("omb-skin", "lagoon");
-    const { readAdvancedMode, settleAdvancedModeDefault, ADVANCED_MODE_KEY } = await fresh();
-    expect(readAdvancedMode()).toBe(true);
-    settleAdvancedModeDefault();
-    expect(local.getItem(ADVANCED_MODE_KEY)).toBe("1");
+  it("does not carry over the choice an earlier version stored", async () => {
+    local.setItem("omb-advanced-mode", "1");
+    expect((await fresh()).readAdvancedMode()).toBe(false);
   });
 
-  it("keeps an explicit choice over the existing-install default", async () => {
-    local.setItem("omb-skin", "midnight");
+  it("keeps an explicit choice across a relaunch", async () => {
+    (await fresh()).setAdvancedMode(true);
+    expect((await fresh()).readAdvancedMode()).toBe(true);
     (await fresh()).setAdvancedMode(false);
     expect((await fresh()).readAdvancedMode()).toBe(false);
   });
@@ -67,8 +62,6 @@ describe("interface mode", () => {
     local.getItem.mockImplementation(() => {
       throw new Error("blocked");
     });
-    const { readAdvancedMode, settleAdvancedModeDefault } = await fresh();
-    expect(() => settleAdvancedModeDefault()).not.toThrow();
-    expect(readAdvancedMode()).toBe(false);
+    expect((await fresh()).readAdvancedMode()).toBe(false);
   });
 });

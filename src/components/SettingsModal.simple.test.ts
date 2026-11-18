@@ -1,11 +1,10 @@
 import { createElement, type ComponentProps } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { setLocale, t } from "@/lib/i18n";
+import { setLocale } from "@/lib/i18n";
 import type { AppSettingsSection } from "@/state/store";
 import type { Switch } from "./SettingsPrimitives";
 import { SECTIONS, SIMPLE_FOLDED, SIMPLE_HIDDEN_SECTIONS, SIMPLE_PAGES, SettingsModal, revealSettingsBlock } from "./SettingsModal";
-import { SIMPLE_ADVANCED_ONLY, SimpleLooksPage } from "./SettingsSimplePages";
 
 const fixture = vi.hoisted(() => ({
   section: "general" as AppSettingsSection,
@@ -128,29 +127,26 @@ const placement = (html: string, needle: string): "shown" | "folded" | "missing"
 const open = (section: AppSettingsSection) => { fixture.section = section; return render(); };
 
 describe("Settings in Simple mode", () => {
-  it("draws sectional desktop pages including Vault without Advanced-only pages", () => {
+  it("draws four desktop pages: General, AI, Usage & billing and Updates", () => {
     const html = render();
-    expect(pages(html)).toEqual(["general", "ai", "computer", "vault", "billing", "updates"]);
-    expect(SIMPLE_PAGES.map((page) => page.id)).toEqual(["general", "account", "botAccess", "ai", "computer", "vault", "billing", "updates"]);
-    expect(html).toMatch(/General<\/span>[\s\S]*AI<\/span>[\s\S]*Computer<\/span>[\s\S]*Usage &amp; billing<\/span>[\s\S]*Updates<\/span>/);
+    expect(pages(html)).toEqual(["general", "ai", "billing", "updates"]);
+    expect(SIMPLE_PAGES.map((page) => page.id)).toEqual(["general", "account", "ai", "billing", "updates"]);
+    expect(html).toMatch(/General<\/span>[\s\S]*AI<\/span>[\s\S]*Usage &amp; billing<\/span>[\s\S]*Updates<\/span>/);
     expect(html).not.toContain("data-settings-group=");
     expect(html).not.toContain("data-settings-section=");
     expect(html).not.toMatch(/class="(?:[^"]*\s)?uppercase(?:\s[^"]*)?"/);
-    for (const hidden of ["backups", "experimental", "workspaces", "skills"]) expect(html).not.toContain(`value="${hidden}"`);
+    for (const hidden of SIMPLE_HIDDEN_SECTIONS) expect(html).not.toContain(`value="${hidden}"`);
     const picker = html.match(/<select aria-label="Settings"[\s\S]*?<\/select>/)![0];
-    expect([...picker.matchAll(/<option value="([^"]+)"/g)].map((match) => match[1])).toEqual(["general", "ai", "computer", "vault", "billing", "updates"]);
+    expect([...picker.matchAll(/<option value="([^"]+)"/g)].map((match) => match[1])).toEqual(["general", "ai", "billing", "updates"]);
     expect(html).toContain('data-settings-look="simple"');
   });
 
-  it("gives a team's admins Bot access as its own page, found by its search words, and nobody else", () => {
+  it("keeps Bot access out of the pages, and opens it for a team's admin only while it is the linked one", () => {
     fixture.config = { ...fixture.config, team: { id: "team-acme", name: "Acme" }, cloudHome: true };
     fixture.ownerOrAdmin = true;
-    expect(pages(render())).toContain("botAccess");
-    expect(pages(render())[1]).toBe("botAccess");
-    expect(blocks(render())).not.toContain("botAccess");
+    expect(pages(render())).not.toContain("botAccess");
     fixture.section = "botAccess";
     expect(currentPage(render())).toBe("botAccess");
-    fixture.section = "general";
     fixture.ownerOrAdmin = false;
     expect(pages(render())).not.toContain("botAccess");
   });
@@ -158,52 +154,34 @@ describe("Settings in Simple mode", () => {
   it("files every Advanced page under one Simple page, or hides it", () => {
     const placed = SIMPLE_PAGES.flatMap((page) => page.sections);
     expect(new Set(placed).size).toBe(placed.length);
+    expect(placed).toEqual(["general", "appearance", "organization", "account", "engines", "connections", "usage", "cloudAccount", "updates"]);
     const hidden = SECTIONS.map((entry) => entry.id).filter((id) => !placed.includes(id));
-    expect(hidden).toEqual(["decisionModel", "skills", "backups", "workspaces", "experimental"]);
-    for (const id of hidden) expect(SIMPLE_HIDDEN_SECTIONS).toContain(id);
+    expect([...hidden].sort()).toEqual([...SIMPLE_HIDDEN_SECTIONS].sort());
   });
 
-  it("opens General on Account, then Appearance, Notifications, System and Import, with Advanced mode last as a plain row", () => {
+  it("opens General on Account, then Appearance, Notifications, System and Organization, with no Advanced mode switch", () => {
     const html = render();
     expect(currentPage(html)).toBe("general");
-    expect(groupLabels(html)).toEqual(["Account", "Appearance", "Notifications", "System", "Import", "Organization"]);
-    expect(blocks(html).at(-1)).toBe("advanced-mode");
-    expect([...html.matchAll(/<button[^>]*role="switch"[^>]*>/g)].at(-1)?.[0]).toContain('aria-label="Advanced mode"');
-    expect(html).toContain("Show every control, including tools for builders. Nothing is deleted either way.");
+    expect(groupLabels(html)).toEqual(["Account", "Appearance", "Notifications", "System", "Organization"]);
+    expect(blocks(html)).not.toContain("advanced-mode");
+    expect(html).not.toContain('aria-label="Advanced mode"');
     expect(html).not.toContain("border-accent-border/40");
     expect(html).toContain("Add your name");
     expect(html).toMatch(/aria-expanded="false" aria-controls="[^"]+"[^>]*>Add<\/button>/);
   });
 
-  it("puts the sidebar's colour and picture right under Theme in General, the switch for the window's rail beside them, and only the skins behind More looks", () => {
+  it("keeps Appearance to the theme, the bubble colour, the language and the send key", () => {
     fixture.rail = { available: true, hidden: false };
     const html = render();
     const appearance = html.slice(html.indexOf('data-settings-block="appearance"'), html.indexOf(">Notifications<"));
-    const order = ['role="radiogroup" aria-label="Theme"', ">Sidebar picture<", 'aria-label="Show your computers"', 'aria-label="Color my messages with the bot&#x27;s color"', ">More looks<"]
+    const order = ['role="radiogroup" aria-label="Theme"', 'aria-label="Color my messages with the bot&#x27;s color"', 'aria-label="App language"', 'aria-label="Send messages with"']
       .map((needle) => appearance.indexOf(needle));
     expect(order.every((at) => at > -1), String(order)).toBe(true);
     expect(order).toEqual([...order].sort((a, b) => a - b));
-    expect(appearance).toContain("A circle for each place your bots live, at the window&#x27;s left edge.");
-    const toggle = fixture.switches.find((props) => props["aria-label"] === "Show your computers")!;
-    expect(toggle.checked).toBe(true);
-    toggle.onClick!({} as never);
-    expect(fixture.railHidden).toEqual([true]);
-    const looks = renderToStaticMarkup(createElement(SimpleLooksPage, { onBack: () => {} }));
-    expect(looks).toContain('data-settings-block="looks"');
-    expect(looks).not.toContain("data-place-picture");
+    for (const gone of [">Sidebar picture<", "Show your computers", ">More looks<"]) expect(html, gone).not.toContain(gone);
   });
 
-  it("shows the rail's switch only where this window has a rail to hide", () => {
-    for (const rail of [null, { available: false, hidden: true }]) {
-      fixture.rail = rail;
-      expect(render()).not.toContain("Show your computers");
-    }
-    fixture.rail = { available: true, hidden: true };
-    render();
-    expect(fixture.switches.find((props) => props["aria-label"] === "Show your computers")?.checked).toBe(false);
-  });
-
-  it("keeps the everyday rows and leaves the fourteen builder controls to Advanced, where search still points", () => {
+  it("keeps the everyday rows and has none of the fourteen builder controls", () => {
     const general = open("general");
     for (const shown of ['aria-label="Send usage analytics"', 'aria-label="Color my messages with the bot&#x27;s color"', 'aria-label="Send messages with"',
       'aria-label="Notification sounds"', 'aria-label="Show the notification feed"', 'aria-label="App language"', 'role="radiogroup" aria-label="Theme"']) {
@@ -215,15 +193,14 @@ describe("Settings in Simple mode", () => {
       "Interface font", "Chat width", "Pinned bots as circles", "Universal pins", "Tool calls", "This run", "Keep prompt cache warm"]) {
       expect(everyPage, gone).not.toContain(`>${gone}<`);
     }
-    expect(SIMPLE_ADVANCED_ONLY).toHaveLength(14);
-    expect(SIMPLE_ADVANCED_ONLY.map((key) => t(key))).toEqual(expect.arrayContaining(["Effort for new bots", "Interface font", "Keep prompt cache warm"]));
   });
 
-  it("shows update checks, product updates, the welcome tour and diagnostics", () => {
+  it("shows update checks, product updates and diagnostics, and no welcome tour", () => {
     vi.stubGlobal("window", { ogb: { ...desktop.ogb, updater: { check: vi.fn(), install: vi.fn(), onState: vi.fn() } } });
     fixture.updater = { status: "idle" };
     const html = open("updates");
-    for (const shown of ["Check for updates", "MARKER:updatesConsent;", "Replay welcome tour", "Diagnostics"]) expect(placement(html, shown), shown).toBe("shown");
+    for (const shown of ["Check for updates", "MARKER:updatesConsent;", "Diagnostics"]) expect(placement(html, shown), shown).toBe("shown");
+    expect(placement(html, "Replay welcome tour")).toBe("missing");
   });
 
   it("checks the server's version from a browser", () => {
@@ -235,13 +212,10 @@ describe("Settings in Simple mode", () => {
     expect(placement(html, "Check for updates")).toBe("shown");
   });
 
-  it("opens the fold that holds a linked setting: API keys, Servers or this app as a client", () => {
+  it("opens the fold that holds a linked setting: API keys", () => {
     expect(placement(open("connections"), "MARKER:apiKey;")).toBe("shown");
     expect(placement(open("engines"), "MARKER:apiKey;")).toBe("folded");
-    expect(placement(open("desktopWorkspaces"), "MARKER:desktopWorkspaces;")).toBe("shown");
-    expect(placement(open("remote"), "MARKER:companion;")).toBe("shown");
-    expect(placement(open("companion"), "MARKER:companion;")).toBe("folded");
-    expect(SIMPLE_FOLDED).toEqual({ connections: "ai-keys", remote: "computer-elsewhere", desktopWorkspaces: "computer-elsewhere" });
+    expect(SIMPLE_FOLDED).toEqual({ connections: "ai-keys" });
   });
 
   it("shows the AI page as Your AI, then API keys", () => {
@@ -254,14 +228,6 @@ describe("Settings in Simple mode", () => {
     expect(html).not.toContain("API keys and connections");
   });
 
-  it("shows computer controls separately from logins in Vault", () => {
-    fixture.section = "companion";
-    const html = render();
-    expect(currentPage(html)).toBe("computer");
-    expect(blocks(html)).toEqual(expect.arrayContaining(["computer", "companion", "browser", "elsewhere", "remote", "desktopWorkspaces"]));
-    expect(html).toContain('aria-label="Enable the built-in browser"');
-  });
-
   it("leads Usage & billing with one usage block, folds the limits, then shows the plan", () => {
     fixture.section = "cloudAccount";
     const html = render();
@@ -272,46 +238,43 @@ describe("Settings in Simple mode", () => {
     expect(groupLabels(html)).toContain("Plan");
   });
 
-  it("shows a hosted workspace's admins People in Account and Activity as its own group", () => {
+  it("opens People for a hosted workspace's admins only while it is the linked page", () => {
     vi.stubGlobal("window", {});
     fixture.ownerOrAdmin = true;
+    expect(pages(render())).toEqual(["general", "ai", "billing", "updates"]);
     fixture.section = "people";
     const html = render();
-    expect(pages(html)).toEqual(["general", "ai", "computer", "vault", "billing", "updates"]);
-    expect(currentPage(html)).toBe("general");
+    expect(pages(html)).toEqual(["general", "ai", "billing", "updates", "people"]);
+    expect(currentPage(html)).toBe("people");
     expect(placement(html, "MARKER:people;")).toBe("shown");
-    expect(placement(html, "MARKER:activity;")).toBe("shown");
-    expect(groupLabels(html)).toContain("Activity");
   });
 
-  it("keeps a paired remote client's reduced set: General for appearance, and Computer with your devices and Connect from elsewhere", () => {
+  it("keeps a paired remote client to General, and opens its servers only while they are the linked page", () => {
     vi.stubGlobal("window", { ogb: { ...desktop.ogb, remoteClient: { active: true } } });
     fixture.section = "desktopWorkspaces";
     const html = render();
-    expect(pages(html)).toEqual(["general", "computer"]);
-    expect(currentPage(html)).toBe("computer");
-    expect(blocks(html)).toEqual(["companion", "elsewhere", "remote", "desktopWorkspaces"]);
-    expect(html).not.toContain('aria-label="Enable the built-in browser"');
+    expect(pages(html)).toEqual(["general", "desktopWorkspaces"]);
+    expect(currentPage(html)).toBe("desktopWorkspaces");
     fixture.section = "appearance";
     const general = render();
+    expect(pages(general)).toEqual(["general"]);
     expect(currentPage(general)).toBe("general");
     expect(general).not.toContain("Add your name");
     expect(general).toContain('aria-label="App language"');
-    expect(general).toContain('aria-label="Advanced mode"');
+    expect(general).not.toContain('aria-label="Advanced mode"');
   });
 
   it.each<[AppSettingsSection, string]>([
     ["general", "general"],
     ["appearance", "general"],
-    ["import", "general"],
+    ["import", "import"],
     ["organization", "general"],
     ["engines", "ai"],
     ["connections", "ai"],
-    ["companion", "computer"],
-    ["remote", "computer"],
-    ["desktopWorkspaces", "computer"],
+    ["companion", "companion"],
+    ["desktopWorkspaces", "desktopWorkspaces"],
     ["computer", "computer"],
-    ["logins", "vault"],
+    ["logins", "logins"],
     ["usage", "billing"],
     ["cloudAccount", "billing"],
     ["updates", "updates"],
@@ -319,7 +282,7 @@ describe("Settings in Simple mode", () => {
     fixture.section = section;
     const html = render();
     expect(currentPage(html)).toBe(page);
-    expect(blocks(html)).toContain(section === "remote" ? "remote" : section);
+    expect(blocks(html)).toContain(section);
   });
 
   it.each<[AppSettingsSection, string]>([
@@ -330,7 +293,7 @@ describe("Settings in Simple mode", () => {
   ])("opens a hidden page (%s) for as long as it is the open one", (section, content) => {
     fixture.section = section;
     const html = render();
-    expect(pages(html)).toEqual(["general", "ai", "computer", "vault", "billing", "updates", section]);
+    expect(pages(html)).toEqual(["general", "ai", "billing", "updates", section]);
     expect(currentPage(html)).toBe(section);
     if (content === "skillAuthoring") expect(html).toContain("Bots may write their own skills");
     else expect(markers(html)).toContain(content);
@@ -380,11 +343,7 @@ describe("the built-in browser switch", () => {
     fixture.advancedMode = advanced;
     fixture.section = "computer";
     const html = render();
-    if (advanced) {
-      expect(html.indexOf('aria-label="Enable the built-in browser"')).toBeLessThan(html.indexOf("MARKER:computer;"));
-    } else {
-      expect(html.indexOf("MARKER:computer;")).toBeLessThan(html.indexOf('aria-label="Enable the built-in browser"'));
-    }
+    expect(html.indexOf('aria-label="Enable the built-in browser"')).toBeLessThan(html.indexOf("MARKER:computer;"));
     const toggle = browserSwitch()!;
     expect(toggle.checked).toBe(false);
     toggle.onClick!({} as never);

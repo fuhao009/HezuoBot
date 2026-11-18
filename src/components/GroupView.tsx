@@ -1130,7 +1130,6 @@ export function GroupView({ group }: { group: Group }) {
                   state={toolInFlight && !awaited ? "working" : "thinking"}
                   size={36}
                   forward={false}
-                  lookAround={1}
                   trackPointer={false}
                 />
               }

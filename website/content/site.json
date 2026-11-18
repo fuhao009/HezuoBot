@@ -1,0 +1,72 @@
+{
+  "title": "HezuoBot",
+  "description": "住在你电脑里的 AI 同事 你开口 Bot 动手",
+  "url": "",
+  "lang": "zh-CN",
+  "brand": "HezuoBot",
+  "nav": [
+    {
+      "label": "Bot",
+      "href": "#bots"
+    },
+    {
+      "label": "能力",
+      "href": "#hands"
+    },
+    {
+      "label": "本机",
+      "href": "#local"
+    },
+    {
+      "label": "价格",
+      "href": "#pricing"
+    }
+  ],
+  "navCta": {
+    "login": "登录",
+    "download": "下载",
+    "href": "#download"
+  },
+  "links": {
+    "login": "",
+    "mac": "",
+    "windows": "",
+    "linux": "",
+    "upgrade": "",
+    "contact": ""
+  },
+  "sections": [
+    "hero",
+    "roster",
+    "hands",
+    "always",
+    "local",
+    "pricing",
+    "download"
+  ],
+  "footer": {
+    "links": [
+      {
+        "label": "文档",
+        "href": ""
+      },
+      {
+        "label": "更新日志",
+        "href": ""
+      },
+      {
+        "label": "隐私政策",
+        "href": ""
+      },
+      {
+        "label": "服务条款",
+        "href": ""
+      },
+      {
+        "label": "联系我们",
+        "href": ""
+      }
+    ],
+    "legal": "© 2026 HezuoBot"
+  }
+}

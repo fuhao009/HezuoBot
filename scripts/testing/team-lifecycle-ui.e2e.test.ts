@@ -79,7 +79,7 @@ if (!enabled) console.log("skipping team lifecycle UI e2e: set OMB_UI_E2E=1 to i
     const a = (await control("new-bot", "--name", "Researcher", "--section", "Research") as any).bot;
     const b = (await control("new-bot", "--name", "Engineer", "--section", "Engineering") as any).bot;
 
-    await click("New or share");
+    await click("New");
     await click("Create department");
     await type("Department name", "Delivery");
     await click("Create department");

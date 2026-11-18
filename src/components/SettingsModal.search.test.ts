@@ -69,13 +69,9 @@ describe("Settings search in Simple mode", () => {
     expect(search().value).toBe("f");
   });
 
-  it("lists a builder control as Advanced and, when chosen, opens General at the Advanced mode row", () => {
+  it("never points at Advanced mode for a builder control", () => {
     type("font");
-    const result = host.querySelector<HTMLButtonElement>('[data-settings-advanced-only="settings.font.title"]')!;
-    expect(result.textContent).toBe("Interface font · Advanced");
-    flushSync(() => result.click());
-    expect(fixture.dispatch).toHaveBeenCalledWith({ type: "toggleAppSettings", open: true, section: "general" });
-    expect(scrolled.map((element) => element.getAttribute("data-settings-block"))).toContain("advanced-mode");
-    expect(search().value).toBe("");
+    expect(host.querySelector("[data-settings-advanced-only]")).toBeNull();
+    expect(dialog().textContent).not.toContain("Advanced");
   });
 });

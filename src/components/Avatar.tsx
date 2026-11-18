@@ -9,17 +9,12 @@ import {
   type ReactNode,
 } from "react";
 import { cn } from "@/lib/cn";
-import { CHROME_EYES, CHROME_GRADIENT, HEZUO_COLORS, type HezuoColor, type HezuoMotion, type HezuoState } from "@/lib/mascot";
-import { CursorAvatar, type CursorAvatarHandle } from "./CursorAvatar";
+import { CHROME_EYES, HEZUO_GRADIENTS, type HezuoColor, type HezuoMotion, type HezuoState } from "@/lib/mascot";
+import { BotFigure, type BotFigureHandle } from "./BotFigure";
 import { avatarCropRadius, botAvatarProfile, clampAvatarFocus, clampAvatarZoom, mascotFaceInk, type BotAvatarCrop, type MascotFaceColor } from "../../shared/bot-avatar";
 import { MASCOT_BODIES, botMascotBody } from "../../shared/mascot-bodies";
-import { isHalloweenBody, type BotBodyId } from "../../shared/bot-body";
-import { useHalloweenDressed, wornBody } from "@/lib/halloween-dress";
-import { CarvedAvatar } from "./CarvedAvatar";
-import { steelBodyImage } from "@/lib/steel-body";
-
-export const EYE_SCALE = 1.12;
-export const MOUTH_WEIGHT = 11;
+import { bodyOfBot, isHalloweenBody, type BotBodyId } from "../../shared/bot-body";
+import { HALLOWEEN_BODIES } from "../../shared/halloween-bodies";
 
 const POINTER_GAZE = { forward: 1, authored: 0.25 };
 
@@ -45,24 +40,7 @@ const MOTION_FACE: MotionFaces = {
 
 const MOTION_FACE_MS = 1400;
 
-function mix(hex: string, toward: string, t: number): string {
-  const a = Number.parseInt(hex.slice(1), 16);
-  const b = Number.parseInt(toward.slice(1), 16);
-  const channel = (shift: number) => {
-    const va = (a >> shift) & 0xff;
-    const vb = (b >> shift) & 0xff;
-    return Math.round(va + (vb - va) * t);
-  };
-  return `#${[channel(16), channel(8), channel(0)]
-    .map((part) => part.toString(16).padStart(2, "0"))
-    .join("")}`;
-}
-
-const gradientFor = (color: HezuoColor): [string, string, string] => {
-  if (color === "chrome") return CHROME_GRADIENT;
-  const fill = HEZUO_COLORS[color] ?? HEZUO_COLORS.green;
-  return [mix(fill, "#ffffff", 0.55), fill, mix(fill, "#000000", 0.42)];
-};
+const gradientFor = (color: HezuoColor): [string, string, string] => HEZUO_GRADIENTS[color] ?? HEZUO_GRADIENTS.green;
 
 export function roomAvatarGradient(color: HezuoColor): [string, string, string] {
   const fill = `var(--identity-${color})`;
@@ -73,24 +51,17 @@ export function roomAvatarGradient(color: HezuoColor): [string, string, string] 
   ];
 }
 
-export type HezuoAvatarHandle = CursorAvatarHandle;
+export type HezuoAvatarHandle = BotFigureHandle;
 
 export type HezuoAvatarProps = {
   color: HezuoColor;
   state?: HezuoState;
-  expression?: number;
   size?: number;
   label?: string;
   motion?: HezuoMotion;
   motionKey?: number;
-  turn?: number;
   gaze?: { x?: number; y?: number };
-  spring?: number;
-  eyeScale?: number;
-  showMouth?: boolean;
-  mouthStroke?: number;
   forward?: boolean;
-  lookAround?: number;
   trackPointer?: boolean;
   animated?: boolean;
   bodyId?: BotBodyId;
@@ -98,46 +69,16 @@ export type HezuoAvatarProps = {
   faceColor?: MascotFaceColor | null;
 };
 
-function HezuoAvatarComponent(props: HezuoAvatarProps, ref: React.Ref<HezuoAvatarHandle>) {
-  const { bodyId, color, size, state, motion, motionKey, gaze, trackPointer, animated, label } = props;
-  if (isHalloweenBody(bodyId)) {
-    return (
-      <CarvedAvatar
-        ref={ref}
-        body={bodyId}
-        color={color}
-        faceColor={props.faceColor}
-        size={size}
-        state={state}
-        motion={motion}
-        motionKey={motionKey}
-        gaze={gaze}
-        trackPointer={trackPointer}
-        animated={animated}
-        label={label}
-      />
-    );
-  }
-  return <GradientAvatar ref={ref} {...props} />;
-}
-
-function GradientAvatarComponent(
+function HezuoAvatarComponent(
   {
     color,
     state = "idle",
-    expression,
     size = 44,
     label,
     motion = "none",
     motionKey = 0,
-    turn,
     gaze,
-    spring,
-    eyeScale,
-    showMouth,
-    mouthStroke,
     forward = true,
-    lookAround,
     trackPointer = true,
     animated = true,
     bodyId,
@@ -146,14 +87,12 @@ function GradientAvatarComponent(
   }: HezuoAvatarProps,
   ref: React.Ref<HezuoAvatarHandle>,
 ) {
-  const silhouette = MASCOT_BODIES[botMascotBody(bodyId)];
-  const chrome = color === "chrome";
+  const shape = isHalloweenBody(bodyId) ? HALLOWEEN_BODIES[bodyId].shape : MASCOT_BODIES[botMascotBody(bodyId)].shape;
   const faceInk = mascotFaceInk(faceColor);
-  const inner = useRef<CursorAvatarHandle>(null);
+  const inner = useRef<BotFigureHandle>(null);
   useImperativeHandle(ref, () => ({
     blink: () => inner.current?.blink(),
     spin: (durationMs?: number) => inner.current?.spin(durationMs),
-    setExpression: (index: number) => inner.current?.setExpression(index),
   }));
 
   const [motionState, setMotionState] = useState<HezuoState | null>(null);
@@ -187,36 +126,27 @@ function GradientAvatarComponent(
       onPointerMove={trackPointer && animated ? onPointerMove : undefined}
       onPointerLeave={trackPointer && animated ? onPointerLeave : undefined}
     >
-      <CursorAvatar
+      <BotFigure
         ref={inner}
         state={motionState ?? state}
-        expression={expression}
         size={size}
-        silhouette={silhouette}
+        shape={shape}
         gradient={gradient ?? gradientFor(color)}
-        picture={chrome && !faceInk ? steelBodyImage(silhouette.id, size, globalThis.devicePixelRatio ?? 1) : null}
-        eyeColor={faceInk ?? (chrome ? CHROME_EYES : undefined)}
+        eyeColor={faceInk ?? (color === "chrome" ? CHROME_EYES : undefined)}
         title={label ?? null}
-        lookAround={lookAround ?? (forward ? 0 : 1)}
         gaze={{ x: (gaze?.x ?? 0) + pointer.x, y: (gaze?.y ?? 0) + pointer.y }}
-        turn={turn}
-        spring={spring}
-        eyeScale={eyeScale}
-        showMouth={showMouth}
-        mouthStroke={mouthStroke}
         paused={!animated}
       />
     </span>
   );
 }
 
-const GradientAvatar = forwardRef(GradientAvatarComponent);
-
 export const HezuoAvatar = memo(forwardRef(HezuoAvatarComponent));
 
 export type BotAvatarProps = Omit<HezuoAvatarProps, "color" | "gradient"> & {
   readable?: boolean;
   bot: {
+    id?: string;
     name?: string;
     color: HezuoColor;
     avatarUrl?: string | null;
@@ -246,7 +176,6 @@ export function resolveBotAvatarOutcome(params: {
 
 export function BotAvatar({ bot, size = 44, label, readable = false, ...mascotProps }: BotAvatarProps) {
   const profile = botAvatarProfile(bot);
-  const dressed = useHalloweenDressed();
   const [imageFailed, setImageFailed] = useState(false);
 
   useEffect(() => setImageFailed(false), [profile.avatarUrl]);
@@ -260,7 +189,7 @@ export function BotAvatar({ bot, size = 44, label, readable = false, ...mascotPr
   if (outcome !== "flatImage") {
     return (
       <HezuoAvatar
-        bodyId={wornBody(bot.mascotBody, bot.color, dressed)}
+        bodyId={bodyOfBot(bot)}
         {...mascotProps}
         color={bot.color}
         faceColor={bot.mascotFaceColor}

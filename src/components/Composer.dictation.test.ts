@@ -5,6 +5,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Bot } from "@/state/store";
 import { restoreComposerDraft } from "@/lib/drafts";
+import { setAdvancedMode } from "@/lib/interface-mode";
 import { t } from "@/lib/i18n";
 
 const fixture = vi.hoisted(() => ({ dispatch: vi.fn() }));
@@ -53,6 +54,7 @@ describe("native dictation in the real composer", () => {
   const hear = (text: string) => flushSync(() => transcript({ text, partial: true }));
 
   beforeEach(() => {
+    setAdvancedMode(true);
     vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} });
     vi.spyOn(HTMLElement.prototype, "scrollIntoView").mockImplementation(() => {});
     speechStop = vi.fn().mockResolvedValue(undefined);
@@ -72,6 +74,7 @@ describe("native dictation in the real composer", () => {
   });
 
   afterEach(() => {
+    setAdvancedMode(false);
     flushSync(() => root.unmount());
     container.remove();
     restoreComposerDraft(draftId, { text: "", attachments: [] });

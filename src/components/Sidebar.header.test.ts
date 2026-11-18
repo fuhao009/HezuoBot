@@ -60,7 +60,7 @@ describe("sidebar header", () => {
     fixture.density = density;
     const html = render();
     expect(html).toContain('aria-label="Active Threads"');
-    expect(html).toContain('aria-label="New or share"');
+    expect(html).toContain('aria-label="New"');
     expect(html).not.toMatch(collapse);
   });
 
@@ -69,7 +69,7 @@ describe("sidebar header", () => {
     fixture.density = density;
     const html = render();
     expect(html).not.toContain('aria-label="Active Threads"');
-    expect(html).toContain('aria-label="New or share"');
+    expect(html).toContain('aria-label="New"');
     expect(html).not.toMatch(collapse);
     expect(html, "the edge that is dragged, open or as avatars, so the avatars are never a dead end").toMatch(/role="separator" aria-label="Resize sidebar"/);
   });
@@ -83,7 +83,7 @@ describe("sidebar top row", () => {
   });
   const topRow = (html: string) => {
     const start = html.indexOf("data-sidebar-top-row");
-    const end = html.indexOf('aria-label="New or share"');
+    const end = html.indexOf('aria-label="New"');
     expect(start).toBeGreaterThan(-1);
     expect(end).toBeGreaterThan(start);
     return html.slice(start, end);
@@ -126,12 +126,12 @@ describe("sidebar top row", () => {
     expect(row).toMatch(/aria-label="Switch server: Servers"[^>]*title="Servers"[^>]*class="[^"]*\bh-7\b[^"]*\boverflow-hidden\b[^"]*\btext-\[13px\][^"]*" style="-webkit-app-region:no-drag"/);
     expect(row).toContain('<span class="min-w-0 truncate @max-[96px]/sidebar-top:hidden">Servers</span>');
     expect(row).toContain("focus-visible:outline-2");
-    expect(html).toContain('title="New or share"');
+    expect(html).toContain('title="New"');
     expect(row).toContain('title="Active Threads"');
     expect(html.match(/Switch server:/g)).toHaveLength(1);
   });
 
-  it.each(["mac-inset", "win-caption"] as const)("in Simple mode on %s keeps only the top corner: plain search and + at its right end, no drag region, no server pill, nothing on the edge", (windowChrome) => {
+  it.each(["mac-inset", "win-caption"] as const)("in Simple mode on %s keeps only the top corner: + alone at its right end, no search, no drag region, no server pill, nothing on the edge", (windowChrome) => {
     fixture.advanced = false;
     fixture.windowChrome = windowChrome;
     desktop();
@@ -145,10 +145,11 @@ describe("sidebar top row", () => {
     expect(lights).toBe(-1);
     expect(buttons).toBeGreaterThan(slot);
     expect(classesOf(row, "data-sidebar-top-buttons")).toEqual(expect.arrayContaining(["shrink-0", "pointer-events-auto"]));
-    expect(row.slice(buttons).match(/<button/g)).toHaveLength(2);
-    expect(row).toMatch(/data-sidebar-search-toggle="true" aria-label="Search bots and messages" aria-expanded="false" title="Search bots and messages" class="[^"]*\bsize-\[26px\][^"]*\brounded-lg\b[^"]*\btext-ink-secondary\b/);
-    expect(row, "no round box round either").not.toContain("bg-composer");
-    expect(html).toMatch(/aria-label="New or share" class="[^"]*\bsize-\[26px\][^"]*\brounded-lg\b/);
+    expect(row.slice(buttons).match(/<button/g)).toHaveLength(1);
+    expect(html).not.toContain("data-sidebar-search-toggle");
+    expect(html).not.toContain('aria-label="Search bots and messages"');
+    expect(row, "no round box round it").not.toContain("bg-composer");
+    expect(html).toMatch(/aria-label="New" class="[^"]*\bsize-\[26px\][^"]*\brounded-lg\b/);
     expect(html).not.toContain("data-sidebar-edge-toggle");
     expect(html).not.toContain('title="Active Threads"');
     expect(html).not.toContain("data-sidebar-search-pill");
@@ -209,7 +210,7 @@ describe("sidebar top row", () => {
     expect(buttons).toBeGreaterThan(spacer);
   });
 
-  it("collapses Simple mode to a rail: round search and + on top (the frame's top bar holds the lights), nothing on the edge, and Apps and the account at the foot", () => {
+  it("collapses Simple mode to a rail: round + alone on top (the frame's top bar holds the lights), nothing on the edge, and the account alone at the foot", () => {
     fixture.advanced = false;
     fixture.density = "icons";
     fixture.windowChrome = "mac-inset";
@@ -219,28 +220,20 @@ describe("sidebar top row", () => {
     expect(top).not.toContain("data-traffic-light-space");
     expect(top).not.toContain("data-sidebar-top-buttons");
     expect(top).not.toContain("data-workspace-switcher");
-    expect(top.indexOf('aria-label="Search bots and messages"')).toBeLessThan(top.indexOf('aria-label="New or share"'));
     expect(top).toMatch(/data-sidebar-rail-top="true" class="flex flex-col items-center gap-2 pt-1"/);
-    expect(top).toMatch(/aria-label="New or share" class="[^"]*\bsize-9\b[^"]*\brounded-full\b/);
+    expect(top.slice(top.indexOf("data-sidebar-rail-top")).match(/<button/g)).toHaveLength(1);
+    expect(top).toMatch(/aria-label="New" class="[^"]*\bsize-9\b[^"]*\brounded-full\b/);
     const foot = html.slice(html.indexOf("data-sidebar-rail-footer"));
-    const at = (marker: string) => {
-      const index = foot.indexOf(marker);
-      expect(index, marker).toBeGreaterThan(-1);
-      return index;
-    };
     expect(html).not.toContain("data-sidebar-edge-toggle");
+    expect(html).not.toMatch(/<button[^>]*aria-label="Search bots and messages"/);
     expect(foot).not.toContain('aria-label="Search bots and messages"');
-    const positions = [
-      at('data-sidebar-nav="apps"'),
-      at("data-sidebar-account"),
-    ];
-    expect(positions).toEqual([...positions].sort((a, b) => a - b));
-    expect(foot).toMatch(/data-tour="nav-apps" data-sidebar-nav="apps"[^>]*aria-label="Connect apps"[^>]*class="[^"]*\bsize-9\b[^"]*"><svg[^>]*lucide-puzzle/);
+    expect(foot).toContain("data-sidebar-account");
+    expect(html).not.toContain('data-sidebar-nav="apps"');
     expect(foot).not.toContain("data-workspace-switcher");
     expect(foot).not.toContain('data-sidebar-nav="automations"');
     expect(foot).not.toContain('data-sidebar-nav="team-map"');
     expect(html).not.toContain("Switch server:");
-    expect(html.match(/aria-label="New or share"/g)).toHaveLength(1);
+    expect(html.match(/aria-label="New"/g)).toHaveLength(1);
   });
 
   it("stacks the icons rail unchanged and keeps the icon-only switcher beneath it", () => {
@@ -261,7 +254,7 @@ describe("sidebar top row", () => {
 describe("the button that hides and shows the window's rail of places", () => {
   const row = () => {
     const html = render();
-    return html.slice(html.indexOf("data-sidebar-top-row"), html.indexOf('aria-label="New or share"'));
+    return html.slice(html.indexOf("data-sidebar-top-row"), html.indexOf('aria-label="New"'));
   };
   const toggle = (html: string) => /<button type="button" data-rail-toggle="true"[^>]*>/.exec(html)?.[0] ?? "";
   beforeEach(() => {
@@ -351,18 +344,15 @@ describe("sidebar head and foot", () => {
 });
 
 describe("sidebar foot in Simple mode", () => {
-  it("puts the account avatar then the Connect apps pill in the foot, with Automations and Team map in the account menu", () => {
+  it("puts the account avatar in the foot, with no Automations, Team map or Connect apps beside it", () => {
     fixture.advanced = false;
     const html = render();
     const foot = html.slice(html.indexOf('data-glass-bar="bottom"'));
     expect(foot).toContain('data-sidebar-footer="simple"');
-    expect(html).not.toContain('data-sidebar-nav="automations"');
-    expect(html).not.toContain('data-sidebar-nav="team-map"');
-    expect(html.match(/data-sidebar-nav="apps"/g)).toHaveLength(1);
-    expect(foot.indexOf("data-sidebar-account")).toBeGreaterThan(-1);
-    expect(foot.indexOf("data-sidebar-account")).toBeLessThan(foot.indexOf('data-sidebar-nav="apps"'));
-    expect(foot).toMatch(/data-tour="nav-apps" data-sidebar-nav="apps"[^>]*>(<[^>]*>)*Connect apps</);
-    expect(foot.match(/data-app-face="/g)).toHaveLength(3);
+    expect(foot).toContain("data-sidebar-account");
+    for (const nav of ["automations", "team-map", "apps"]) expect(html, nav).not.toContain(`data-sidebar-nav="${nav}"`);
+    expect(html).not.toContain("Connect apps");
+    expect(html).not.toContain("data-app-face=");
   });
 
   it("keeps one Automations row in the foot and no Routines row in Advanced mode, and still one Apps", () => {

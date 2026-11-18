@@ -77,7 +77,8 @@ describe("the room header in Simple mode", () => {
   it("shows only the room's name and up to three faces with +N", () => {
     const markup = view(room());
     const head = header(markup);
-    expect(shown(head)).toEqual(["members"]);
+    expect(shown(head)).toEqual([]);
+    expect(head).toContain("data-room-faces=");
     expect(head).toContain("data-room-name=");
     expect(head).toContain('aria-label="Open settings for Desk HQ"');
     expect(head).toContain("The recruiting desk");
@@ -147,12 +148,17 @@ describe("the Simple header's buttons", () => {
     host.remove();
   });
 
-  it("opens the Room panel from the room's name, and Manage members from the faces", () => {
+  it("opens the Room panel from the room's name and from the faces, never Manage members", async () => {
+    const { closeRoomPanel } = await import("@/lib/room-panel");
     draw();
     flushSync(() => host.querySelector<HTMLButtonElement>("[data-room-name]")!.click());
     expect(opened.id).toBe("desk");
+    flushSync(() => closeRoomPanel());
+    expect(opened.id).toBeNull();
     flushSync(() => host.querySelector<HTMLButtonElement>("[data-room-faces]")!.click());
-    expect(onOpenMembers).toHaveBeenCalledTimes(1);
+    expect(opened.id).toBe("desk");
+    expect(onOpenMembers).not.toHaveBeenCalled();
+    flushSync(() => closeRoomPanel());
   });
 
   it("cuts both buttons out of the window's drag region", () => {

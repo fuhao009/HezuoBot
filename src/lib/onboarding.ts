@@ -92,10 +92,8 @@ export type BeatId = "meet" | "chief";
 /** Every screen the first run can show, in the order it shows them. */
 export const BEAT_ORDER: readonly BeatId[] = ["meet", "chief"];
 
-/** Two screens, then the chat: meeting the app (and connecting an AI when none works), then the Chief of Staff. A hosted
- * place's admin only meets the app: their team's bots and Chief are already set up. */
-export function beatsFor(options: { hosted?: boolean }): BeatId[] {
-  return options.hosted ? ["meet"] : ["meet", "chief"];
+export function beatsFor(): BeatId[] {
+  return ["meet"];
 }
 
 /** Where a reloaded first run opens: the saved screen while it is offered, else the first. */

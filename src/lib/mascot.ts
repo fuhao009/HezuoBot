@@ -1,4 +1,4 @@
-import { CURSOR_STATES, type CursorState } from "@/components/CursorAvatar";
+import { BOT_STATES, type BotState } from "@/components/bot-states";
 import { botShowsUnread } from "./bot-unread";
 import { lastNonReceipt } from "./receipts";
 import type { HezuoColor } from "../../shared/wire";
@@ -6,10 +6,9 @@ import type { LocaleKey } from "@/locales";
 
 export { HEZUO_COLOR_NAMES, type HezuoColor } from "../../shared/wire";
 
-export type HezuoState = CursorState;
-export const HEZUO_STATES = CURSOR_STATES;
+export type HezuoState = BotState;
+export const HEZUO_STATES = BOT_STATES;
 
-/** CursorAvatar ships French group labels; these mirror its STATE_GROUPS memberships exactly. */
 export const STATE_GROUPS = {
   Lifecycle: ["sleeping", "waking", "idle", "listening", "thinking", "searching", "working"],
   Reactions: [
@@ -73,10 +72,26 @@ export const HEZUO_COLOR_LABEL = {
 export const CHROME_GRADIENT: [string, string, string] = ["#F1F4F7", "#AEB8C3", "#66717E"];
 export const CHROME_EYES = "#1E2833";
 
+/** Light, base and dark stops of a figure's body. */
+export const HEZUO_GRADIENTS = {
+  green: ["#c8f8da", "#3fd086", "#0e9160"],
+  blue: ["#c3daff", "#5b95ff", "#2a5ce0"],
+  red: ["#ffd3d0", "#ff7a72", "#d83a48"],
+  orange: ["#ffe5bd", "#ffa246", "#e36f18"],
+  purple: ["#e5daff", "#a383f7", "#6f45d8"],
+  cyan: ["#b9fff3", "#3fdcf2", "#1290cc"],
+  pink: ["#ffdaec", "#f67cba", "#cc3a88"],
+  yellow: ["#fff1b8", "#ffcf40", "#e09a12"],
+  teal: ["#bff7ea", "#35d0b8", "#0c9285"],
+  coral: ["#ffdccf", "#ff8f6b", "#e0552f"],
+  silver: ["#f3f5f8", "#b9c0ca", "#7d8792"],
+  chrome: CHROME_GRADIENT,
+} satisfies Record<HezuoColor, [string, string, string]>;
+
 export function colorSwatch(color: HezuoColor): string {
-  if (color !== "chrome") return HEZUO_COLORS[color];
-  const [light, mid, edge] = CHROME_GRADIENT;
-  return `radial-gradient(circle at 34% 26%, #ffffff 0%, ${light} 20%, ${mid} 55%, ${edge} 100%)`;
+  const [light, mid, edge] = HEZUO_GRADIENTS[color];
+  if (color === "chrome") return `radial-gradient(circle at 34% 26%, #ffffff 0%, ${light} 20%, ${mid} 55%, ${edge} 100%)`;
+  return `linear-gradient(210deg, ${light}, ${mid} 45%, ${edge})`;
 }
 
 export const HEZUO_MOTIONS = [

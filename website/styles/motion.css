@@ -1,0 +1,50 @@
+:root{--ease:cubic-bezier(.16,1,.3,1)}
+
+body,header,.tile,.plan,.bot-card,.picker,.perm,.gate-box,.browser,.seg{transition:background-color .4s ease,color .4s ease,border-color .4s ease}
+.btn{transition:background-color .2s,color .2s,border-color .2s,scale .2s var(--ease)}
+.btn:active,.ask-actions button:active{scale:.97}
+.seg button,.bot-card,.pick-row button{transition:background-color .2s,box-shadow .2s}
+
+@keyframes rise{from{opacity:0;translate:0 24px}}
+@keyframes appear{from{opacity:0}}
+.motion .hero h1{animation:rise 1s var(--ease) both}
+.motion .hero .sub{animation:rise 1s var(--ease) .12s both}
+.motion .hero .cta{animation:rise 1s var(--ease) .24s both}
+.motion .hero .window{animation:rise 1.2s var(--ease) .4s both;scale:calc(.94 + .06*var(--p,1));transform-origin:50% 0}
+
+.motion .scene:not(.play) .step{opacity:0}
+.motion .scene.play .step{animation:rise .6s var(--ease) both;animation-delay:calc(var(--i)*1.1s + 1.2s)}
+@keyframes work{0%{rotate:0turn}0%,85%{background-color:transparent;border-color:var(--win-3);border-top-color:#fff}85%,100%{rotate:2turn}}
+.motion .scene.play .tick{animation:work 1.1s linear both;animation-delay:calc(var(--i)*1.1s + 1.2s)}
+.motion .scene.play .tick::after,.motion .scene.play .work em{animation:appear .3s both;animation-delay:calc(var(--i)*1.1s + 2.2s)}
+
+@keyframes ptr{0%,5%{translate:330px 30px}12%,26%{translate:150px 66px}32%,46%{translate:120px 145px}52%,66%{translate:170px 224px}74%,100%{translate:104px 292px}}
+@keyframes t1{0%,13%{clip-path:inset(0 100% 0 0)}24%,97%{clip-path:inset(0)}100%{clip-path:inset(0 100% 0 0)}}
+@keyframes t2{0%,33%{clip-path:inset(0 100% 0 0)}44%,97%{clip-path:inset(0)}100%{clip-path:inset(0 100% 0 0)}}
+@keyframes t3{0%,53%{clip-path:inset(0 100% 0 0)}64%,97%{clip-path:inset(0)}100%{clip-path:inset(0 100% 0 0)}}
+@keyframes press{0%,76%{scale:1;background-color:var(--accent)}79%{scale:.93}82%,97%{scale:1;background-color:var(--ok)}100%{background-color:var(--accent)}}
+.motion .browser.play .pointer{animation:ptr 8s var(--ease) infinite}
+.motion .browser.play .t1{animation:t1 8s linear infinite}
+.motion .browser.play .t2{animation:t2 8s linear infinite}
+.motion .browser.play .t3{animation:t3 8s linear infinite}
+.motion .browser.play .b-submit{animation:press 8s linear infinite}
+
+@keyframes sweep{0%{scale:0 1}80%,96%{scale:1 1}100%{scale:0 1}}
+@keyframes lit1{0%,15%{opacity:.25}18%,96%{opacity:1}100%{opacity:.25}}
+@keyframes lit2{0%,39%{opacity:.25}42%,96%{opacity:1}100%{opacity:.25}}
+@keyframes lit3{0%,63%{opacity:.25}66%,96%{opacity:1}100%{opacity:.25}}
+.motion .night.play .fill{animation:sweep 9s linear infinite}
+.motion .night.play .r1{animation:lit1 9s linear infinite}
+.motion .night.play .r2{animation:lit2 9s linear infinite}
+.motion .night.play .r3{animation:lit3 9s linear infinite}
+
+@keyframes travel{0%{left:0;opacity:0}15%,85%{opacity:1}100%{left:100%;opacity:0}}
+@keyframes travel-down{0%{top:0;opacity:0}15%,85%{opacity:1}100%{top:100%;opacity:0}}
+.motion .local.play .wire i{display:block;animation:travel 2.6s linear infinite}
+.motion .local.play .wire i+i{animation-delay:1.3s}
+@media(max-width:860px){.motion .local.play .wire i{animation-name:travel-down}}
+
+@keyframes pulse{50%{opacity:.3}}
+.motion .live:not(.idle) i{animation:pulse 1.6s ease-in-out infinite}
+.motion header{border-bottom-color:transparent}
+.motion header.scrolled{border-bottom-color:var(--nav-line)}
